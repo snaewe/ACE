@@ -19,7 +19,9 @@
 #include "helper.h"
 #include "bd_string.h"
 
-ACE_RCSID(Param_Test, bd_string, "$Id$")
+ACE_RCSID (Param_Test, 
+           bd_string, 
+           "$Id$")
 
 // ************************************************************************
 //               Test_Bounded_String
@@ -54,13 +56,44 @@ Test_Bounded_String::opname (void) const
   return this->opname_;
 }
 
+void
+Test_Bounded_String::dii_req_invoke (CORBA::Request *req
+                                     ACE_ENV_ARG_DECL)
+{
+  req->add_in_arg ("s1") <<= CORBA::Any::from_string (this->in_, 128);
+  req->add_inout_arg ("s2") <<= CORBA::Any::from_string (this->inout_, 128);
+  req->add_out_arg ("s3") <<= CORBA::Any::from_string (this->out_, 128);
+
+  // The Any arg manages its memory but this class member does not.
+  CORBA::string_free (this->inout_);
+
+  req->set_return_type (Param_Test::_tc_short_string);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  char *tmp;
+  req->return_value () >>= CORBA::Any::to_string (tmp, 128);
+  this->ret_ = CORBA::string_dup (tmp);
+
+  CORBA::NamedValue_ptr arg2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *arg2->value () >>= CORBA::Any::to_string (tmp, 128);
+  this->inout_ = CORBA::string_dup (tmp);
+
+  CORBA::NamedValue_ptr arg3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *arg3->value () >>= CORBA::Any::to_string (tmp, 128);
+  this->out_ = CORBA::string_dup (tmp);
+}
+
 int
-Test_Bounded_String::init_parameters (Param_Test_ptr objref,
-				      CORBA::Environment &env)
+Test_Bounded_String::init_parameters (Param_Test_ptr
+                                      ACE_ENV_ARG_DECL_NOT_USED)
 {
   Generator *gen = GENERATOR::instance (); // value generator
-  ACE_UNUSED_ARG (objref);
-  ACE_UNUSED_ARG (env);
 
   // release any previously occupied values
   CORBA::string_free (this->in_);
@@ -81,6 +114,9 @@ int
 Test_Bounded_String::reset_parameters (void)
 {
   // release any previously occupied values
+  CORBA::string_free (this->inout_);
+  CORBA::string_free (this->out_);
+  CORBA::string_free (this->ret_);
   this->inout_ = 0;
   this->out_ = 0;
   this->ret_ = 0;
@@ -90,57 +126,29 @@ Test_Bounded_String::reset_parameters (void)
 }
 
 int
-Test_Bounded_String::run_sii_test (Param_Test_ptr objref,
-				   CORBA::Environment &env)
+Test_Bounded_String::run_sii_test (Param_Test_ptr objref
+                                   ACE_ENV_ARG_DECL)
 {
-  CORBA::String_out str_out (this->out_);
-  this->ret_ = objref->test_unbounded_string (this->in_,
-                                              this->inout_,
-                                              str_out,
-                                              env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      CORBA::String_out str_out (this->out_);
 
-int
-Test_Bounded_String::add_args (CORBA::NVList_ptr param_list,
-			       CORBA::NVList_ptr retval,
-			       CORBA::Environment &env)
-{
-  // create the parameters
-  CORBA::Any in_arg (CORBA::_tc_string,
-                     &this->in_,
-                     CORBA::B_FALSE);
+      this->ret_ = objref->test_bounded_string (this->in_,
+                                                this->inout_,
+                                                str_out
+                                                ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-  CORBA::Any inout_arg (CORBA::_tc_string,
-                        &this->inout_,
-                        CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_Bounded_String::run_sii_test\n");
 
-  CORBA::Any out_arg (CORBA::_tc_string,
-                      &this->out_,
-                      CORBA::B_FALSE);
-
-  // add parameters
-  param_list->add_value ("s1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("s2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("s3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // add return value
-  retval->item (0, env)->value ()->replace (CORBA::_tc_string,
-                                            &this->ret_,
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
@@ -159,9 +167,10 @@ Test_Bounded_String::check_validity (void)
 }
 
 CORBA::Boolean
-Test_Bounded_String::check_validity (CORBA::Request_ptr req)
+Test_Bounded_String::check_validity (CORBA::Request_ptr)
 {
-  ACE_UNUSED_ARG (req);
+  // No need to retrieve anything because, for all the args and
+  // the return, we provided the memory and we own it.
   return this->check_validity ();
 }
 
@@ -184,4 +193,3 @@ Test_Bounded_String::print_values (void)
               (this->ret_ ? ACE_OS::strlen (this->ret_):0),
               (this->ret_ ? this->ret_:"<nul string>")));
 }
-

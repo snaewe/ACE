@@ -45,17 +45,29 @@
 //
 // ============================================================================
 
-#if !defined (PEER_H)
+#ifndef PEER_H
 #define PEER_H
 
 #include "ace/Service_Config.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Acceptor.h"
-#include "ace/Connector.h"
 #include "ace/SOCK_Acceptor.h"
 #include "ace/SOCK_Connector.h"
+#include "ace/Svc_Handler.h"
+#include "ace/Connector.h"
+#include "ace/Null_Condition.h"
+#include "ace/Null_Mutex.h"
 #include "Options.h"
 
 ACE_SVC_FACTORY_DECLARE (Peer_Factory)
+
+#if defined ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION_EXPORT
+template class ACE_Svc_Export ACE_Svc_Handler<ACE_SOCK_STREAM, ACE_NULL_SYNCH>;
+#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION_EXPORT */
 
 class ACE_Svc_Export Peer_Handler : public ACE_Svc_Handler<ACE_SOCK_STREAM, ACE_NULL_SYNCH>
 {
@@ -135,7 +147,15 @@ protected:
 
   size_t total_bytes_;
   // The total number of bytes sent/received to the gatewayd thus far.
+
+  int first_time_;
+  // Used to call register_stdin_handle only once.  Otherwise, thread
+  // leak will occur on Win32.
 };
+
+#if defined ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION_EXPORT
+template class ACE_Svc_Export ACE_Acceptor<Peer_Handler, ACE_SOCK_ACCEPTOR>;
+#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION_EXPORT */
 
 class ACE_Svc_Export Peer_Acceptor : public ACE_Acceptor<Peer_Handler, ACE_SOCK_ACCEPTOR>
 {
@@ -148,7 +168,7 @@ public:
   Peer_Acceptor (void);
   // Default initialization.
 
-  int open (u_short);
+  int start (u_short);
   //  the <Peer_Acceptor>.
 
   int close (void);
@@ -169,6 +189,10 @@ private:
 
   typedef ACE_Acceptor<Peer_Handler, ACE_SOCK_ACCEPTOR> inherited;
 };
+
+#if defined ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION_EXPORT
+template class ACE_Svc_Export ACE_Connector<Peer_Handler, ACE_SOCK_CONNECTOR>;
+#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION_EXPORT */
 
 class ACE_Svc_Export Peer_Connector : public ACE_Connector<Peer_Handler, ACE_SOCK_CONNECTOR>
 {
@@ -203,13 +227,13 @@ class ACE_Svc_Export Peer_Factory : public ACE_Service_Object
 public:
   // = Dynamic initialization and termination hooks from <ACE_Service_Object>.
 
-  virtual int init (int argc, char *argv[]);
+  virtual int init (int argc, ACE_TCHAR *argv[]);
   // Initialize the acceptor and connector.
 
   virtual int fini (void);
   // Perform termination activities.
 
-  virtual int info (char **, size_t) const;
+  virtual int info (ACE_TCHAR **, size_t) const;
   // Return info about this service.
 
   virtual int handle_signal (int signum, siginfo_t *, ucontext_t *);

@@ -6,19 +6,24 @@
 //
 // = LIBRARY
 //    apps
-// 
+//
 // = FILENAME
 //    HTTP_Helpers.h
 //
 // = AUTHOR
 //    James Hu
-// 
+//
 // ============================================================================
 
-#if !defined (HTTP_HELPERS_H)
+#ifndef HTTP_HELPERS_H
 #define HTTP_HELPERS_H
 
-#include "ace/Synch.h"
+#include "ace/Synch_Traits.h"
+#include "ace/Thread_Mutex.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 class HTTP_Helper
 // Static functions to enhance the lives of HTTP programmers everywhere.
@@ -68,7 +73,7 @@ public:
   static const char **instance (void);
   // Singleton access point.
 
-  enum STATUS_CODE 
+  enum STATUS_CODE
   {
     STATUS_OK = 200,
     STATUS_CREATED = 201,
@@ -88,7 +93,7 @@ public:
     STATUS_INSUFFICIENT_DATA = 399
   };
 
-  enum 
+  enum
   {
     MAX_STATUS_CODE = 599
   };

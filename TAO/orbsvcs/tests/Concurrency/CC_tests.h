@@ -18,12 +18,11 @@
 //
 // ============================================================================
 
-#include "tao/corba.h"
 #include "orbsvcs/CosConcurrencyControlC.h"
 #include "orbsvcs/CosNamingC.h"
 #include "CC_naming_service.h"
 
-#if !defined (_CC_TESTS_H_)
+#ifndef _CC_TESTS_H_
 #define _CC_TESTS_H_
 
 // Return codes for the tests

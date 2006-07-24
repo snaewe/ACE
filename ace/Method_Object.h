@@ -1,43 +1,38 @@
 /* -*- C++ -*- */
-// $Id$
+
+//=============================================================================
+/**
+ *  @file    Method_Object.h
+ *
+ *  $Id$
+ *
+ *  This file just #includes "ace/Method_Request.h" and is just here
+ *  for backwards compatibility with earlier versions of ACE.
+ *  Please don't use it directly since it may go away at some point.
+ *
+ *
+ *  @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//=============================================================================
 
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Method_Object.h
-//
-// = AUTHOR
-//    Andres Kruse <Andres.Kruse@cern.ch> and Douglas C. Schmidt
-//    <schmidt@cs.wustl.edu> 
-// 
-// ============================================================================
-
-#if !defined (ACE_METHOD_OBJECT_H)
+#ifndef ACE_METHOD_OBJECT_H
 #define ACE_METHOD_OBJECT_H
+#include /**/ "ace/pre.h"
 
-#include "ace/OS.h"
+#include "ace/Method_Request.h"
 
-class ACE_Export ACE_Method_Object 
-{
-  // = TITLE
-  //     Reifies a method into an object.  Subclasses typically
-  //     represent necessary state and behavior.
-  //
-  // = DESCRIPTION
-  //     A <Method_Object> is inserted in the <Activation_Queue>, where
-  //     it is subsequently removed by the <Scheduler> and invoked.
-public:
-  // = Initialization and termination methods.
-  ACE_Method_Object (void);
-  virtual ~ACE_Method_Object (void);
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
-  // = Invocation method
-  virtual int call (void) = 0;
-  // Invoked when the <Method_Object> is scheduled to run.
-};
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
+// Maintain backwards compatibility so that Steve Huston doesn't go
+// postal... ;-)
+typedef ACE_Method_Request ACE_Method_Object;
+
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#include /**/ "ace/post.h"
 #endif /* ACE_METHOD_OBJECT_H */

@@ -1,8 +1,11 @@
 // $Id$
 
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Service_Config.h"
 #include "ace/Thread_Manager.h"
-#include "ace/Synch.h"
+#include "ace/Signal.h"
 
 ACE_RCSID(Threads, thread_specific, "$Id$")
 
@@ -33,7 +36,7 @@ cleanup (void *ptr)
               "(%t) in cleanup, ptr = %x\n",
               ptr));
 
-  delete ACE_reinterpret_cast (char *, ptr);
+  delete reinterpret_cast<char *> (ptr);
 }
 
 // This worker function is the entry point for each thread.
@@ -61,7 +64,7 @@ worker (void *c)
                   0);
 
   if (ACE_Thread::setspecific (key, (void *) ip) == -1)
-    ACE_ERROR ((LM_ERROR, 
+    ACE_ERROR ((LM_ERROR,
                 "(%t) %p\n",
                 "ACE_Thread::setspecific"));
 
@@ -120,8 +123,15 @@ worker (void *c)
         // Use the guard to serialize access to printf...
         ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, printf_lock, 0);
 
-        ACE_OS::printf ("(%u) errno = %d, lineno = %d, flags = %d\n",
-                        handle,
+#if defined(linux) || defined(__OpenBSD__)
+        // @@ Normally the platform specific way to print a thread ID
+        // is encapsulated in Log_Msg.cpp, but for this small example
+        // we cannot (or do not want to) use ACE_Log_Msg.
+        ACE_OS::printf ("(%lu)", (unsigned long)handle);
+#else
+        ACE_OS::printf ("(%u)", handle);
+#endif /* ! linux */
+        ACE_OS::printf (" errno = %d, lineno = %d, flags = %d\n",
                         tss_error->error (),
                         tss_error->line (),
                         tss_error->flags ());
@@ -178,7 +188,7 @@ handler (int signum)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   // The Service_Config must be the first object defined in main...
   ACE_Service_Config daemon (argv[0]);
@@ -193,7 +203,7 @@ main (int argc, char *argv[])
 #if defined (ACE_HAS_THREADS)
   if (ACE_Thread_Manager::instance ()->spawn_n (threads,
                                                ACE_THR_FUNC (&worker),
-                                               (void *) count,
+                                               reinterpret_cast<void *> (count),
                                                THR_BOUND | THR_DETACHED) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "%p\n",
@@ -207,16 +217,9 @@ main (int argc, char *argv[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_TSS<Errno>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_TSS<Errno>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
-
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR_RETURN ((LM_ERROR,
                      "ACE doesn't support support threads on this platform (yet)\n"),

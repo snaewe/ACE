@@ -16,30 +16,32 @@
 //
 // ============================================================================
 
-#include "results.h"
 #include "client.h"
+#include "driver.h"
+#include "results.h"
 #include "tests.h"
 #include "ace/Get_Opt.h"
-#include "driver.h"
 
-ACE_RCSID(Param_Test, driver, "$Id$")
+ACE_RCSID (Param_Test,
+           driver,
+           "$Id$")
 
 // This function runs the test (main program)
 int
 main (int argc, char **argv)
 {
   // get an instance of the driver object
-  Driver *drv = DRIVER::instance ();
+  Driver drv;
 
   // initialize the driver
-  if (drv->init (argc, argv) == -1)
+  if (drv.init (argc, argv) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "(%N:%l) driver.cpp - "
                        "Driver initialization failed\n"),
                       -1);
 
   // run various tests
-  if (drv->run () == -1)
+  if (drv.run () == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "(%N:%l) driver.cpp - "
                        "tests failed\n"),
@@ -61,51 +63,58 @@ int
 Driver::init (int argc, char **argv)
 {
   // environment to track exceptions
-  CORBA::Environment env;
+  ACE_DECLARE_NEW_CORBA_ENV;
 
   // retrieve the instance of Options
   Options *opt = OPTIONS::instance ();
 
-  // Retrieve the underlying ORB
-  this->orb_ = CORBA::ORB_init (argc,
-                                argv,
-                                "internet",
-                                env);
+  char exception_string[256];
 
-  if (env.exception () != 0)
+  ACE_TRY
     {
-      env.print_exception ("ORB initialization");
+      ACE_OS::strcpy (exception_string, "ORB Initialization");
+
+      // Retrieve the underlying ORB
+      this->orb_ = CORBA::ORB_init (argc,
+                                    argv,
+                                    "internet"
+                                    ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      // Parse command line and verify parameters.
+      if (opt->parse_args (argc, argv) == -1)
+        ACE_ERROR_RETURN ((LM_ERROR,
+                           "(%N:%l) driver.cpp - "
+                           "parse_args failed\n"),
+                          -1);
+      // Retrieve a Param_Test object reference
+      ACE_OS::strcpy (exception_string,"ORB::string_to_object() failed.");
+
+      CORBA::Object_var temp =
+        this->orb_->string_to_object (opt->param_test_ior () ACE_ENV_ARG_PARAMETER);
+
+      ACE_TRY_CHECK;
+
+      if (CORBA::is_nil (temp.in()))
+        ACE_ERROR_RETURN ((LM_ERROR,
+                           "ORB::string_to_object() returned null object for IOR <%s>\n",
+                           opt->param_test_ior ()),
+                          -1);
+
+      // Get the object reference
+      ACE_OS::strcpy (exception_string,"Param_Test::_narrow () failed.");
+
+      this->objref_ = Param_Test::_narrow (temp.in() ACE_ENV_ARG_PARAMETER);
+
+      ACE_TRY_CHECK;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, exception_string);
       return -1;
     }
-
-  // Parse command line and verify parameters.
-  if (opt->parse_args (argc, argv) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR,
-                       "(%N:%l) driver.cpp - "
-                       "parse_args failed\n"),
-                      -1);
-
-  // Retrieve a Param_Test object reference
-  CORBA::Object_var temp =
-    this->orb_->string_to_object (opt->param_test_ior (), env);
-  if (env.exception () != 0)
-    {
-      env.print_exception ("ORB::string_to_object() failed.");
-      return -1;
-    }
-
-  if (CORBA::is_nil (temp.in()))
-    ACE_ERROR_RETURN ((LM_ERROR,
-                       "ORB::string_to_object() returned null object for IOR <%s>\n",
-                       opt->param_test_ior ()),
-                      -1);
-
-  this->objref_ = Param_Test::_narrow (temp.in(), env);
-  if (env.exception () != 0)
-    {
-      env.print_exception ("Param_Test::_narrow failed");
-      return -1;
-    }
+  ACE_ENDTRY;
+  ACE_CHECK_RETURN (-1);
 
   return 0;
 }
@@ -173,6 +182,32 @@ Driver::run (void)
         delete client;
       }
       break;
+    case Options::TEST_UB_WSTRING:
+      {
+        Param_Test_Client<Test_Unbounded_WString> *client = new
+          Param_Test_Client<Test_Unbounded_WString> (this->orb_.in (),
+                                                     this->objref_.in(),
+                                                     new Test_Unbounded_WString);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_BD_WSTRING:
+      {
+        Param_Test_Client<Test_Bounded_WString> *client = new
+          Param_Test_Client<Test_Bounded_WString> (this->orb_.in (),
+                                                   this->objref_.in(),
+                                                   new Test_Bounded_WString);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
     case Options::TEST_FIXED_STRUCT:
       {
         Param_Test_Client<Test_Fixed_Struct> *client = new
@@ -212,6 +247,32 @@ Driver::run (void)
         delete client;
       }
       break;
+    case Options::TEST_UB_WSTRING_SEQUENCE:
+      {
+        Param_Test_Client<Test_WString_Sequence> *client = new
+          Param_Test_Client<Test_WString_Sequence> (this->orb_.in (),
+                                                    this->objref_.in(),
+                                                    new Test_WString_Sequence);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_BD_WSTRING_SEQUENCE:
+      {
+        Param_Test_Client<Test_Bounded_WString_Sequence> *client = new
+          Param_Test_Client<Test_Bounded_WString_Sequence> (this->orb_.in (),
+                                                            this->objref_.in(),
+                                                            new Test_Bounded_WString_Sequence);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
     case Options::TEST_VAR_STRUCT:
       {
         Param_Test_Client<Test_Var_Struct> *client = new
@@ -238,7 +299,19 @@ Driver::run (void)
         delete client;
       }
       break;
-
+    case Options::TEST_RECURSIVE_STRUCT:
+      {
+        Param_Test_Client<Test_Recursive_Struct> *client = new
+          Param_Test_Client<Test_Recursive_Struct> (this->orb_.in (),
+                                                    this->objref_.in(),
+                                                    new Test_Recursive_Struct);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
     case Options::TEST_OBJREF_STRUCT:
       {
         Param_Test_Client<Test_Objref_Struct> *client = new
@@ -252,7 +325,6 @@ Driver::run (void)
         delete client;
       }
       break;
-
     case Options::TEST_UB_STRUCT_SEQUENCE:
       {
         Param_Test_Client<Test_Struct_Sequence> *client = new
@@ -264,14 +336,52 @@ Driver::run (void)
         else
           retstatus = client->run_dii_test ();
         delete client;
+
+        Param_Test_Client<Test_Unbounded_Struct_Sequence> *client2 = new
+          Param_Test_Client<Test_Unbounded_Struct_Sequence>
+          (this->orb_.in (),
+           this->objref_.in(),
+           new Test_Unbounded_Struct_Sequence);
+
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client2->run_sii_test ();
+        else
+          retstatus = client2->run_dii_test ();
+        delete client2;
       }
       break;
     case Options::TEST_BD_STRUCT_SEQUENCE:
       {
         Param_Test_Client<Test_Bounded_Struct_Sequence> *client = new
           Param_Test_Client<Test_Bounded_Struct_Sequence> (this->orb_.in (),
-                                                           this->objref_.in(),
+                                                           this->objref_.in (),
                                                            new Test_Bounded_Struct_Sequence);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_UB_ARRAY_SEQUENCE:
+      {
+        Param_Test_Client<Test_Array_Sequence> *client = new
+          Param_Test_Client<Test_Array_Sequence> (this->orb_.in (),
+                                                  this->objref_.in (),
+                                                  new Test_Array_Sequence);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_BD_ARRAY_SEQUENCE:
+      {
+        Param_Test_Client<Test_Bounded_Array_Sequence> *client = new
+          Param_Test_Client<Test_Bounded_Array_Sequence> (this->orb_.in (),
+                                                          this->objref_.in (),
+                                                          new Test_Bounded_Array_Sequence);
         if (opt->invoke_type () == Options::SII)
           retstatus = client->run_sii_test ();
         else
@@ -283,7 +393,7 @@ Driver::run (void)
       {
         Param_Test_Client<Test_ObjRef> *client = new
           Param_Test_Client<Test_ObjRef> (this->orb_.in (),
-                                          this->objref_.in(),
+                                          this->objref_.in (),
                                           new Test_ObjRef);
         if (opt->invoke_type () == Options::SII)
           retstatus = client->run_sii_test ();
@@ -422,7 +532,6 @@ Driver::run (void)
         delete client;
       }
       break;
-
     case Options::TEST_EXCEPTION:
       {
         Param_Test_Client<Test_Exception> *client = new
@@ -436,77 +545,90 @@ Driver::run (void)
         delete client;
       }
       break;
+    case Options::TEST_BIG_UNION:
+      {
+        Param_Test_Client<Test_Big_Union> *client = new
+          Param_Test_Client<Test_Big_Union> (this->orb_.in (),
+                                             this->objref_.in(),
+                                             new Test_Big_Union);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_SMALL_UNION:
+      {
+        Param_Test_Client<Test_Small_Union> *client = new
+          Param_Test_Client<Test_Small_Union> (this->orb_.in (),
+                                             this->objref_.in(),
+                                             new Test_Small_Union);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_RECURSIVE_UNION:
+      {
+        Param_Test_Client<Test_Recursive_Union> *client = new
+          Param_Test_Client<Test_Recursive_Union> (this->orb_.in (),
+                                                   this->objref_.in(),
+                                                   new Test_Recursive_Union);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_COMPLEX_ANY:
+      {
+        Param_Test_Client<Test_Complex_Any> *client = new
+          Param_Test_Client<Test_Complex_Any> (this->orb_.in (),
+                                               this->objref_.in(),
+                                               new Test_Complex_Any);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
+    case Options::TEST_MULTDIM_ARRAY:
+      {
+        Param_Test_Client<Test_Multdim_Array> *client = new
+          Param_Test_Client<Test_Multdim_Array> (this->orb_.in (),
+                                                 this->objref_.in(),
+                                                 new Test_Multdim_Array);
+        if (opt->invoke_type () == Options::SII)
+          retstatus = client->run_sii_test ();
+        else
+          retstatus = client->run_dii_test ();
+        delete client;
+      }
+      break;
     default:
       break;
     }
 
-  TAO_TRY
+  // Get in a new environment variable
+  ACE_DECLARE_NEW_CORBA_ENV;
+  ACE_TRY
     {
       if (opt->shutdown ())
         {
-          this->objref_->shutdown (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+          this->objref_->shutdown (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("during shutdown");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "during shutdown");
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
 
   return retstatus;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Singleton<Driver, ACE_SYNCH_RECURSIVE_MUTEX>;
-template class Param_Test_Client<Test_Short>;
-template class Param_Test_Client<Test_ULongLong>;
-template class Param_Test_Client<Test_Unbounded_String>;
-template class Param_Test_Client<Test_Bounded_String>;
-template class Param_Test_Client<Test_Fixed_Struct>;
-template class Param_Test_Client<Test_String_Sequence>;
-template class Param_Test_Client<Test_Bounded_String_Sequence>;
-template class Param_Test_Client<Test_Var_Struct>;
-template class Param_Test_Client<Test_Nested_Struct>;
-template class Param_Test_Client<Test_Objref_Struct>;
-template class Param_Test_Client<Test_Struct_Sequence>;
-template class Param_Test_Client<Test_Bounded_Struct_Sequence>;
-template class Param_Test_Client<Test_ObjRef>;
-template class Param_Test_Client<Test_ObjRef_Sequence>;
-template class Param_Test_Client<Test_TypeCode>;
-template class Param_Test_Client<Test_Any>;
-template class Param_Test_Client<Test_AnySeq>;
-template class Param_Test_Client<Test_Short_Sequence>;
-template class Param_Test_Client<Test_Bounded_Short_Sequence>;
-template class Param_Test_Client<Test_Long_Sequence>;
-template class Param_Test_Client<Test_Bounded_Long_Sequence>;
-template class Param_Test_Client<Test_Fixed_Array>;
-template class Param_Test_Client<Test_Var_Array>;
-template class Param_Test_Client<Test_Exception>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Singleton<Driver, ACE_SYNCH_RECURSIVE_MUTEX>
-#pragma instantiate Param_Test_Client<Test_Short>
-#pragma instantiate Param_Test_Client<Test_ULongLong>
-#pragma instantiate Param_Test_Client<Test_Unbounded_String>
-#pragma instantiate Param_Test_Client<Test_Bounded_String>
-#pragma instantiate Param_Test_Client<Test_Fixed_Struct>
-#pragma instantiate Param_Test_Client<Test_String_Sequence>
-#pragma instantiate Param_Test_Client<Test_Bounded_String_Sequence>
-#pragma instantiate Param_Test_Client<Test_Var_Struct>
-#pragma instantiate Param_Test_Client<Test_Nested_Struct>
-#pragma instantiate Param_Test_Client<Test_Objref_Struct>
-#pragma instantiate Param_Test_Client<Test_Struct_Sequence>
-#pragma instantiate Param_Test_Client<Test_Bounded_Struct_Sequence>
-#pragma instantiate Param_Test_Client<Test_ObjRef>
-#pragma instantiate Param_Test_Client<Test_ObjRef_Sequence>
-#pragma instantiate Param_Test_Client<Test_TypeCode>
-#pragma instantiate Param_Test_Client<Test_Any>
-#pragma instantiate Param_Test_Client<Test_AnySeq>
-#pragma instantiate Param_Test_Client<Test_Short_Sequence>
-#pragma instantiate Param_Test_Client<Test_Bounded_Short_Sequence>
-#pragma instantiate Param_Test_Client<Test_Long_Sequence>
-#pragma instantiate Param_Test_Client<Test_Bounded_Long_Sequence>
-#pragma instantiate Param_Test_Client<Test_Fixed_Array>
-#pragma instantiate Param_Test_Client<Test_Var_Array>
-#pragma instantiate Param_Test_Client<Test_Exception>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */

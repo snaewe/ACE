@@ -1,15 +1,16 @@
 // $Id$
 
-#if !defined (ACE_IOSTREAM_C)
-#define ACE_IOSTREAM_C
-
-#define ACE_BUILD_DLL
+#ifndef ACE_IOSTREAM_CPP
+#define ACE_IOSTREAM_CPP
 
 #include "ace/IOStream.h"
 
 ACE_RCSID(ace, IOStream, "$Id$")
 
 #if !defined (ACE_LACKS_ACE_IOSTREAM)
+
+#  include "ace/OS_NS_errno.h"
+#  include "ace/OS_Memory.h"
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -85,6 +86,8 @@ ACE_RCSID(ace, IOStream, "$Id$")
   // function will be invoked by the first >>.  Since it returns
   // a myiostream&, the second >> will be invoked as desired.  */
 
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
 ACE_HANDLE
 ACE_Streambuf::get_handle (void)
 {
@@ -101,7 +104,7 @@ ACE_Streambuf::recv_timeout (ACE_Time_Value *tv)
       recv_timeout_ = &recv_timeout_value_;
     }
   else
-    recv_timeout_ = NULL;
+    recv_timeout_ = 0;
 
   return rval;
 }
@@ -479,7 +482,7 @@ ACE_Streambuf::ACE_Streambuf (u_int streambuf_size, int io_mode)
     put_mode_ (2),
     mode_ (io_mode),
     streambuf_size_ (streambuf_size),
-    recv_timeout_ (NULL)
+    recv_timeout_ (0)
 {
  (void)reset_get_buffer ();
  (void)reset_put_buffer ();
@@ -555,11 +558,13 @@ ACE_Streambuf::reset_get_buffer (char *newBuffer,
   if (newBuffer)
     {
       if (streambuf_size_ != _streambuf_size)
-        return NULL;
+        return 0;
       this->eback_saved_ = newBuffer;
     }
   else
-    ACE_NEW_RETURN (this->eback_saved_, char[streambuf_size_], 0);
+    ACE_NEW_RETURN (this->eback_saved_,
+                    char[streambuf_size_],
+                    0);
 
   this->gptr_saved_ = this->eback_saved_ + _gptr;
   this->egptr_saved_ = this->eback_saved_ + _egptr;
@@ -602,11 +607,13 @@ ACE_Streambuf::reset_put_buffer (char *newBuffer,
   if (newBuffer)
     {
       if (streambuf_size_ != _streambuf_size)
-        return NULL;
+        return 0;
       this->pbase_saved_ = newBuffer;
     }
   else
-    ACE_NEW_RETURN (this->pbase_saved_, char[streambuf_size_], 0);
+    ACE_NEW_RETURN (this->pbase_saved_,
+                    char[streambuf_size_],
+                    0);
 
   this->pptr_saved_ = this->pbase_saved_ + _pptr;
   this->epptr_saved_ = this->pbase_saved_ + streambuf_size_;
@@ -652,5 +659,7 @@ u_char ACE_Streambuf::timeout (void)
   return rval;
 }
 
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #endif /* !ACE_LACKS_ACE_IOSTREAM */
-#endif /* ACE_IOSTREAM_C */
+#endif /* ACE_IOSTREAM_CPP */

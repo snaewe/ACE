@@ -62,103 +62,138 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-// utl_strlist.cc
-//
-// Implementation of a list of utl_string nodes
+// Implementation of a list of utl_string nodes.
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "utl_strlist.h"
+#include "utl_string.h"
 
-ACE_RCSID(util, utl_strlist, "$Id$")
+// FUZZ: disable check_for_streams_include
+#include "ace/streams.h"
 
-/*
- * Constructor(s)
- */
+#include "ace/OS_Memory.h"
+#include "ace/OS_NS_string.h"
 
-UTL_StrList::UTL_StrList(String *s, UTL_StrList *cdr)
-	   : UTL_List(cdr),
-	     pd_car_data(s)
+ACE_RCSID (util,
+           utl_strlist,
+           "$Id$")
+
+UTL_StrList::UTL_StrList (UTL_String *s,
+                          UTL_StrList *cdr)
+  : UTL_List(cdr),
+    pd_car_data(s)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Get list item
-String *
-UTL_StrList::head()
+UTL_StrList::~UTL_StrList (void)
 {
-  return pd_car_data;
 }
 
-// Set list item
+// Get list item.
+UTL_String *
+UTL_StrList::head (void)
+{
+  return this->pd_car_data;
+}
+
+// Set list item.
 void
-UTL_StrList::set_head(String *s)
+UTL_StrList::set_head (UTL_String *s)
 {
-  pd_car_data = s;
+  this->pd_car_data = s;
 }
 
 // Get last item of this list
-String *
-UTL_StrList::last_component()
+UTL_String *
+UTL_StrList::last_component (void)
 {
-  if (tail() == NULL)
-    return pd_car_data;
-  return ((UTL_StrList *) tail())->last_component();
+  if (this->tail () == 0)
+    {
+      return pd_car_data;
+    }
+
+  return ((UTL_StrList *) this->tail ())->last_component();
 }
 
-// Copy a list
+// Copy a list.
 UTL_List *
-UTL_StrList::copy()
+UTL_StrList::copy (void)
 {
-  if (tail() == NULL)
-    return new UTL_StrList(head(), NULL);
-  return new UTL_StrList(head(), (UTL_StrList *) tail()->copy());
+  UTL_List *retval = 0;
+
+  if (this->tail () == 0)
+    {
+      ACE_NEW_RETURN (retval,
+                      UTL_StrList (head (),
+                                   0),
+                      0);
+    }
+  else
+    {
+      ACE_NEW_RETURN (retval,
+                      UTL_StrList (head (),
+                                   (UTL_StrList *) this->tail ()->copy ()),
+                      0);
+    }
+
+  return retval;
+}
+
+void
+UTL_StrList::destroy (void)
+{
+  UTL_String *str = 0;
+
+  for (UTL_StrlistActiveIterator i (this); !i.is_done (); i.next ())
+    {
+      str = i.item ();
+      str->destroy ();
+      delete str;
+      str = 0;
+    }
 }
 
 // AST Dumping
 void
-UTL_StrList::dump(ostream &o)
+UTL_StrList::dump (ACE_OSTREAM_TYPE &o)
 {
-  char			      *s;
-  UTL_StrlistActiveIterator *i = new UTL_StrlistActiveIterator(this);
-  idl_bool		       first = I_TRUE;
-  idl_bool		       second = I_FALSE;
+  char *s = 0;
+  bool first = true;
+  bool second = false;
 
-  while (!(i->is_done())) {
-    if (!first)
-      o << "::";
-    else if (second)
-      first = second = I_FALSE;
-    s = i->item()->get_string();
-    o << s;
-    if (first) {
-      if (strcmp(s, "::") != 0)
-	first = I_FALSE;
-      else
-	second = I_TRUE;
+  for (UTL_StrlistActiveIterator i (this); !i.is_done(); i.next ())
+    {
+      if (!first)
+        {
+          o << "::";
+        }
+      else if (second)
+        {
+          first = second = false;
+        }
+
+      s = i.item ()->get_string ();
+      o << s;
+
+      if (first)
+        {
+          if (ACE_OS::strcmp (s, "::") != 0)
+            {
+              first = false;
+            }
+          else
+            {
+              second = true;
+            }
+        }
     }
-    i->next();
-  }
 }
 
 /*
@@ -171,8 +206,8 @@ UTL_StrList::dump(ostream &o)
  * Constructor
  */
 
-UTL_StrlistActiveIterator::UTL_StrlistActiveIterator(UTL_StrList *s)
-			   : UTL_ListActiveIterator(s)
+UTL_StrlistActiveIterator::UTL_StrlistActiveIterator (UTL_StrList *s)
+  : UTL_ListActiveIterator (s)
 {
 }
 
@@ -185,12 +220,15 @@ UTL_StrlistActiveIterator::UTL_StrlistActiveIterator(UTL_StrList *s)
  */
 
 // Get current item
-String *
-UTL_StrlistActiveIterator::item()
+UTL_String *
+UTL_StrlistActiveIterator::item (void)
 {
-  if (source == NULL)
-    return NULL;
-  return ((UTL_StrList *) source)->head();
+  if (source == 0)
+    {
+      return 0;
+    }
+
+  return ((UTL_StrList *) source)->head ();
 }
 
 /*

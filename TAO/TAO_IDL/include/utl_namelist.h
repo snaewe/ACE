@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,60 +62,53 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _UTL_NAMELIST_UTL_NAMELIST_HH
 #define _UTL_NAMELIST_UTL_NAMELIST_HH
 
-// utl_namelist.hh
-//
-// List of UTL_ScopedName nodes
+#include "utl_scoped_name.h"
+
+// List of UTL_ScopedName nodes.
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-/*
-** DEPENDENCIES: utl_list.hh, utl_scoped_name.hh
-**
-** USE: Included from util.hh
-*/
-
-class	UTL_NameList : public UTL_List
+class TAO_IDL_FE_Export UTL_NameList : public UTL_List
 {
 public:
-  // Operations
+  UTL_NameList (UTL_ScopedName *s,
+                UTL_NameList *cdr);
 
-  // Constructor(s)
-  UTL_NameList(UTL_ScopedName *s, UTL_NameList *cdr);
+  // Get list item.
+  UTL_ScopedName *head (void);
 
-  // Get list item
-  UTL_ScopedName	*head();
+  // Accessors.
+  bool truncatable (void) const;
+  void truncatable (bool val);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  UTL_ScopedName	*pd_car_data;	// List item
+  // List item.
+  UTL_ScopedName *pd_car_data;
+
+  // Used only with valuetye inheritance list. Defualts to 0.
+  bool pd_truncatable;
 };
 
-// Active iterator for UTL_NameList
-class	UTL_NamelistActiveIterator : public UTL_ListActiveIterator
+// Active iterator for UTL_NameList.
+class   UTL_NamelistActiveIterator : public UTL_ListActiveIterator
 {
 public:
-  // Operations
+  UTL_NamelistActiveIterator (UTL_NameList *source);
 
-  // Constructor(s)
-  UTL_NamelistActiveIterator(UTL_NameList *source);
-
-  // Get current item
-  UTL_ScopedName	*item();
+  // Get current item.
+  UTL_ScopedName *item (void);
 };
 
 #endif           // _UTL_NAMELIST_UTL_NAMELIST_HH

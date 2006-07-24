@@ -62,451 +62,523 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-// drv_args.c - Argument parsing for IDL compiler main driver
+// drv_args.cpp - Argument parsing for IDL compiler main driver
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "idl_defines.h"
+#include "global_extern.h"
+#include "drv_extern.h"
+#include "fe_extern.h"
+#include "be_global.h"
+#include "be_extern.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/os_include/os_ctype.h"
 
-#include	"drv_private.h"
-#include        "drv_link.h"
+ACE_RCSID (driver,
+           drv_args,
+           "$Id$")
 
-#include        "be.h"
-#include	<stdio.h>
+extern long DRV_nfiles;
+extern char *DRV_files[];
 
-ACE_RCSID(driver, drv_args, "$Id$")
-
-  /*
- * Push a file into the list of files to be processed
- */
-  static void
-DRV_push_file(char *s)
+// Push a file into the list of files to be processed
+void
+DRV_push_file (const char *s)
 {
-  DRV_files[DRV_nfiles++] = s;
+  // If filenames come from the command line, there is no
+  // need to duplicate the string, but some backends have
+  // an option to recurse over a directory and add all
+  // IDL files found. In this latter case we have to
+  // duplicate the file name string.
+  DRV_files[DRV_nfiles++] = ACE::strnew (s);
 }
 
-/*
- * Prepare a CPP argument
- */
+// Prepare a CPP argument
 static void
-DRV_prep_cpp_arg(char *s)
+DRV_prep_cpp_arg (char *s)
 {
-  char *newarg = new char[512];
+  char *newarg = 0;
+  ACE_NEW (newarg,
+           char[512]);
   char *farg;
 
   newarg[0] = '\0';
-  for (farg = strtok(s, ","); farg != NULL; farg = strtok(NULL, ","))
-    strcat(newarg,farg);
-  DRV_cpp_putarg(newarg);
+
+  for (farg = ACE_OS::strtok (s, ",");
+       farg != 0;
+       farg = ACE_OS::strtok (0, ","))
+    {
+      ACE_OS::strcat (newarg,
+                      farg);
+    }
+
+  DRV_cpp_putarg (newarg);
 }
 
-/*
- * Print a usage message and exit
- */
+// Print a usage message and exit.
 void
-DRV_usage()
+DRV_usage (void)
 {
-  cerr << idl_global->prog_name()
-       << GTDEVEL(": usage: ")
-       << idl_global->prog_name()
-       << GTDEVEL(" [flag | file]*\n");
-  cerr << GTDEVEL("Legal flags:\n");
-  cerr << GTDEVEL(" -A...\t\t\tlocal implementation-specific escape\n");
-  cerr << GTDEVEL(" -Dname[=value]\t\tdefines name for preprocessor\n");
-  cerr << GTDEVEL(" -E\t\t\truns preprocessor only, prints on stdout\n");
-  cerr << GTDEVEL(" -Idir\t\t\tincludes dir in search path for preprocessor\n");
-  cerr << GTDEVEL(" -Uname\t\t\tundefines name for preprocessor\n");
-  cerr << GTDEVEL(" -V\t\t\tprints version info then exits\n");
-  cerr << GTDEVEL(" -W[p|b],arg1,argn\tpasses args to preprocessor or BE\n");
-  cerr << GTDEVEL(" -Yp,path\t\tdefines location of preprocessor\n");
-  cerr << GTDEVEL(" -bback_end\t\tcauses specified back end to be used\n");
-  cerr << GTDEVEL(" -u\t\t\tprints usage message and exits\n");
-  cerr << GTDEVEL(" -v\t\t\ttraces compilation stages\n");
-  cerr << GTDEVEL(" -w\t\t\tsuppresses IDL compiler warning messages\n");
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("%s%s%s%s"),
+              idl_global->prog_name (),
+              ACE_TEXT (": usage: "),
+              idl_global->prog_name (),
+              ACE_TEXT (" [flag | file]*\n")));
+
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("Legal flags:\n")));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -A...\t\t\tlocal implementation-specific escape\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Cw\t\t\tWarning if identifier spellings differ ")
+      ACE_TEXT ("only in case (default is error)\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Ce\t\t\tError if identifier spellings differ ")
+      ACE_TEXT ("only in case (default)\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -d\t\t\tOutputs (to stdout) a dump of the AST\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Dname[=value]\t\tdefines name for preprocessor\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -E\t\t\truns preprocessor only, prints on stdout\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Idir\t\t\tincludes dir in search path for preprocessor\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -t\t\t\tTemporary directory to be used")
+      ACE_TEXT (" by the IDL compiler.\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -u\t\t\tprints usage message and exits\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Uname\t\t\tundefines name for preprocessor\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -v\t\t\ttraces compilation stages\n")
+   ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -V\t\t\tprints version info then exits\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -w\t\t\tsuppresses IDL compiler warning messages\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Wp,<arg1,...,argn>\t\t\t\tpasses args to preprocessor\n")
+    ));
+  ACE_DEBUG ((
+      LM_DEBUG,
+      ACE_TEXT (" -Yp,path\t\tdefines location of preprocessor\n")
+    ));
+
+  be_global->usage ();
 }
 
-/*
- * Parse arguments on command line
- */
+// Parse arguments on command line
 void
-DRV_parse_args(long ac, char **av)
+DRV_parse_args (long ac, char **av)
 {
-  char	*buffer;
-  char	*s;
-  long	i;
+  ACE_CString buffer;
+  char *s = 0;
+  long i;
+  bool has_space = false;
 
-  // Retrieve the singleton instance of the code generator.
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
+  FE_store_env_include_paths ();
+  DRV_cpp_init ();
+  idl_global->set_prog_name (av[0]);
 
-  DRV_cpp_init();
-  idl_global->set_prog_name(av[0]);
   for (i = 1; i < ac; i++)
     {
-      if (av[i][0] == '-') {
-        switch (av[i][1]) {
-        case 0:
-          DRV_push_file("standard input");
-          break;
-        case 'A':
-          if (av[i][2] == '\0')
-            {
-              if (i < ac - 1) {
-                i++;
-                s = av[i];
-              } else
-                exit(99);
-            } else
-              s = av[i] + 2;
-          strcat(idl_global->local_escapes(), s);
-          strcat(idl_global->local_escapes(), " ");
-          break;
-       
-          // = File name endings for all the IDL generated header files,
-          //   stub files, skeleton files and inline files. 
+      if (av[i][0] == '-')
+        {
+          idl_global->append_idl_flag (av[i]);
 
-          // = Various 'h'eader_file_name_endings.
-        case 'h':
-        
-          // <-hc Client's header file name ending> 
-          //      Default is "C.h".
-          // <-hs Server's header file name ending>
-          //       Default is "S.h".
-          // <-hT Server's template hdr file name ending>
-          //       Default is "S_T.h".
+          switch (av[i][1])
+            {
+            case 0:
+              // One or more letters expected after the dash.
+              ACE_ERROR ((
+                  LM_ERROR,
+                  ACE_TEXT ("IDL: Space between dash and option ")
+                  ACE_TEXT ("letters not allowed\n")
+                ));
 
-          if (av[i][2] == 'c')
-            {
-              // Client stub's header file ending.
-              // @@ No error handling done here.
-              idl_global->client_hdr_ending (av[i+1]);
-              i++;
-            }
-          else if (av[i][2] == 's')
-            {
-              // Server skeleton's header file.
-              idl_global->server_hdr_ending (av[i+1]);
-              i++;
-            }
-          else if (av[i][2] == 'T')
-            {
-              // Server Template header ending.
-              idl_global->server_template_hdr_ending (av[i+1]);
-              i++;
-            }
-          else
-            {
-              // I expect 'c' or 's' or 'T' after this.
-              cerr << GTDEVEL("Incomplete Flag : ")
-                   << av[i];
-              exit(99);
-            }
-          break;
-        
-          // = Various 'c'lient side stub file_name_endings.
-        case 'c':
-          // <-cs Client stub's file name ending>
-          //      Default is "C.cpp".
-          // <-ci Client inline file name ending>
-          //      Default is "C.i".
-
-          if (av[i][2] == 's')
-            {
-              idl_global->client_stub_ending (av[i+1]);
-              i++;
-            }
-          else if (av[i][2] == 'i')
-            {
-              idl_global->client_inline_ending (av[i+1]);
-              i++;
-            }
-          else
-            {
-              // I expect 's' or 'i' after 'c'.
-              cerr << GTDEVEL("Incomplete Flag : ")
-                   << av[i];
-              exit(99);
-            }
-          break;
-     
-          // = Various 's'erver side skeleton file name endings. 
-        case 's':
-          // <-ss Server's skeleton file name ending>
-          //      Default is "S.cpp".
-          // <-sT Server's template skeleton file name ending>
-          //      Default is "S_T.cpp".
-          // <-si Server's inline file name ending>
-          //      Default is "S.i".
-          // <-st Server's template inline file name ending>
-          //      Default is "S_T.i".
-    
-          if (av[i][2] == 's')
-            {
-              idl_global->server_skeleton_ending (av[i+1]);
-              i++;
-            }
-          else if (av[i][2] == 'T')
-            {
-              idl_global->server_template_skeleton_ending (av[i+1]);
-              i++;
-            }
-          else if (av[i][2] == 'i')
-            {
-              idl_global->server_inline_ending (av[i+1]);
-              i++;
-            }
-          else if (av[i][2] == 't')
-            {
-              idl_global->server_template_inline_ending (av[i+1]);
-              i++;
-            }
-          else 
-            {
-              // I expect 's' or 'T' or 'i' or 't' after 's'. 
-              cerr << GTDEVEL("Incomplete Flag : ")
-                   << av[i];
-              exit(99);
-            }
-          break;
-    
-          // Operation lookup strategy.
-          // <perfect> or <dynamic>
-          // Default is perfect.
-        case 'H':
-          if (ACE_OS::strcmp (av[i+1], "dynamic") == 0)
-            cg->lookup_strategy (TAO_CodeGen::TAO_DYNAMIC_HASH);
-          // else Perfect Hash, the default strategy.
-          i++;
-          break;
-     
-          // Path for the perfect hash generator(gperf) program. Default
-          // is $ACE_ROOT/bin/gperf.
-        case 'g':
-          idl_global->perfect_hasher (av[i+1]);
-          i++;
-          break;
-      
-          // Directory where all the IDL-Compiler-Generated files are to
-          // be kept. Default is the current directory from which the
-          // <tao_idl> is called.
-        case 'o':
-          idl_global->output_dir (av [i+1]);
-          i++;
-          break;
-        
-        case 'D':
-        case 'U':
-        case 'I':
-          if (av[i][2] == '\0')
-            {
-              if (i < ac - 1)
+              ++i;
+              idl_global->set_err_count (idl_global->err_count () + 1);
+              break;
+            case 'A':
+              if (av[i][2] == '\0')
                 {
-                  buffer = new char[strlen(av[i]) + strlen(av[i + 1]) + 2];
-                  sprintf(buffer, "%s%s", av[i], av[i+1]);
-                  DRV_cpp_putarg(buffer);
-                  i++;
+                  if (i < ac - 1)
+                    {
+                      s = av[i + 1];
+                      ++i;
+                    }
+                  else
+                    {
+                      ACE_ERROR ((
+                          LM_ERROR,
+                          ACE_TEXT ("IDL: incorrect use of ")
+                          ACE_TEXT ("the -A option\n")
+                        ));
+                        
+                      idl_global->set_compile_flags (
+                                      idl_global->compile_flags ()
+                                      | IDL_CF_ONLY_USAGE
+                                    );
+                      break;
+                    }
                 }
               else
                 {
-                  cerr << GTDEVEL("IDL: missing argument after '")
-                       << av[i]
-                       << GTDEVEL("' flag\n");
-                  exit(99);
+                  s = av[i] + 2;
                 }
-            } 
-          else
-            DRV_cpp_putarg(av[i]);
-          break;
-        case 'E':
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_ONLY_PREPROC);
-          break;
-        case 'V':
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_VERSION);
-          break;
-        case 'W':
-          if (av[i][2] == '\0') 
-            {
-              if (i < ac - 1) 
+
+              ACE_OS::strcat (idl_global->local_escapes (), s);
+              ACE_OS::strcat (idl_global->local_escapes (), " ");
+              break;
+            // Temp directory for the IDL compiler to keep its files.
+            case 't':
+              if ((av[i][2] == '\0') && (i < ac - 1))
                 {
-                  i++;
-                  s = av[i];
-                } 
+                  idl_global->append_idl_flag (av[i + 1]);
+                  idl_global->temp_dir (av[i + 1]);
+                  ++i;
+                }
               else
                 {
-                  cerr << GTDEVEL("IDL: missing argument after '")
-                       << av[i]
-                       << GTDEVEL("' flag\n");
-                  exit(99);
+                  ACE_ERROR ((
+                      LM_ERROR,
+                      ACE_TEXT ("IDL: I don't understand")
+                      ACE_TEXT (" the '%s' option\n"),
+                      av[i]
+                    ));
+                    
+                  idl_global->set_compile_flags (
+                                  idl_global->compile_flags ()
+                                  | IDL_CF_ONLY_USAGE
+                                );
                 }
-            } 
-          else
-            s = av[i] + 2;
-          switch (*s)
-            {
+                
+              break;
+            case 'D':
+            case 'U':
+            case 'I':
+              if (av[i][2] == '\0')
+                {
+                  if (i < ac - 1)
+                    {
+                      idl_global->append_idl_flag (av[i + 1]);
+                      has_space = idl_global->hasspace (av[i + 1]);
+
+                      // If the include path has a space, we need to
+                      // add literal "s.
+                      ACE_CString arg = av[i];
+                      arg += (has_space ? "\"" : "");
+                      arg += av[i + 1];
+                      arg += (has_space ? "\"" : "");
+
+                      DRV_cpp_putarg (arg.c_str ());
+                      idl_global->add_include_path (arg.substr (2).c_str ());
+                      ++i;
+                    }
+                  else
+                    {
+                      ACE_ERROR ((
+                          LM_ERROR,
+                          ACE_TEXT ("IDL: I don't understand")
+                          ACE_TEXT (" the '%s' option\n"),
+                          av[i]
+                        ));
+                        
+                      idl_global->set_compile_flags (
+                                      idl_global->compile_flags ()
+                                      | IDL_CF_ONLY_USAGE
+                                    );
+                      break;
+                    }
+                }
+              else
+                {
+                  has_space = idl_global->hasspace (av[i]);
+
+                  // If the include path has a space, we need to
+                  // add literal "s.
+                  ACE_CString arg (av[i], 2);
+                  arg += (has_space ? "\"" : "");
+                  arg += av[i] + 2;
+                  arg += (has_space? "\"" : "");
+
+                  idl_global->add_include_path (arg.substr (2).c_str ());
+                  DRV_cpp_putarg (arg.c_str ());
+                }
+                
+              break;
+            case 'E':
+              idl_global->set_compile_flags (idl_global->compile_flags () |
+                                             IDL_CF_ONLY_PREPROC);
+              break;
+            case 'V':
+              idl_global->set_compile_flags (idl_global->compile_flags () |
+                                             IDL_CF_VERSION);
+              break;
+            case 'W':
+              if (av[i][2] == '\0')
+                {
+                  if (i < ac - 1)
+                    {
+                      s = av[i + 1];
+                      ++i;
+                    }
+                  else
+                    {
+                      ACE_ERROR ((
+                          LM_ERROR,
+                          ACE_TEXT ("IDL: I don't understand")
+                          ACE_TEXT (" the '%s' option\n"),
+                          av[i]
+                        ));
+                        
+                      idl_global->set_compile_flags (
+                                      idl_global->compile_flags ()
+                                      | IDL_CF_ONLY_USAGE
+                                    );
+                      break;
+                    }
+                }
+              else
+                {
+                  s = av[i] + 2;
+                }
+
+              switch (*s)
+                {
+                default:
+                  ACE_ERROR ((
+                      LM_ERROR,
+                      ACE_TEXT ("IDL: Incorrect use of -W option\n")
+                    ));
+                        
+                  idl_global->set_compile_flags (
+                                  idl_global->compile_flags ()
+                                  | IDL_CF_ONLY_USAGE
+                                );
+                  break;
+                case 'p':
+                  if (*(s + 1) == ',')
+                    {
+                      DRV_prep_cpp_arg (s + 2);
+                    }
+                    
+                  break;
+                case 'b':
+                  if (*(s + 1) == ',')
+                    {
+                      be_global->prep_be_arg (s + 2);
+                    }
+                    
+                  break;
+                }
+                
+              break;
+            case 'Y':
+              if (av[i][2] == '\0')
+                {
+                  if (i < ac - 1)
+                    {
+                      s = av[i + 1];
+                      ++i;
+                    }
+                  else
+                    {
+                      ACE_ERROR ((
+                          LM_ERROR,
+                          ACE_TEXT ("IDL: I don't understand")
+                          ACE_TEXT (" the '%s' option\n"),
+                          av[i]
+                        ));
+                        
+                      idl_global->set_compile_flags (
+                                      idl_global->compile_flags ()
+                                      | IDL_CF_ONLY_USAGE
+                                    );
+                      break;
+                    }
+                }
+              else
+                {
+                  s = av[i] + 2;
+                }
+
+              switch (*s)
+                {
+                  case 'p':
+                    if (*(s + 1) == ',')
+                      {
+                        idl_global->set_cpp_location (s + 2);
+                        DRV_cpp_new_location (s + 2);
+                      }
+                    else
+                      {
+                        ACE_ERROR ((
+                            LM_ERROR,
+                            ACE_TEXT ("IDL: I don't understand")
+                            ACE_TEXT (" the '-Y' option\n")
+                          ));
+                          
+                        idl_global->set_compile_flags (
+                                        idl_global->compile_flags ()
+                                        | IDL_CF_ONLY_USAGE
+                                      );
+                      }
+                      
+                    break;
+                  default:
+                    ACE_ERROR ((
+                        LM_ERROR,
+                        ACE_TEXT ("IDL: I dont' understand the use of")
+                        ACE_TEXT (" %s with the '-Y' option\n"),
+                        s
+                      ));
+                    
+                    idl_global->set_compile_flags (
+                                    idl_global->compile_flags ()
+                                    | IDL_CF_ONLY_USAGE
+                                  );
+                   break;
+                }
+              break;
+            case 'd':
+              idl_global->set_compile_flags (idl_global->compile_flags ()
+                                             | IDL_CF_DUMP_AST);
+              break;
+            case 'u':
+              idl_global->set_compile_flags (idl_global->compile_flags ()
+                                             | IDL_CF_ONLY_USAGE);
+              break;
+            case 'v':
+              idl_global->set_compile_flags (idl_global->compile_flags ()
+                                             | IDL_CF_INFORMATIVE);
+              break;
+            case 'w':
+              idl_global->set_compile_flags (idl_global->compile_flags ()
+                                             | IDL_CF_NOWARNINGS);
+              break;
+            case 'C':
+              // If identifiers in the same scope differ only by case...
+              if (av[i][2] == 'e')
+                {
+                  // ...report an error.
+                  idl_global->case_diff_error (true);
+                }
+              else if (av[i][2] == 'w')
+                {
+                  // ...report a warning (default for now)
+                  idl_global->case_diff_error (false);
+                }
+              else
+                {
+                  ACE_ERROR ((
+                      LM_ERROR,
+                      ACE_TEXT ("IDL: I don't understand the '%s' option\n"),
+                      av[i]
+                    ));
+
+                  idl_global->set_compile_flags (
+                                  idl_global->compile_flags ()
+                                  | IDL_CF_ONLY_USAGE
+                                );
+                }
+
+              break;
             default:
-              cerr << GTDEVEL("IDL: -W must be followed by 'p' or 'b'\n");
-              exit(99);
-            case 'p':
-              if (*(s + 1) == ',')
-                DRV_prep_cpp_arg(s + 2);
+              be_global->parse_args (i, av);
               break;
-            case 'b':
-              if (*(s + 1) == ',')
-                (*DRV_BE_prep_arg)(s + 2, I_TRUE);
-              break;
-            }
-          break;
-        case 'Y':
-          if (av[i][2] == '\0') {
-            if (i < ac - 1) {
-              i++;
-              s = av[i];
-            } else {
-              cerr << GTDEVEL("IDL: missing argument after '")
-                   << av[i]
-                   << GTDEVEL("' flag\n");
-              exit(99);
-            }
-          } else
-            s = av[i] + 2;
-          switch (*s) {
-          case 'p':
-            if (*(s + 1) == ',') {
-              idl_global->set_cpp_location(s + 2);
-              DRV_cpp_new_location(s + 2);
-            }
-            break;
-          default:
-            break;
-          }
-          break;
-        case 'b':
-          if (av[i][2] == '\0') {
-            if (i < ac - 1) {
-              i++;
-              s = av[i];
-            } else {
-              cerr << GTDEVEL("IDL: missing argument after '")
-                   << av[i]
-                   << GTDEVEL("' flag\n");
-              exit(99);
-            }
-          } else
-            s = av[i] + 2;
-          idl_global->set_be(s);
-          break;
-        case 'd':
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_DUMP_AST);
-          break;
-        case 'u':
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_ONLY_USAGE);
-          break;
-        case 'v':
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_INFORMATIVE);
-          break;
-        case 'w':
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_NOWARNINGS);
-          break;
-        default:
-          cerr << GTDEVEL("IDL: Illegal option '") << av[i] << "'\n";
-          idl_global->set_compile_flags(idl_global->compile_flags() |
-                                        IDL_CF_ONLY_USAGE);
-          break;
-        }
-      } else
-        DRV_push_file(av[i]);
-    }
-
-#if defined (ACE_HAS_GPERF)
-  // If Perfect Hashing Strategy has been selected, let us make sure
-  // that it exists and will work.
-  if (cg->lookup_strategy () == TAO_CodeGen::TAO_PERFECT_HASH)
-    {
-      // Testing whether GPERF works or no.
-      int return_value = DRV_check_gperf ();
-      if (return_value == -1)
-        {
-#if 0
-          ACE_DEBUG ((LM_DEBUG,
-                      "%p"
-                      "GPERF program couldn't be executed"
-                      "Perfect Hashed Operation Lookup strategy can not be used\n"
-                      "Using Dynamic_Hashed Operation Lookup strategy\n",
-                      "TAO_IDL:"));
-#endif /* 0 */
-          
-          // Switching over to Dynamic Hashing.
-          cg->lookup_strategy (TAO_CodeGen::TAO_DYNAMIC_HASH);
-        }
-    }
-#else /* Not ACE_HAS_GPERF */
-  // If GPERF is not there, we cannot use PERFECT_HASH strategy. Let
-  // us go for DYNAMIC_HASH.
-  if (cg->lookup_strategy () == TAO_CodeGen::TAO_PERFECT_HASH)
-    cg->lookup_strategy (TAO_CodeGen::TAO_DYNAMIC_HASH);
-#endif /* ACE_HAS_GPERF */    
-}
-  
-// Return 0 on success, -1 failure. The <errno> corresponding to the  
-// error that caused the GPERF execution is also set.
-int 
-DRV_check_gperf (void)
-{
-  // Just call gperf in silent mode. It will come and immly exit.
-
-  // Using ACE_Process.
-  ACE_Process process_manager;
-  ACE_Process_Options process_options;
-  
-  // Set the command line for the gperf program.
-  process_options.command_line ("%s"
-                                " "
-                                "-V",
-                                idl_global->perfect_hasher ());
-  
-  // Spawn a process for gperf.
-  if (process_manager.spawn (process_options) == -1)
-    return -1;
-  
-  // Wait for gperf to complete.
-  int wait_status = 0;
-  if (process_manager.wait (&wait_status) == -1)
-    return -1;
-  else
-    {
-      // Wait is sucessful, we will check the exit code from the
-      // spawned process.
-      if (WIFEXITED (wait_status))
-        {
-          // Normal exit.
-
-          // Check the exit value of the spawned process. ACE_Process
-          // exits with <errno> as exit code, if it is not able to
-          // exec gperf program, so get the exit code now and set that
-          // to <errno> again, so that it can be used to print error
-          // messages. 
-          errno = WEXITSTATUS (wait_status);
-          if (errno)
-            // <exec> has failed.
-            return -1;
-          else
-            // Everything was alright.
-            return 0;
-        }
+            } // End of switch (av[i][1])
+        } // End of IF (av[i][0] == '-')
       else
-        // Not a normal exit. No <errno> might be set. 
-        return -1;
+        {
+          DRV_push_file (av[i]);
+        }
+    } // End of FOR (i = 1; i < ac; i++)
+
+  be_global->arg_post_proc ();
+
+  // Make sure the output directory is valid.
+  if (idl_global->temp_dir () == 0)
+    {
+      char tmpdir[MAXPATHLEN + 1];
+
+      if (ACE::get_temp_dir (tmpdir, MAXPATHLEN) == -1)
+        {
+          ACE_ERROR ((LM_ERROR,
+                      ACE_TEXT ("Temporary path too long, ")
+                      ACE_TEXT ("defaulting to current directory\n")));
+
+          ACE_OS::strcpy (tmpdir, ".");
+        }
+
+#if defined(ACE_MVS)
+      if (ACE_OS::access (tmpdir, F_OK) == -1
+          || ACE_OS::access (tmpdir, R_OK) == -1
+          || ACE_OS::access (tmpdir, W_OK) == -1)
+#else
+      if (ACE_OS::access (tmpdir, F_OK | R_OK | W_OK) == -1)
+#endif /* ACE_MVS */
+        {
+          ACE_ERROR ((
+              LM_ERROR,
+              ACE_TEXT ("%s%s%s\n"),
+              ACE_TEXT ("Can't access temporary directory ("),
+              tmpdir,
+              ACE_TEXT ("), using current directory for temp files.")
+            ));
+
+          ACE_OS::strcpy (tmpdir, ".");
+#if defined(ACE_MVS)
+          if (ACE_OS::access (tmpdir, F_OK) == -1
+              || ACE_OS::access (tmpdir, R_OK) == -1
+              || ACE_OS::access (tmpdir, W_OK) == -1)
+#else
+          if (ACE_OS::access (tmpdir, F_OK | R_OK | W_OK) == -1)
+#endif /* ACE_MVS */
+            {
+              ACE_ERROR ((LM_ERROR,
+                          "%s%s\n",
+                          ACE_TEXT ("Error: Can't access ")
+                          ACE_TEXT ("temporary directory "),
+                          tmpdir));
+
+              idl_global->set_err_count (idl_global->err_count () + 1);
+              throw FE_Bailout ();
+            }
+        }
+
+      idl_global->temp_dir (tmpdir);
     }
+
+  DRV_cpp_post_init ();
 }
-
-
-
-
-
-

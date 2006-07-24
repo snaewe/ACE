@@ -1,14 +1,24 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (SP_ACCEPTOR_H)
+#ifndef SP_ACCEPTOR_H
 #define SP_ACCEPTOR_H
 
 #include "ace/Svc_Handler.h"
+#include "ace/Service_Config.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Acceptor.h"
 #include "ace/SPIPE_Stream.h"
 #include "ace/SPIPE_Acceptor.h"
 #include "ace/Asynch_IO.h"
+
+// This only works on Win32 platforms and on Unix platforms
+// supporting POSIX aio calls.
+#if ((defined (ACE_WIN32) && !defined (ACE_HAS_WINCE)) || (defined (ACE_HAS_AIO_CALLS)))
 
 // This is the class that does the work once the ACE_Oneshot_Acceptor
 // has accepted a connection.
@@ -37,7 +47,7 @@ public:
   ~IPC_Server (void);
 
   // = Dynamic linking hooks.
-  virtual int init (int argc, char *argv[]);
+  virtual int init (int argc, ACE_TCHAR *argv[]);
   // Initialize the network server.
 
   virtual int fini (void);
@@ -47,19 +57,23 @@ public:
   // Run the interative service.
 
 private:
-  int parse_args (int argc, char *argv[]);
+  int parse_args (int argc, ACE_TCHAR *argv[]);
   // Parse command-line arguments.
 
   int n_threads_;
   // Size of thread pool to use.
 
-  TCHAR rendezvous_[MAXPATHLEN + 1];
+  ACE_TCHAR rendezvous_[MAXPATHLEN + 1];
   // Meeting place for pipe.
 
-  ACE_Sig_Adapter done_handler_;
+  int shutdown_;
   // Keeps track of when we shut down due to receipt of the SIGINT
   // signal.
+
+  int handle_signal (int signum, siginfo_t *, ucontext_t *);
+  // Signal handler method.
 };
 
+#endif /* ACE_WIN32 || ACE_HAS_AIO_CALLS*/
 #endif /* SP_ACCEPTOR_H */
 

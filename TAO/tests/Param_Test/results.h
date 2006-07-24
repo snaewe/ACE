@@ -16,11 +16,24 @@
 //
 // ============================================================================
 
-#if !defined (RESULTS_H)
+#ifndef RESULTS_H
 #define RESULTS_H
 
-#include "tao/corba.h"
+#include "tao/Basic_Types.h"
+
 #include "ace/Profile_Timer.h"
+#include "ace/CORBA_macros.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+namespace CORBA
+{
+  class Environment;
+}
+TAO_END_VERSIONED_NAMESPACE_DECL
 
 class Results
 {
@@ -34,8 +47,8 @@ public:
   void print_stats (void);
   // prints the time stats
 
-  void print_exception (const char *call_name,
-                        CORBA::Environment &);
+  void print_exception (const char *call_name
+                        ACE_ENV_ARG_DECL_NOT_USED);
   // print the exception
 
   void start_timer (void);

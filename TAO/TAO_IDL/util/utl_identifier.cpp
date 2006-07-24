@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,63 +62,176 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-// utl_identifier - Implementation of identifiers
+#include "utl_identifier.h"
+#include "global_extern.h"
+#include "utl_err.h"
+#include "utl_string.h"
 
-#include	"idl.h"
-#include	"idl_extern.h"
+// FUZZ: disable check_for_streams_include
+#include "ace/streams.h"
 
-ACE_RCSID(util, utl_identifier, "$Id$")
+ACE_RCSID (util,
+           utl_identifier,
+           "$Id$")
 
-/*
- * Constructors
- */
-
-Identifier::Identifier ()
-  : pv_string (NULL)
+Identifier::Identifier (void)
+  : pv_string (0),
+    escaped_ (0)
 {
 }
 
-Identifier::Identifier (char *s, long, long, long)
-  : pv_string (ACE_OS::strdup (s))
+Identifier::Identifier (const char *s)
 {
-}
+  bool shift = 0;
+  this->escaped_ = 0;
 
-Identifier::~Identifier () 
-{
-  if (this->pv_string != 0)
+  if (*s == '_')
     {
-      // The string was allocated using strdup, which uses malloc.
-      ACE_OS::free (this->pv_string);
+      // Only one leading underscore is allowed.
+      if (s[1] == '_')
+        {
+          idl_global->err ()->error0 (UTL_Error::EIDL_UNDERSCORE);
+        }
+
+      shift = 1;
+      this->escaped_ = 1;
+
+      ACE_CString str (s,
+                       0,
+                       0);
+
+      if (str.find ("_cxx_") == 0
+          || str.find ("_tc_") == 0
+          || str.find ("_tao_") == 0)
+        {
+          shift = 0;
+        }
+    }
+
+  if (shift)
+    {
+      this->pv_string = ACE::strnew (s + 1);
+    }
+  else
+    {
+      this->pv_string = ACE::strnew (s);
     }
 }
 
-// Operations
+Identifier::~Identifier (void)
+{
+  if (this->pv_string != 0)
+    {
+      ACE::strdelete (this->pv_string);
+      this->pv_string = 0;
+    }
+}
+
+// Operations.
 
 char *
-Identifier::get_string ()
+Identifier::get_string (void)
 {
-  return pv_string;
+  return this->pv_string;
+}
+
+void
+Identifier::replace_string (const char * s)
+{
+  if (this->pv_string != 0)
+    {
+      delete [] this->pv_string;
+    }
+
+  this->pv_string = ACE::strnew (s);
 }
 
 // Compare two Identifier *
-long
+bool
 Identifier::compare (Identifier *o)
 {
-  if (o == NULL) return I_FALSE;
-  if (pv_string == NULL || o->get_string() == NULL)
-    return I_FALSE;
-  return (ACE_OS::strcmp (pv_string, o->get_string ()) == 0) ? I_TRUE : I_FALSE;
+  if (o == 0)
+    {
+      return false;
+    };
+
+  if (this->pv_string == 0 || o->get_string () == 0)
+    {
+      return false;
+    }
+
+  if (this->escaped_ ^ o->escaped_)
+    {
+      return false;
+    }
+
+  return (ACE_OS::strcmp (this->pv_string, o->get_string ()) == 0);
 }
 
-// Dumping
+// Report the appropriate error if the two identifiers differ only in case.
+bool
+Identifier::case_compare (Identifier *o)
+{
+  UTL_String member (this->pv_string);
+  UTL_String other (o->get_string ());
+
+  bool result = member.compare (&other);
+
+  member.destroy ();
+  other.destroy ();
+
+  return result;
+}
+
+// Report no error if the two identifiers differ only in case.
+bool
+Identifier::case_compare_quiet (Identifier *o)
+{
+  UTL_String member (this->pv_string);
+  UTL_String other (o->pv_string);
+
+  bool const result = member.compare_quiet (&other);
+
+  member.destroy ();
+  other.destroy ();
+
+  return result;
+}
+
+Identifier *
+Identifier::copy (void)
+{
+  Identifier *retval = 0;
+  ACE_NEW_RETURN (retval,
+                  Identifier (this->pv_string),
+                  0);
+
+  retval->escaped_ = this->escaped_;
+
+  return retval;
+}
+
+bool
+Identifier::escaped (void) const
+{
+  return this->escaped_;
+}
+
+// Dumping.
+void
+Identifier::dump (ACE_OSTREAM_TYPE &o)
+{
+  if (this->pv_string == 0)
+    {
+      return;
+    }
+
+  o << this->pv_string;
+}
 
 void
-Identifier::dump (ostream &o)
+Identifier::destroy (void)
 {
-  if (pv_string == NULL) return;
-
-  o << get_string();
 }
-

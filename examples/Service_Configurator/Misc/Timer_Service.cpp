@@ -1,19 +1,29 @@
 // $Id$
 
+#include "ace/OS_NS_string.h"
 #include "Timer_Service.h"
+#include "ace/Log_Msg.h"
 
 ACE_RCSID(Misc, Timer_Service, "$Id$")
 
-int
-Timer_Service_1::init (int argc, char *argv[])
+Timer_Service_1::Timer_Service_1 (void)
 {
-  ACE_DEBUG ((LM_DEBUG, 
-	      "in Timer_Service::init, argv[0] = %s, argc == %d\n", 
+  ACE_OS::strcpy (this->name_,
+                  ACE_TEXT ("Timer_Service_1"));
+}
+
+int
+Timer_Service_1::init (int argc, ACE_TCHAR *argv[])
+{
+  ACE_DEBUG ((LM_DEBUG,
+	      ACE_TEXT ("in Timer_Service::init, argv[0] = %s, argc == %d\n"),
 	      argv[0], argc));
 
   // Printout the <argv> values for sanity's sake.
   for (int i = 0; i < argc; i++)
-    ACE_DEBUG ((LM_DEBUG, "argv[%d] = %s\n", i, argv[i]));
+    ACE_DEBUG ((LM_DEBUG,
+                ACE_TEXT ("argv[%d] = %s\n"),
+                i, argv[i]));
 
   int interval = Timer_Service_1::TIMEOUT;
 
@@ -42,14 +52,16 @@ Timer_Service_1::init (int argc, char *argv[])
 
   // If the fourth argument exists take this as an indication to
   // enable tracing.
+#if defined (ACE_HAS_TRACE)
   if (argc > 3)
     ACE_Trace::start_tracing ();
   else
     ACE_Trace::stop_tracing ();
+#endif /* ACE_HAS_TRACE */
 
   // Register the timer to go off in 1 second, and then to go off
   // every <interval> seconds.
-  if (ACE_Reactor::instance ()->schedule_timer 
+  if (ACE_Reactor::instance ()->schedule_timer
       (this,
        0,
        ACE_Time_Value (1),
@@ -63,10 +75,11 @@ int
 Timer_Service_1::handle_timeout (const ACE_Time_Value &tv,
                                  const void *)
 {
-  ACE_DEBUG ((LM_DEBUG, 
-	      "(%x) in Timer_Service::handle_timeout sec = %d, usec = %d"
-	      " cur_timeouts = %d, max_timeouts = %d\n",
+  ACE_DEBUG ((LM_DEBUG,
+	      ACE_TEXT ("(%x) in %s::handle_timeout sec = %d, usec = %d")
+	      ACE_TEXT (" cur_timeouts = %d, max_timeouts = %d\n"),
               this,
+              this->name_,
 	      tv.sec (),
               tv.usec (),
 	      this->cur_timeouts_,
@@ -85,15 +98,30 @@ int
 Timer_Service_1::handle_close (ACE_HANDLE,
                                ACE_Reactor_Mask)
 {
-  ACE_DEBUG ((LM_DEBUG, "closing down the timer test\n"));
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("closing down the timer test\n")));
+
+  // Remove ourselves from the timer queue.
+  ACE_Reactor::instance ()->cancel_timer (this);
 
   ACE_Reactor::end_event_loop();
   return 0;
 }
 
+Timer_Service_2::Timer_Service_2 (void)
+{
+  ACE_OS::strcpy (this->name_,
+                  ACE_TEXT ("Timer_Service_2"));
+}
+
+Timer_Service_3::Timer_Service_3 (void)
+{
+  ACE_OS::strcpy (this->name_,
+                  ACE_TEXT ("Timer_Service_3"));
+}
+
 // Define the object that describes the service.
 ACE_STATIC_SVC_DEFINE (Timer_Service_1,
-		       "Timer_Service_1",
+		       ACE_TEXT ("Timer_Service_1"),
                        ACE_SVC_OBJ_T,
                        &ACE_SVC_NAME (Timer_Service_1),
 		       ACE_Service_Type::DELETE_THIS | ACE_Service_Type::DELETE_OBJ,
@@ -104,3 +132,4 @@ ACE_STATIC_SVC_DEFINE (Timer_Service_1,
 // Services.
 ACE_SVC_FACTORY_DEFINE (Timer_Service_1)
 ACE_SVC_FACTORY_DEFINE (Timer_Service_2)
+ACE_SVC_FACTORY_DEFINE (Timer_Service_3)

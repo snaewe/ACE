@@ -3,49 +3,54 @@
 
 // Option manager for ustreams.
 
+// Since this is only included in Options.h these should stay
+// inline, not ACE_INLINE.
+// FUZZ: disable check_for_inline
+
+
 inline void   
-Options::supplier_port (char *port)
+Options::supplier_port (const ACE_TCHAR *port)
 {
   this->supplier_port_ = port;
 }
 
-inline char *
+inline const ACE_TCHAR *
 Options::supplier_port (void)
 {
   return this->supplier_port_;
 }
 
 inline void   
-Options::supplier_file (char *file)
+Options::supplier_file (const ACE_TCHAR *file)
 {
   this->supplier_file_ = file;
 }
 
-inline char *
+inline const ACE_TCHAR *
 Options::supplier_file (void)
 {
   return this->supplier_file_;
 }
 
 inline void   
-Options::consumer_file (char *file)
+Options::consumer_file (const ACE_TCHAR *file)
 {
   this->consumer_file_ = file;
 }
 
-inline char *
+inline const ACE_TCHAR *
 Options::consumer_file (void)
 {
   return this->consumer_file_;
 }
 
 inline void   
-Options::consumer_port (char *port)
+Options::consumer_port (const ACE_TCHAR *port)
 {
   this->consumer_port_ = port;
 }
 
-inline char *
+inline const ACE_TCHAR *
 Options::consumer_port (void)
 {
   return this->consumer_port_;

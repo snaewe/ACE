@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,82 +62,64 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _STRING_STRING_HH
 #define _STRING_STRING_HH
 
-// utl_string.hh - contains a quick and dirty TEMPORARY string implementation
+#include "TAO_IDL_FE_Export.h"
 
-/*
-** DEPENDENCIES: NONE
-**
-** USE: Included from util.hh
-*/
+#include "ace/iosfwd.h"
+  /* Basic_Types.h are needed in QNX for size_t type. */
+#include "ace/Basic_Types.h"
 
-#ifndef String
-#define String	UTL_String
-#endif	// String
-
-class	UTL_String
+class TAO_IDL_FE_Export UTL_String
 {
   // =TITLE
   //  UTL_String
   // =DESCRIPTION
   //  string class to store identifiers
 public:
-  // =Operations
-
   UTL_String (void);
-  // default constructor
 
-  UTL_String (char *str);
-  // construct from a char *
-
-  UTL_String (unsigned long maxlen);
-  // constructor with an initial string length
+  UTL_String (const char *str);
 
   UTL_String (UTL_String *s);
-  // construct using a pointer to UTL_String
 
-  virtual ~UTL_String (void) {}
-  // destructor 
+  virtual ~UTL_String (void);
 
-  // =AST Dumping
-
-  virtual void dump (ostream &o);
-  // dump to the ostream
-
-  // =Other Operations
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+  // Dump to the ostream.
 
   char *get_string (void);
-  // Get contents of utl_string
+  // Get contents of utl_string.
 
   char *get_canonical_rep (void);
   // Get canonical representation. This is (implemented as) the all upper
-  // case corresponding string
+  // case corresponding string.
 
-  virtual long compare (UTL_String *s);
-  // Compare two String *
+  bool compare (UTL_String *s);
+  // Compare two UTL_String *
+
+  bool compare_quiet (UTL_String *s);
+  // Like the above but without error or warning message output.
+
+  virtual void destroy (void);
+  // Cleanup function.
 
 private:
   // Data
-  char		*p_str;		
-  // Storage for characters
+  char *p_str;
+  // Storage for characters.
 
-  char		*c_str;		
+  char *c_str;
   // Canonicalized string
 
-  unsigned long	len;		
-  // How long is string
+  size_t len;
+  // How long is string.
 
-  unsigned long alloced;	
-  // How much allocated
-
-  // =Private helper operations
-
-  void canonicalize (void);	
-  // Compute canonical representation
+  void canonicalize (void);
+  // Compute canonical representation.
 };
 
 #endif           // _STRING_STRING_HH

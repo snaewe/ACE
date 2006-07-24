@@ -18,14 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_typecode.h"
-
-ACE_RCSID(be_visitor_typecode, typecode_decl, "$Id$")
-
+ACE_RCSID (be_visitor_typecode,
+           typecode_decl,
+           "$Id$")
 
 // ******************************************************
 // TypeCode declarations
@@ -34,6 +29,11 @@ ACE_RCSID(be_visitor_typecode, typecode_decl, "$Id$")
 be_visitor_typecode_decl::be_visitor_typecode_decl (be_visitor_context *ctx)
   : be_visitor_decl (ctx)
 {
+  if (be_global->gen_anyop_files ())
+    {
+      // The context is always a copy, so this is ok.
+      this->ctx_->stream (tao_cg->anyop_header ());
+    }
 }
 
 be_visitor_typecode_decl::~be_visitor_typecode_decl (void)
@@ -45,28 +45,42 @@ be_visitor_typecode_decl::visit_type (be_type *node)
 {
   TAO_OutStream *os = this->ctx_->stream ();
 
-  // Generate the typecode decl
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__ << be_nl << be_nl;
+  
+  // If -GA is used but anyop macro isn't set, defaults to stub macro.    
+  const char *export_macro = (be_global->gen_anyop_files ()
+                              ? this->ctx_->non_null_export_macro ()
+                              : be_global->stub_export_macro ());
+
   if (node->is_nested ())
     {
-      // we have a scoped name
-      os->indent ();
-      // is our enclosing scope a module? We need this check because for
-      // platforms that support namespaces, the typecode must be declared
-      // extern
+      // We have a scoped name.
+      // Is our enclosing scope a module? We need this check because
+      // for platforms that support namespaces, the TypeCode must be
+      // declared extern.
       if (node->defined_in ()->scope_node_type () == AST_Decl::NT_module)
-        *os << "TAO_NAMESPACE_STORAGE_CLASS ";
+        {
+          *os << "extern " << export_macro << " ";
+        }
       else
-        *os << "static ";
-      *os << "CORBA::TypeCode_ptr "
-          << node->tc_name ()->last_component () << ";\n\n";
+        {
+          *os << "static ";
+        }
+
+      *os << "::CORBA::TypeCode_ptr const "
+          << node->tc_name ()->last_component ()
+          << ";";
     }
   else
     {
-      // we are in the ROOT scope
-      os->indent ();
-      *os << "extern " << idl_global->export_macro () << " CORBA::TypeCode_ptr "
-          << " " << node->tc_name ()->last_component () << ";\n\n";
+      // We are in the ROOT scope.
+      *os << "extern " << export_macro
+          << " ::CORBA::TypeCode_ptr const "
+          << node->tc_name ()->last_component ()
+          << ";";
     }
+
   return 0;
 }
 
@@ -95,6 +109,18 @@ be_visitor_typecode_decl::visit_interface (be_interface *node)
 }
 
 int
+be_visitor_typecode_decl::visit_component (be_component *node)
+{
+  return this->visit_type (node);
+}
+
+int
+be_visitor_typecode_decl::visit_home (be_home *node)
+{
+  return this->visit_type (node);
+}
+
+int
 be_visitor_typecode_decl::visit_sequence (be_sequence *node)
 {
   return this->visit_type (node);
@@ -114,6 +140,24 @@ be_visitor_typecode_decl::visit_typedef (be_typedef *node)
 
 int
 be_visitor_typecode_decl::visit_union (be_union *node)
+{
+  return this->visit_type (node);
+}
+
+int
+be_visitor_typecode_decl::visit_valuebox (be_valuebox *node)
+{
+  return this->visit_type (node);
+}
+
+int
+be_visitor_typecode_decl::visit_valuetype (be_valuetype *node)
+{
+  return this->visit_type (node);
+}
+
+int
+be_visitor_typecode_decl::visit_eventtype (be_eventtype *node)
 {
   return this->visit_type (node);
 }

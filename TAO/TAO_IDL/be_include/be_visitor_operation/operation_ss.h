@@ -1,6 +1,6 @@
+// -*- C++ -*-
 //
 // $Id$
-//
 
 // ============================================================================
 //
@@ -18,14 +18,14 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_OPERATION_OPERATION_SS_H_)
+#ifndef _BE_VISITOR_OPERATION_OPERATION_SS_H_
 #define _BE_VISITOR_OPERATION_OPERATION_SS_H_
 
 // ************************************************************
 // Operation visitor for server skeletons
 // ************************************************************
 
-class be_visitor_operation_ss : public be_visitor_scope
+class be_visitor_operation_ss : public be_visitor_operation
 {
   //
   // = TITLE
@@ -48,8 +48,18 @@ public:
   virtual int visit_argument (be_argument *node);
   // visit argument to generate ParamData entries
 
-  virtual int post_process (void);
-  // stuff to output after every member of the scope is handled
+  // template methods
+
+  virtual int gen_pre_skel_info (be_operation *node);
+  // generate any pre skeleton code info
+
+  /// Generate the skeleton operation body.
+  int gen_skel_operation_body (be_operation * node,
+                               be_type * return_type);
+
+  /// Generate the skeleton operation argument list.
+  void gen_skel_body_arglist (be_operation * node,
+                              TAO_OutStream * os);
 };
 
 #endif /* _BE_VISITOR_OPERATION_OPERATION_SS_H_ */

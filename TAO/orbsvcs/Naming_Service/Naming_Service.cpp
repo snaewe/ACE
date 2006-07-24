@@ -1,178 +1,158 @@
 // $Id$
 
-// ============================================================================
-//
-// = LIBRARY
-//    orbsvcs/Naming_Service/Naming_Service
-//
-// = FILENAME
-//    Naming_Service.cpp
-//
-// = DESCRIPTION
-//      This class implements a Naming_Service object.
-//
-// = AUTHORS
-//    Nagarajan Surendran (naga@cs.wustl.edu)
-//
-// ============================================================================
-
 #include "Naming_Service.h"
+
+#include "ace/Get_Opt.h"
+#include "ace/Argv_Type_Converter.h"
 
 ACE_RCSID(Naming_Service, Naming_Service, "$Id$")
 
 // Default Constructor.
 
-Naming_Service::Naming_Service (void)
-  : ior_output_file_ (0),
-    pid_file_name_ (0)
+TAO_Naming_Service::TAO_Naming_Service (void)
+  : time_ (0)
 {
 }
 
 // Constructor taking command-line arguments.
-
-Naming_Service::Naming_Service (int argc,
-                                char* argv[])
-  : ior_output_file_ (0),
-    pid_file_name_ (0)
+TAO_Naming_Service::TAO_Naming_Service (int argc,
+                                        ACE_TCHAR* argv[])
+  : time_ (0)
 {
   this->init (argc, argv);
 }
 
+
+// Initialize the state of the TAO_Naming_Service object
 int
-Naming_Service::parse_args (int argc,
-                            char *argv[])
-{
-  ACE_Get_Opt get_opts (argc, argv, "o:p:");
-  int c;
-
-  while ((c = get_opts ()) != -1)
-    switch (c)
-      {
-      case 'o': // outputs the naming service ior to a file.
-        this->ior_output_file_ =
-          ACE_OS::fopen (get_opts.optarg, "w");
-
-        if (this->ior_output_file_ == 0)
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "Unable to open %s for writing: %p\n",
-                             get_opts.optarg), -1);
-        break;
-      case 'p':
-        this->pid_file_name_ = get_opts.optarg;
-        break;
-      case '?':
-      default:
-        ACE_ERROR_RETURN ((LM_ERROR,
-                           "usage:  %s "
-                           "-NScontextname <contextname> "
-                           "-o <ior_output_file> "
-                           "-p <pid_file_name> "
-                           "\n",
-                           argv [0]),
-                          -1);
-      }
-  return 0;
-}
-
-// Initialize the state of the Naming_Service object
-int
-Naming_Service::init (int argc,
-                      char* argv[])
+TAO_Naming_Service::init (int argc,
+                          ACE_TCHAR* argv[])
 {
   int result;
-  CORBA::ORB_var orb;
-  PortableServer::POA_var child_poa;
 
-  TAO_TRY
+  ACE_DECLARE_NEW_CORBA_ENV;
+  ACE_TRY
     {
-      this->orb_manager_.init_child_poa (argc,
-                                         argv,
-                                         "child_poa",
-                                         TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      // Copy command line parameter.
+      ACE_Argv_Type_Converter command_line(argc, argv);
 
-      orb = this->orb_manager_.orb ();
-      child_poa = this->orb_manager_.child_poa ();
+      // Initialize the ORB
+      this->orb_ =
+        CORBA::ORB_init (command_line.get_argc(), command_line.get_ASCII_argv(), 0 ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-      result = this->my_naming_server_.init (orb.in (),
-                                             child_poa.in (),
-                                             argc,
-                                             argv);
-      TAO_CHECK_ENV;
+      // Parse the args for '-t' option. If '-t' option is passed, do
+      // the needful and then remove the option from the list of
+      // arguments.
+      this->parse_args (command_line.get_argc(), command_line.get_TCHAR_argv());
+
+      // This function call initializes the naming service and returns
+      // '-1' in case of an exception.
+      result = this->my_naming_server_.init_with_orb (command_line.get_argc(),
+                                                      command_line.get_TCHAR_argv(),
+                                                      this->orb_.in ());
+
       if (result == -1)
         return result;
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("Naming_Service::init");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "TAO_Naming_Service::init");
       return -1;
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
+  ACE_CHECK_RETURN (-1);
 
-  // Check the non-ORB arguments.
-  result = this->parse_args (argc,
-                             argv);
+  return 0;
+}
 
-  if (result < 0)
-    return result;
-  if (this->ior_output_file_ != 0)
+int
+TAO_Naming_Service::parse_args (int &argc,
+                                ACE_TCHAR* argv[])
+{
+  ACE_Get_Opt get_opts (argc, argv, ACE_TEXT("-t:"));
+  int c;
+
+  while ((c = get_opts ()) != -1)
     {
-      CORBA::String_var str =
-        this->my_naming_server_.naming_service_ior ();
-      ACE_OS::fprintf (this->ior_output_file_,
-                       "%s",
-                       str.in ());
-      ACE_OS::fclose (this->ior_output_file_);
-    }
-
-  if (this->pid_file_name_ != 0)
-    {
-      FILE* pidf = fopen (this->pid_file_name_, "w");
-      if (pidf != 0)
+      switch (c)
         {
-          ACE_OS::fprintf (pidf, "%d\n", ACE_OS::getpid ());
-          ACE_OS::fclose (pidf);
+        case 't':
+          {
+            int time = ACE_OS::atoi (get_opts.opt_arg ());
+            if (time >= 0)
+              this->time_ = time;
+
+            // Remove the option '-t' from argv []
+            // to avoid any confusion that might result.
+            for (int i = get_opts.opt_ind (); i != argc; ++i)
+              argv [i-2 ] = argv [i];
+
+            // Decrement the value of argc to reflect the removal
+            // of '-t' option.
+            argc = argc - 2;
+            break;
+          }
+        case '?':
+        default:
+          // Don't do anything. The TAO_Naming_Server::parse_args ()
+          // takes care of indicating an error in case of error.
+          break;
         }
     }
   return 0;
 }
 
-// Run the ORB event loop
+// Run the ORB event loop.
+int
+TAO_Naming_Service::run (ACE_ENV_SINGLE_ARG_DECL)
+{
+  if (time_ == 0)
+    {
+      this->orb_->run (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_CHECK_RETURN (-1);
+    }
+  else
+    {
+      ACE_Time_Value tv (time_);
+      this->orb_->run (tv ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK_RETURN (-1);
+    }
+
+  return 0;
+}
+
+void
+TAO_Naming_Service::shutdown (ACE_ENV_SINGLE_ARG_DECL)
+{
+  this->orb_->shutdown (0 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+}
 
 int
-Naming_Service::run (CORBA_Environment& env)
+TAO_Naming_Service::fini (void)
 {
-  return this->orb_manager_.run (env);
+  ACE_DECLARE_NEW_CORBA_ENV;
+
+  this->my_naming_server_.fini();
+
+  ACE_TRY
+  {
+    // destroy implies shutdown
+    this->orb_->destroy (ACE_ENV_SINGLE_ARG_PARAMETER);
+    ACE_TRY_CHECK;
+  }
+  ACE_CATCHANY
+  {
+    ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "TAO_Naming_Service::fini");
+    return -1;
+  }
+  ACE_ENDTRY;
+  return 0;
 }
 
 // Destructor.
-
-Naming_Service::~Naming_Service (void)
+TAO_Naming_Service::~TAO_Naming_Service (void)
 {
-}
-
-int
-main (int argc, char* argv[])
-{
-  int init_result;
-
-  Naming_Service naming_service;
-
-  init_result = naming_service.init (argc,argv);
-  if (init_result < 0)
-    return init_result;
-
-  TAO_TRY
-    {
-      naming_service.run (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-
-    }
-  TAO_CATCHANY
-    {
-      TAO_TRY_ENV.print_exception ("NamingService");
-      return -1;
-    }
-  TAO_ENDTRY;
-  return 0;
+  // Destructor
 }

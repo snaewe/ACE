@@ -27,10 +27,14 @@
 // for the lock.  If there were multiple threads contending for the lock,
 // the Mutex_Singleton performance would get increasing worse...
 
+#include "ace/OS_main.h"
+#include "ace/Guard_T.h"
 #include "ace/Profile_Timer.h"
 #include "ace/Singleton.h"
-#include "ace/Synch.h"
+#include "ace/Synch_Traits.h"
 #include "ace/Log_Msg.h"
+
+#include "test_singleton.h"
 
 ACE_RCSID(Misc, test_singleton, "$Id$")
 
@@ -46,11 +50,11 @@ public:
   static Mutex_Singleton *instance (void);
 
 private:
-  static ACE_Thread_Mutex lock_;
+  static ACE_SYNCH_MUTEX lock_;
   static Mutex_Singleton *instance_;
 };
 
-ACE_Thread_Mutex Mutex_Singleton::lock_;
+ACE_SYNCH_MUTEX Mutex_Singleton::lock_;
 
 Mutex_Singleton *Mutex_Singleton::instance_;
 
@@ -58,7 +62,7 @@ Mutex_Singleton *
 Mutex_Singleton::instance (void)
 {
   // Acquire the lock every time in.
-  ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, Mutex_Singleton::lock_, 0);
+  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ace_mon, Mutex_Singleton::lock_, 0);
 
   if (Mutex_Singleton::instance_ == 0)
     ACE_NEW_RETURN (Mutex_Singleton::instance_, Mutex_Singleton, 0);
@@ -66,19 +70,7 @@ Mutex_Singleton::instance (void)
   return Mutex_Singleton::instance_;
 }
 
-class DC_Singleton
-{
-public:
-  DC_Singleton (void) {}
-  void svc (void) {}
-  static DC_Singleton *instance (void);
-
-private:
-  static ACE_Thread_Mutex lock_;
-  static DC_Singleton *instance_;
-};
-
-ACE_Thread_Mutex DC_Singleton::lock_;
+ACE_SYNCH_MUTEX DC_Singleton::lock_;
 
 DC_Singleton *DC_Singleton::instance_;
 
@@ -88,7 +80,7 @@ DC_Singleton::instance (void)
   if (DC_Singleton::instance_ == 0)
     {
       // Only lock if instance_ isn't 0.
-      ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, DC_Singleton::lock_, 0);
+      ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ace_mon, DC_Singleton::lock_, 0);
 
       // Perform the Double-Check.
       if (DC_Singleton::instance_ == 0)
@@ -98,10 +90,10 @@ DC_Singleton::instance (void)
   return DC_Singleton::instance_;
 }
 
-typedef ACE_Singleton <DC_Singleton, ACE_Thread_Mutex> My_Singleton;
+typedef ACE_Singleton <DC_Singleton, ACE_SYNCH_MUTEX> My_Singleton;
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   ACE_Profile_Timer timer;
   int iterations = argc > 1 ? ACE_OS::atoi (argv[1]) : DEFAULT_ITERATIONS;
@@ -171,16 +163,15 @@ main (int argc, char *argv[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Singleton<DC_Singleton, ACE_Thread_Mutex>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Singleton<DC_Singleton, ACE_Thread_Mutex>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+#if defined (ACE_HAS_EXPLICIT_STATIC_TEMPLATE_MEMBER_INSTANTIATION)
+template ACE_Singleton<DC_Singleton, ACE_SYNCH_MUTEX> *
+  ACE_Singleton<DC_Singleton, ACE_SYNCH_MUTEX>::singleton_;
+#endif /* ACE_HAS_EXPLICIT_STATIC_TEMPLATE_MEMBER_INSTANTIATION */
 
 
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

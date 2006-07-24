@@ -1,19 +1,25 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (_CONSUMER_ROUTER_H)
+#ifndef _CONSUMER_ROUTER_H
 #define _CONSUMER_ROUTER_H
 
 #include "ace/SOCK_Acceptor.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/UPIPE_Acceptor.h"
 #include "ace/Svc_Handler.h"
+#include "ace/RW_Thread_Mutex.h"
 #include "Peer_Router.h"
 
 class Consumer_Router : public Peer_Router
 {
   // = TITLE
   //     Provides the interface between one or more Consumers and the
-  //     Event Server <ACE_Stream>.  
+  //     Event Server <ACE_Stream>.
   //
   // = DESCRIPTION
   //     This class normally sits on "top" of the Stream and routes
@@ -58,7 +64,7 @@ protected:
   // the stream.
 
   // = Dynamic linking hooks.
-  virtual int info (char **info_string, size_t length) const;
+  virtual int info (ACE_TCHAR **info_string, size_t length) const;
   // Returns information about this service.
 };
 

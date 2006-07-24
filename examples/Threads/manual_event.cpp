@@ -11,9 +11,13 @@
 // ACE_Manual_Event is use to synch with other
 // threads. ACE_Manual_Event::signal() is used for broadcasting.
 
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Service_Config.h"
-#include "ace/Synch.h"
+#include "ace/Thread_Mutex.h"
+#include "ace/Manual_Event.h"
 #include "ace/Thread_Manager.h"
+#include "ace/Atomic_Op.h"
 
 ACE_RCSID(Threads, manual_event, "$Id$")
 
@@ -58,7 +62,7 @@ Pseudo_Barrier::wait (void)
 static void *
 worker (void *arg)
 {
-  Pseudo_Barrier &barrier = *(Pseudo_Barrier *) arg;
+  Pseudo_Barrier &thread_barrier = *(Pseudo_Barrier *) arg;
 
   // work
   ACE_DEBUG ((LM_DEBUG, "(%t) working (%d secs)\n", ++::amount_of_work));
@@ -66,7 +70,7 @@ worker (void *arg)
 
   // synch with everybody else
   ACE_DEBUG ((LM_DEBUG, "(%t) waiting to synch with others \n"));
-  barrier.wait ();
+  thread_barrier.wait ();
 
   // more work
   ACE_DEBUG ((LM_DEBUG, "(%t) more work (%d secs)\n", ++::amount_of_work));
@@ -78,17 +82,17 @@ worker (void *arg)
 }
 
 int
-main (int argc, char **argv)
+ACE_TMAIN (int argc, ACE_TCHAR **argv)
 {
-  int n_threads = argc == 2 ? atoi (argv[1]) : 5;
+  int n_threads = argc == 2 ? ACE_OS::atoi (argv[1]) : 5;
 
   ACE_Thread_Manager &tm = *ACE_Thread_Manager::instance ();
 
   // synch object shared by all threads
-  Pseudo_Barrier barrier (n_threads);
+  Pseudo_Barrier thread_barrier (n_threads);
 
   // create workers
-  if (tm.spawn_n (n_threads, (ACE_THR_FUNC) worker, &barrier) == -1)
+  if (tm.spawn_n (n_threads, (ACE_THR_FUNC) worker, &thread_barrier) == -1)
     ACE_ERROR_RETURN ((LM_ERROR, "thread creates for worker failed"), -1);
 
   // wait for all workers to exit
@@ -100,15 +104,9 @@ main (int argc, char **argv)
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Atomic_Op<ACE_Thread_Mutex, int>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Atomic_Op<ACE_Thread_Mutex, int>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

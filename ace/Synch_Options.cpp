@@ -1,51 +1,57 @@
-// Synch_Options.cpp
-// $Id$
-
-#define ACE_BUILD_DLL
 #include "ace/Synch_Options.h"
 
-#if !defined (__ACE_INLINE__)
-#include "ace/Synch_Options.i"
-#endif /* __ACE_INLINE__ */
+#include "ace/Global_Macros.h"
+#include "ace/config-all.h"
 
-ACE_RCSID(ace, Synch_Options, "$Id$")
+ACE_RCSID (ace,
+           Synch_Options,
+           "$Id$")
 
-ACE_ALLOC_HOOK_DEFINE(ACE_Synch_Options)
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+ACE_ALLOC_HOOK_DEFINE (ACE_Synch_Options)
 
 void
 ACE_Synch_Options::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_Synch_Options::dump");
+#endif /* ACE_HAS_DUMP */
 }
 
 // Static initialization.
+// Note: these three objects require static construction and destruction.
 
-/* static */ 
+/* static */
 ACE_Synch_Options ACE_Synch_Options::defaults;
 
-/* static */ 
+/* static */
 ACE_Synch_Options ACE_Synch_Options::synch;
 
-/* static */ 
+/* static */
 ACE_Synch_Options ACE_Synch_Options::asynch (ACE_Synch_Options::USE_REACTOR);
 
-ACE_Synch_Options::ACE_Synch_Options (u_long options,
-				      const ACE_Time_Value &timeout,
-				      const void *arg)
+ACE_Synch_Options::ACE_Synch_Options (unsigned long options,
+                                      const ACE_Time_Value &timeout,
+                                      const void *arg)
 {
   // ACE_TRACE ("ACE_Synch_Options::ACE_Synch_Options");
   this->set (options, timeout, arg);
 }
 
 void
-ACE_Synch_Options::set (u_long options,
-			const ACE_Time_Value &timeout,
-			const void *arg)
+ACE_Synch_Options::set (unsigned long options,
+                        const ACE_Time_Value &timeout,
+                        const void *arg)
 {
   // ACE_TRACE ("ACE_Synch_Options::set");
   this->options_ = options;
   this->timeout_ = (ACE_Time_Value &) timeout;
 
+  // Whoa, possible dependence on static initialization here.  This
+  // function is called during initialization of the statics above.
+  // But, ACE_Time_Value::zero is a static object.  Very fortunately,
+  // its bits have a value of 0.
   if (this->timeout_ != ACE_Time_Value::zero)
     ACE_SET_BITS (this->options_, ACE_Synch_Options::USE_TIMEOUT);
 
@@ -53,14 +59,14 @@ ACE_Synch_Options::set (u_long options,
 }
 
 int
-ACE_Synch_Options::operator[] (u_long option) const
+ACE_Synch_Options::operator[] (unsigned long option) const
 {
   ACE_TRACE ("ACE_Synch_Options::operator[]");
   return (this->options_ & option) != 0;
 }
 
-void 
-ACE_Synch_Options::operator= (u_long option)
+void
+ACE_Synch_Options::operator= (unsigned long option)
 {
   ACE_TRACE ("ACE_Synch_Options::operator=");
   this->options_ |= option;
@@ -73,8 +79,8 @@ ACE_Synch_Options::timeout (void) const
   return this->timeout_;
 }
 
-void 
-ACE_Synch_Options::timeout (ACE_Time_Value &tv)
+void
+ACE_Synch_Options::timeout (const ACE_Time_Value &tv)
 {
   ACE_TRACE ("ACE_Synch_Options::timeout");
   this->timeout_ = tv;
@@ -101,3 +107,4 @@ ACE_Synch_Options::arg (const void *a)
   this->arg_ = a;
 }
 
+ACE_END_VERSIONED_NAMESPACE_DECL

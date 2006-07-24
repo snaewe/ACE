@@ -1,27 +1,44 @@
-# $Id$
-# -*- perl -*-
 eval '(exit $?0)' && eval 'exec perl -S $0 ${1+"$@"}'
     & eval 'exec perl -S $0 $argv:q'
     if 0;
 
-unshift @INC, '../../../../bin';
-require Process;
+# $Id$
+# -*- perl -*-
 
-$NS_ior = "NameService.ior";
-$sleeptime = 3;
+use lib '../../../../bin';
+use PerlACE::Run_Test;
 
-$NS = Process::Create ("../../Naming_Service/Naming_Service".
-		       $Process::EXE_EXT." -o $NS_ior ");
+$status = 0;
 
-sleep $sleeptime;
+$NS_ior = PerlACE::LocalFile ("NameService.ior");
+
+$NS = new PerlACE::Process ("../../Naming_Service/Naming_Service", "-o $NS_ior");
+$T = new PerlACE::Process ("EC_Multiple", 
+                           "-ORBInitRef NameService=file://$NS_ior"
+                           ." -s local");
+
+$NS->Spawn ();
+
+if (PerlACE::waitforfile_timed ($NS_ior, 5) == -1) {
+    print STDERR "ERROR: waiting for naming service IOR file\n";
+    $NS->Kill ();
+    exit 1;
+}
 
 # This is a very simple test, no multiple consumers and no gateways.
-$status = system ("EC_Multiple".$Process::EXE_EXT.
-		  " -s local");
+$test = $T->SpawnWaitKill (60);
 
-$NS->Kill ();
 
-unlink $NS_ior;
+if ($test != 0) {
+    print STDERR "ERROR: test returned $test\n";
+    $status = 1;
+}
 
-# @@ Capture any errors from the server too.
+$nserver = $NS->TerminateWaitKill (5);
+
+if ($nserver != 0) {
+    print STDERR "ERROR: naming service returned $nserver\n";
+    $status = 1;
+}
+
 exit $status;

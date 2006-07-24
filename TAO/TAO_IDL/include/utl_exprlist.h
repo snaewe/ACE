@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,60 +62,48 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _UTL_EXPRLIST_UTL_EXPRLIST_HH
 #define _UTL_EXPRLIST_UTL_EXPRLIST_HH
 
-// utl_exprlist.hh
-//
-// List of strings
+#include "utl_list.h"
+
+class AST_Expression;
+
+// List of expressions.
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-/*
-** DEPENDENCIES: ast_expression.hh, utl_list.hh
-**
-** USE: Included from util.hh
-*/
-
-class	UTL_ExprList : public UTL_List
+class TAO_IDL_FE_Export UTL_ExprList : public UTL_List
 {
 public:
-  // Operations
+  UTL_ExprList (AST_Expression *s, 
+                UTL_ExprList *cdr);
 
-  // Constructor(s)
-  UTL_ExprList(AST_Expression *s, UTL_ExprList *cdr);
+  // Get list item.
+  AST_Expression *head (void);
 
-  // Get list item
-  AST_Expression		*head();
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  AST_Expression		*pd_car_data;	// List item
+  // Data.
+  AST_Expression *pd_car_data;
 };
 
-// Active iterator for UTL_ExprList
-class	UTL_ExprlistActiveIterator : public UTL_ListActiveIterator
+// Active iterator for UTL_ExprList.
+class   UTL_ExprlistActiveIterator : public UTL_ListActiveIterator
 {
 public:
-  // Operations
+  UTL_ExprlistActiveIterator (UTL_ExprList *s);
 
-  // Constructor(s)
-  UTL_ExprlistActiveIterator(UTL_ExprList *s);
-
-  // Get current item
-  AST_Expression		*item();
+  // Get current item.
+  AST_Expression *item (void);
 };
 
 #endif           // _UTL_EXPRLIST_UTL_EXPRLIST_HH

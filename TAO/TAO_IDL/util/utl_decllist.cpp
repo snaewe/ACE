@@ -73,31 +73,24 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 //	 It relies on a type-unsafe cast from UTL_List to subclasses, which
 //	 will cease to operate correctly if you use either multiple or
 //	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "utl_decllist.h"
+#include "fe_declarator.h"
 
-ACE_RCSID(util, utl_decllist, "$Id$")
+ACE_RCSID (util, 
+           utl_decllist, 
+           "$Id$")
 
 /*
  * Constructor(s)
  */
 
-UTL_DeclList::UTL_DeclList(FE_Declarator *s, UTL_DeclList *cdr)
-	    : UTL_List(cdr),
-	      pd_car_data(s)
+UTL_DeclList::UTL_DeclList (FE_Declarator *s, 
+                            UTL_DeclList *cdr)
+  : UTL_List(cdr),
+	  pd_car_data(s)
 {
 }
-
-/*
- * Private operations
- */
 
 /*
  * Public operations
@@ -105,9 +98,22 @@ UTL_DeclList::UTL_DeclList(FE_Declarator *s, UTL_DeclList *cdr)
 
 // Get list item
 FE_Declarator *
-UTL_DeclList::head()
+UTL_DeclList::head (void)
 {
   return pd_car_data;
+}
+
+void
+UTL_DeclList::destroy (void)
+{
+  if (this->pd_car_data != 0)
+    {
+      this->pd_car_data->destroy ();
+      delete this->pd_car_data;
+      this->pd_car_data = 0;
+    }
+
+  this->UTL_List::destroy ();
 }
 
 /*
@@ -120,8 +126,8 @@ UTL_DeclList::head()
  * Constructor
  */
 
-UTL_DecllistActiveIterator::UTL_DecllistActiveIterator(UTL_DeclList *s)
-			    : UTL_ListActiveIterator(s)
+UTL_DecllistActiveIterator::UTL_DecllistActiveIterator (UTL_DeclList *s)
+  : UTL_ListActiveIterator (s)
 {
 }
 
@@ -135,12 +141,14 @@ UTL_DecllistActiveIterator::UTL_DecllistActiveIterator(UTL_DeclList *s)
 
 // Get current item
 FE_Declarator *
-UTL_DecllistActiveIterator::item()
+UTL_DecllistActiveIterator::item (void)
 {
-  if (source == NULL)
-    return NULL;
+  if (source == 0)
+    {
+      return 0;
+    }
 
-  return ((UTL_DeclList *) source)->head();
+  return ((UTL_DeclList *) source)->head ();
 }
 
 /*

@@ -1,13 +1,20 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (SP_CONNECTOR_H)
+#ifndef SP_CONNECTOR_H
 #define SP_CONNECTOR_H
 
 #include "ace/Svc_Handler.h"
+#include "ace/Service_Config.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/SPIPE_Stream.h"
 #include "ace/Connector.h"
 #include "ace/SPIPE_Connector.h"
+#include "ace/Sig_Adapter.h"
 
 class Peer_Handler : public ACE_Svc_Handler<ACE_SPIPE_STREAM, ACE_NULL_SYNCH>
 {
@@ -26,7 +33,7 @@ public:
   // = Demultiplexing hooks.
   virtual int handle_input (ACE_HANDLE);
   virtual int handle_close (ACE_HANDLE handle = ACE_INVALID_HANDLE,
-			    ACE_Reactor_Mask mask = ACE_Event_Handler::ALL_EVENTS_MASK);
+                            ACE_Reactor_Mask mask = ACE_Event_Handler::ALL_EVENTS_MASK);
 
   virtual ACE_HANDLE get_handle (void) const;
 
@@ -45,7 +52,7 @@ public:
   ~IPC_Client (void);
 
   // = Dynamic linking hooks.
-  virtual int init (int argc, char *argv[]);
+  virtual int init (int argc, ACE_TCHAR *argv[]);
   // Initialize the IPC client.
 
   virtual int fini (void);
@@ -53,18 +60,18 @@ public:
 
   virtual int svc (void);
   // Run the svc.
-  
+
   virtual int handle_close (ACE_HANDLE, ACE_Reactor_Mask);
   // Report connection errors.
 
 private:
-  int parse_args (int argc, char *argv[]);
+  int parse_args (int argc, ACE_TCHAR *argv[]);
   // Parse command-line arguments.
 
   int iterations_;
   // Number of times to send a buffer.
 
-  TCHAR rendezvous_[MAXPATHLEN + 1];
+  ACE_TCHAR rendezvous_[MAXPATHLEN + 1];
   // Meeting place for pipe.
 
   ACE_Sig_Adapter done_handler_;

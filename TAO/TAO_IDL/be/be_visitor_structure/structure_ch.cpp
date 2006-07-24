@@ -18,14 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_structure.h"
-
-ACE_RCSID(be_visitor_structure, structure_ch, "$Id$")
-
+ACE_RCSID (be_visitor_structure,
+           structure_ch,
+           "$Id$")
 
 // ******************************************************
 // for client header
@@ -40,78 +35,71 @@ be_visitor_structure_ch::~be_visitor_structure_ch (void)
 {
 }
 
-// visit the Structure node and its scope
+// Visit the Structure node and its scope.
 int be_visitor_structure_ch::visit_structure (be_structure *node)
 {
-  TAO_OutStream *os; // output stream
-
-  if (!node->cli_hdr_gen () && !node->imported ()) // not already generated and
-                                                   // not imported
+  if (node->cli_hdr_gen () || node->imported ())
     {
-      os = this->ctx_->stream ();
-
-      os->indent (); // start from whatever indentation level we were at
-      *os << "struct " << idl_global->export_macro () << " "
-          << node->local_name () << be_nl
-          << "{" << be_idt << "\n";
-
-      // generate code for field members
-      if (this->visit_scope (node) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_structure_ch::"
-                             "visit_structure - "
-                             "codegen for scope failed\n"), -1);
-        }
-
-      os->decr_indent ();
-      *os << "};\n\n";
-
-      // generate var defn
-      if (node->gen_var_defn () == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_structure_ch::"
-                             "visit_structure - "
-                             "codegen for _var failed\n"), -1);
-        }
-
-      // a class is generated for an out defn only for a variable length struct
-      if (node->size_type () == be_decl::VARIABLE)
-        {
-          if (node->gen_out_defn () == -1)
-            {
-              ACE_ERROR_RETURN ((LM_ERROR,
-                                 "(%N:%l) be_visitor_structure_ch::"
-                                 "visit_structure - "
-                                 "codegen for _out failed\n"), -1);
-            }
-        }
-      else
-        {
-          os->indent ();
-          *os << "typedef " << node->local_name () << " &" << node->local_name
-            () << "_out;\n\n";
-        }
-
-      // by using a visitor to declare and define the TypeCode, we have the
-      // added advantage to conditionally not generate any code. This will be
-      // based on the command line options. This is still TO-DO
-      be_visitor *visitor;
-      be_visitor_context ctx (*this->ctx_);
-      ctx.state (TAO_CodeGen::TAO_TYPECODE_DECL);
-      visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_structure_ch::"
-                             "visit_structure - "
-                             "TypeCode declaration failed\n"
-                             ), -1);
-        }
-
-
-      node->cli_hdr_gen (I_TRUE);
+      return 0;
     }
+
+  // Evaluate the member in time for the decision to generate
+  // the recursive typecode include in the stub source file.
+  ACE_Unbounded_Queue<AST_Type *> list;
+  (void) node->in_recursion (list);
+
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  // Generate the _var and _out typedefs.
+  node->gen_common_varout (os);
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  *os << be_nl << be_nl
+      << "struct " << be_global->stub_export_macro () << " "
+      << node->local_name () << be_nl
+      << "{" << be_idt_nl;
+
+  // Generate the typedefs.
+  *os << "typedef " << node->local_name () << "_var _var_type;"
+      << be_nl
+      << "typedef " << node->local_name () << "_out _out_type;"
+      << be_nl << be_nl;
+
+  if (be_global->any_support ())
+    {
+      *os << "static void _tao_any_destructor (void *);";
+    }
+
+  // Generate code for field members.
+  if (this->visit_scope (node) == -1)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_structure_ch::"
+                         "visit_structure - "
+                         "codegen for scope failed\n"),
+                        -1);
+    }
+
+  *os << be_uidt_nl;
+  *os << "};";
+
+  if (be_global->tc_support ())
+    {
+      be_visitor_context ctx (*this->ctx_);
+      be_visitor_typecode_decl visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_structure_ch::"
+                             "visit_structure - "
+                             "TypeCode declaration failed\n"),
+                            -1);
+        }
+    }
+
+  node->cli_hdr_gen (true);
   return 0;
 }

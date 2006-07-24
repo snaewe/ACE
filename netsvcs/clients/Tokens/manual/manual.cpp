@@ -1,4 +1,5 @@
 // $Id$
+
 // ============================================================================
 //
 // = LIBRARY
@@ -15,7 +16,6 @@
 //
 // ============================================================================
 
-#include "ace/OS.h"
 #include "ace/Get_Opt.h"
 #include "ace/Local_Tokens.h"
 #include "ace/Remote_Tokens.h"
@@ -25,6 +25,8 @@
 #include "ace/Token_Collection.h"
 #include "ace/Map_Manager.h"
 #include "ace/Service_Config.h"
+
+#if defined (ACE_HAS_THREADS) && defined (ACE_HAS_THREADS_LIBRARY)
 
 ACE_RCSID(manual, manual, "$Id$")
 
@@ -80,7 +82,7 @@ private:
   COLLECTIONS collections_;
   // A collection for each <tid>.
 
-  char *server_host_;
+  const char *server_host_;
   int server_port_;
   int ignore_deadlock_;
   int debug_;
@@ -88,11 +90,11 @@ private:
 };
 
 STDIN_Token::STDIN_Token (void)
-: server_host_ (ACE_DEFAULT_SERVER_HOST),
-  server_port_ (ACE_DEFAULT_SERVER_PORT),
-  ignore_deadlock_ (0),
-  debug_ (0),
-  remote_ (0)
+  : server_host_ (ACE_DEFAULT_SERVER_HOST),
+    server_port_ (ACE_DEFAULT_SERVER_PORT),
+    ignore_deadlock_ (0),
+    debug_ (0),
+    remote_ (0)
 {
 }
 
@@ -108,11 +110,11 @@ STDIN_Token::parse_args (int argc, char *argv[])
       switch (c)
 	{
 	case 'h':  // specify the host machine on which the server is running
-	  server_host_ = get_opt.optarg;
+	  server_host_ = get_opt.opt_arg ();
 	  remote_ = 1;
 	  break;
 	case 'p':  // specify the port on which the server is running
-	  server_port_ = ACE_OS::atoi (get_opt.optarg);
+	  server_port_ = ACE_OS::atoi (get_opt.opt_arg ());
 	  remote_ = 1;
 	  break;
 	case 'd':
@@ -134,7 +136,8 @@ STDIN_Token::parse_args (int argc, char *argv[])
     }
 
   if (remote_)
-    ACE_Remote_Mutex::set_server_address (ACE_INET_Addr (server_port_, server_host_));
+    ACE_Remote_Mutex::set_server_address (ACE_INET_Addr (server_port_,
+                                                         server_host_));
 
   return 0;
 }
@@ -352,16 +355,11 @@ main (int argc, char* argv[])
   return st.open (argc, argv);
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Map_Entry<STDIN_Token::TID, ACE_Token_Collection *>;
-template class ACE_Map_Manager<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>;
-template class ACE_Map_Iterator_Base<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>;
-template class ACE_Map_Iterator<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>;
-template class ACE_Map_Reverse_Iterator<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Map_Entry<STDIN_Token::TID, ACE_Token_Collection *>
-#pragma instantiate ACE_Map_Manager<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Iterator_Base<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Iterator<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Reverse_Iterator<STDIN_Token::TID, ACE_Token_Collection *, ACE_Null_Mutex>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+#else
+int
+main (int, char *[])
+{
+  ACE_ERROR_RETURN ((LM_ERROR,
+		     "threads or ACE_HAS_TOKENS_LIBRARY not supported on this platform\n"), -1);
+}
+#endif /* ACE_HAS_THREADS && ACE_HAS_TOKENS_LIBRARY */

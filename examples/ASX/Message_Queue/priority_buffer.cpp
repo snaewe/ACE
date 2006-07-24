@@ -4,6 +4,8 @@
 // the length of each line via the use of an ASX Message_Queue.  It
 // illustrates how priorities can be used for ACE Message_Queues.
 
+#include "ace/OS_NS_stdio.h"
+#include "ace/Malloc_Base.h"    // To get ACE_Allocator
 #include "ace/Message_Queue.h"
 #include "ace/Read_Buffer.h"
 #include "ace/Thread_Manager.h"
@@ -65,7 +67,7 @@ producer (ACE_Message_Queue<ACE_MT_SYNCH> *msg_queue)
 {
   ACE_Read_Buffer rb (ACE_STDIN);
 
-  // Keep reading stdin, until we reach EOF. 
+  // Keep reading stdin, until we reach EOF.
 
   for (;;)
     {
@@ -100,7 +102,7 @@ producer (ACE_Message_Queue<ACE_MT_SYNCH> *msg_queue)
           mb->wr_ptr (rb.size ());
 
           ACE_DEBUG ((LM_DEBUG,
-		      "enqueueing message of size %d\n", 
+		      "enqueueing message of size %d\n",
                       mb->msg_priority ()));
 
           // Enqueue in priority order.
@@ -113,14 +115,14 @@ producer (ACE_Message_Queue<ACE_MT_SYNCH> *msg_queue)
   // the size of the lines!).
   consumer (msg_queue);
 
-  return 0; 
+  return 0;
 }
 
 // Spawn off one thread that copies stdin to stdout in order of the
 // size of each line.
 
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   // Message queue.
   ACE_Message_Queue<ACE_MT_SYNCH> msg_queue (max_queue);
@@ -134,8 +136,8 @@ main (int, char *[])
   return 0;
 }
 #else
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

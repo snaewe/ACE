@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,72 +62,158 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_typedef.cc - Implementation of class AST_Typedef
- *
- * AST_Typedef nodes represent an IDL typedef statement.
- * AST_Typedef is a subclass of AST_Decl (it is not a type,
- * but instead is a type renaming).
- * AST_Typedef nodes have a base type (a subclass of AST_Type)
- * and a name (an UTL_ScopedName).
- */
+// AST_Typedef nodes represent an IDL typedef statement.
+// AST_Typedef is a subclass of AST_Decl (it is not a type,
+// but instead is a type renaming).
+// AST_Typedef nodes have a base type (a subclass of AST_Type)
+// and a name (an UTL_ScopedName).
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_typedef.h"
+#include "ast_visitor.h"
+#include "utl_identifier.h"
 
-ACE_RCSID(ast, ast_typedef, "$Id$")
+#include "ace/Log_Msg.h"
 
-/*
- * Constructor(s) and destructor
- */
-AST_Typedef::AST_Typedef()
-	   : pd_base_type(NULL)
+ACE_RCSID (ast,
+           ast_typedef,
+           "$Id$")
+
+AST_Typedef::AST_Typedef (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    pd_base_type (0),
+    owns_base_type_ (false)
 {
 }
 
-AST_Typedef::AST_Typedef(AST_Type *bt, UTL_ScopedName *n, UTL_StrList *p)
-	   : AST_Decl(AST_Decl::NT_typedef, n, p),
-	     pd_base_type(bt)
+AST_Typedef::AST_Typedef (AST_Type *bt,
+                          UTL_ScopedName *n,
+                          bool local,
+                          bool abstract)
+  : COMMON_Base (bt->is_local () || local,
+                 abstract),
+    AST_Decl (AST_Decl::NT_typedef,
+              n),
+    AST_Type (AST_Decl::NT_typedef,
+              n),
+    pd_base_type (bt),
+    owns_base_type_ (false)
+{
+  AST_Decl::NodeType nt = bt->node_type ();
+  
+  if (AST_Decl::NT_array == nt || AST_Decl::NT_sequence == nt)
+    {
+      this->owns_base_type_ = true;
+    }
+}
+
+AST_Typedef::~AST_Typedef (void)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_Typedef node to the ostream o
- */
-void
-AST_Typedef::dump(ostream &o)
+// Given a typedef node, traverse the chain of base types until they are no
+// more typedefs, and return that most primitive base type.
+AST_Type *
+AST_Typedef::primitive_base_type (void) const
 {
-  o << "typedef ";
-  pd_base_type->dump(o);
-  o << " ";
-  local_name()->dump(o);
+  AST_Type *d = const_cast<AST_Typedef *> (this);
+  AST_Typedef *temp = 0;
+
+  while (d && d->node_type () == AST_Decl::NT_typedef)
+    {
+      temp = AST_Typedef::narrow_from_decl (d);
+      d = AST_Type::narrow_from_decl (temp->base_type ());
+    }
+
+  return d;
 }
 
-/*
- * Data accessors
- */
+// Redefinition of inherited virtual operations.
 
 AST_Type *
-AST_Typedef::base_type()
+AST_Typedef::base_type (void) const
 {
-  return pd_base_type;
+  return this->pd_base_type;
 }
 
-// Narrowing
+bool
+AST_Typedef::legal_for_primary_key (void) const
+{
+  return this->primitive_base_type ()->legal_for_primary_key ();
+}
+
+bool
+AST_Typedef::is_local (void)
+{
+  return this->pd_base_type->is_local ();
+}
+
+// Dump this AST_Typedef node to the ostream o.
+void
+AST_Typedef::dump (ACE_OSTREAM_TYPE&o)
+{
+  if (this->is_local ())
+    {
+      this->dump_i (o, "(local) ");
+    }
+  else
+    {
+      this->dump_i (o, "(abstract) ");
+    }
+
+  this->dump_i (o, "typedef ");
+  this->pd_base_type->dump (o);
+  this->dump_i (o, " ");
+  this->local_name ()->dump (o);
+}
+
+// Compute the size type of the node in question.
+int
+AST_Typedef::compute_size_type (void)
+{
+  AST_Type *type = this->base_type ();
+
+  if (type == 0)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_typedef::compute_size_type - "
+                         "bad base type\n"),
+                        -1);
+    }
+
+  // Our size type is the same as our type.
+  this->size_type (type->size_type ());
+
+  // While we're here, take care of has_constructor.
+  this->has_constructor (type->has_constructor ());
+
+  return 0;
+}
+
+int
+AST_Typedef::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_typedef (this);
+}
+
+void
+AST_Typedef::destroy (void)
+{
+  if (this->owns_base_type_)
+    {
+      this->pd_base_type->destroy ();
+      delete this->pd_base_type;
+      this->pd_base_type = 0;
+    }
+
+  this->AST_Type::destroy ();
+}
+
+// Data accessors.
+
+// Narrowing.
 IMPL_NARROW_METHODS1(AST_Typedef, AST_Type)
 IMPL_NARROW_FROM_DECL(AST_Typedef)

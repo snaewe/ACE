@@ -1,6 +1,6 @@
+// -*- C++ -*-
 //
 // $Id$
-//
 
 // ============================================================================
 //
@@ -15,24 +15,23 @@
 //    interpretive styled stubs and skeletons
 //
 // = AUTHOR
-//    Aniruddha Gokhale and Carlos O' Ryan
+//    Aniruddha Gokhale and Carlos O'Ryan
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_ARGUMENT_H)
+#ifndef _BE_VISITOR_ARGUMENT_H
 #define _BE_VISITOR_ARGUMENT_H
 
-#include "be_visitor_decl.h"
+#include "idl_defines.h"
+
+#include "be_visitor_scope.h"
 #include "be_visitor_argument/argument.h"
 #include "be_visitor_argument/arglist.h"
-#include "be_visitor_argument/pre_docall_cs.h"
-#include "be_visitor_argument/docall_cs.h"
-#include "be_visitor_argument/post_docall_cs.h"
 #include "be_visitor_argument/vardecl_ss.h"
-#include "be_visitor_argument/pre_upcall_ss.h"
 #include "be_visitor_argument/upcall_ss.h"
 #include "be_visitor_argument/post_upcall_ss.h"
 #include "be_visitor_argument/marshal_ss.h"
-#include "be_visitor_argument/post_marshal_ss.h"
+#include "be_visitor_argument/invoke_cs.h"
+#include "be_visitor_argument/paramlist.h"
 
 #endif /* _BE_VISITOR_ARGUMENT_H */

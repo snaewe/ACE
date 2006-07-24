@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,47 +62,59 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_STRING_AST_STRING_HH
 #define _AST_STRING_AST_STRING_HH
 
-// Representation of string declaration
-//
-// A string type is represented by a maximum size
+#include "ast_concrete_type.h"
+#include "utl_scoped_name.h"
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, ast_decl.hh, ast_expression.hh
-**
-** USE: Included from ast.hh
-*/
+class AST_Expression;
 
-class	AST_String : public virtual AST_ConcreteType
+// Representation of string declaration.
+// A string type is represented by a maximum size.
+
+class TAO_IDL_FE_Export AST_String : public virtual AST_ConcreteType
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_String();
-  AST_String(AST_Expression *max_size);
-  AST_String(AST_Expression *max_size, long wide);
-  virtual ~AST_String() {}
+  // Constructor(s) and destructor
+  AST_String (void);
 
-  // Data Accessors
-  AST_Expression *max_size();
-  long		 width();
+  AST_String (AST_Decl::NodeType nt,
+              UTL_ScopedName *n,
+              AST_Expression *max_size,
+              long wide = 1);
 
-  // Narrowing
+  virtual ~AST_String (void);
+
+  // Data Accessors.
+  AST_Expression *max_size (void);
+  long width (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_String, AST_ConcreteType);
   DEF_NARROW_FROM_DECL(AST_String);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  AST_Expression		*pd_max_size;	// String maximum size
-  long				pd_width;	// Width of string
+  // Data.
+
+  AST_Expression *pd_max_size;
+  // String maximum size.
+
+  long pd_width;
+  // Width of string.
 };
 
 #endif           // _AST_STRING_AST_STRING_HH

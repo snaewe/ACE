@@ -5,39 +5,46 @@
 #include "ace/Get_Opt.h"
 #include "Token_Handler.h"
 
-ACE_RCSID(lib, Token_Handler, "$Id$")
+#if defined (ACE_HAS_TOKENS_LIBRARY)
+
+#include "ace/Signal.h"
+
+
+ACE_RCSID (lib,
+           Token_Handler,
+           "$Id$")
 
 int
-ACE_Token_Acceptor::parse_args (int argc, char *argv[])
+ACE_Token_Acceptor::parse_args (int argc, ACE_TCHAR *argv[])
 {
   ACE_TRACE ("ACE_Token_Acceptor::parse_args");
 
-  this->service_port_ = ACE_DEFAULT_SERVER_PORT;
+  u_short svc_port = ACE_DEFAULT_SERVER_PORT;
 
-  ACE_LOG_MSG->open ("Token Service");
+  ACE_LOG_MSG->open (ACE_TEXT ("Token Service"));
 
-  ACE_Get_Opt get_opt (argc, argv, "p:", 0);
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT ("p:"), 0);
 
   for (int c; (c = get_opt ()) != -1; )
     {
       switch (c)
-	{
-	case 'p':
-	  this->service_port_ = ACE_OS::atoi (get_opt.optarg);
-	  break;
-	default:
-	  ACE_ERROR_RETURN ((LM_ERROR,
-			    "%n:\n[-p server-port]\n%a", 1),
-			   -1);
-	}
+        {
+        case 'p':
+          svc_port = static_cast<u_short> (ACE_OS::atoi (get_opt.opt_arg ()));
+          break;
+        default:
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             ACE_TEXT ("%n:\n[-p server-port]\n"), 1),
+                            -1);
+        }
     }
 
-  this->service_addr_.set (this->service_port_);
+  this->service_addr_.set (svc_port);
   return 0;
 }
 
 int
-ACE_Token_Acceptor::init (int argc, char *argv[])
+ACE_Token_Acceptor::init (int argc, ACE_TCHAR *argv[])
 {
   ACE_TRACE ("ACE_Token_Acceptor::init");
 
@@ -48,27 +55,29 @@ ACE_Token_Acceptor::init (int argc, char *argv[])
   // Set the acceptor endpoint into listen mode (use the Singleton
   // global Reactor...).
   if (this->open (this->service_addr_, ACE_Reactor::instance (),
-		  0, 0, 0,
-		  &this->scheduling_strategy_,
-		  "Token Server", "ACE token service") == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "%n: %p on port %d\n",
-		       "acceptor::open failed",
-		       this->service_addr_.get_port_number ()), -1);
+                  0, 0, 0,
+                  &this->scheduling_strategy_,
+                  ACE_TEXT ("Token Server"),
+                  ACE_TEXT ("ACE token service")) == -1)
+    ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("%n: %p on port %d\n"),
+                       ACE_TEXT ("acceptor::open failed"),
+                       this->service_addr_.get_port_number ()), -1);
 
   // Ignore SIGPIPE so that each <SVC_HANDLER> can handle this on its
   // own.
-  ACE_Sig_Action sig (ACE_SignalHandler (SIG_IGN), SIGPIPE);
+  ACE_Sig_Action sig ((ACE_SignalHandler) SIG_IGN, SIGPIPE);
   ACE_UNUSED_ARG (sig);
 
   ACE_INET_Addr server_addr;
 
   if (this->acceptor ().get_local_addr (server_addr) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "get_remote_addr"), -1);
+    ACE_ERROR_RETURN
+      ((LM_ERROR, ACE_TEXT ("%p\n"), ACE_TEXT ("get_remote_addr")), -1);
 
   ACE_DEBUG ((LM_DEBUG,
-	      "starting up Token Server at port %d on handle %d\n",
-	     server_addr.get_port_number (),
-	     this->acceptor ().get_handle ()));
+              ACE_TEXT ("starting up Token Server at port %d on handle %d\n"),
+              server_addr.get_port_number (),
+              this->acceptor ().get_handle ()));
   return 0;
 }
 
@@ -106,8 +115,8 @@ ACE_Token_Handler::send_reply (ACE_UINT32 err)
 
   if (n != (ssize_t) len)
     ACE_ERROR_RETURN ((LM_ERROR,
-		       "%p, expected len = %d, actual len = %d\n",
-		      "send failed", len, n), -1);
+                       ACE_TEXT ("%p, expected len = %d, actual len = %d\n"),
+                       ACE_TEXT ("send failed"), len, n), -1);
   else
     return 0;
 }
@@ -118,39 +127,42 @@ ACE_Token_Handler::send_reply (ACE_UINT32 err)
 ACE_Token_Handler::acquire (ACE_Token_Proxy *proxy)
 {
   ACE_TRACE ("ACE_Token_Handler::acquire");
+#if 0
   ACE_DEBUG ((LM_DEBUG, "in acquire for client id = %s\n",
-	     proxy->client_id ()));
+             proxy->client_id ()));
+#endif /* 0 */
 
   // @@ add notify in token request reply
   if (proxy->acquire (0, 0, ACE_Synch_Options::asynch) == -1)
     {
       if (errno != EWOULDBLOCK)
-	// bad bad bad
-	return this->send_reply (errno);
+        // bad bad bad
+        return this->send_reply (errno);
 
       // acquire would block
       if (request_options_[ACE_Synch_Options::USE_TIMEOUT] == 1)
-	{
-	  // check for polling
-	  if ((request_options_.timeout ().sec () == 0) &&
-	      (request_options_.timeout ().usec () == 0))
-	    return this->send_reply (EWOULDBLOCK);
+        {
+          // check for polling
+          if ((request_options_.timeout ().sec () == 0) &&
+              (request_options_.timeout ().usec () == 0))
+            return this->send_reply (EWOULDBLOCK);
 
-	  // schedule a timer
-	  this->timeout_id_ = this->reactor ()->schedule_timer
-	    (this, (void *) proxy, request_options_.timeout ());
-	  if (timeout_id_ == -1)
-	    {
-	      ACE_ERROR ((LM_ERROR, "%p\n", "schedule_timer"));
-	      return this->send_reply (errno);
-	    }
-	}
+          // schedule a timer
+          this->timeout_id_ = this->reactor ()->schedule_timer
+            (this, (void *) proxy, request_options_.timeout ());
+          if (timeout_id_ == -1)
+            {
+              ACE_ERROR ((LM_ERROR, ACE_TEXT ("%p\n"),
+                          ACE_TEXT ("schedule_timer")));
+              return this->send_reply (errno);
+            }
+        }
       // send no reply.  wait until we acquire it or until the timer
       // goes off.
       return 0;
     }
   else // success
-    return this->send_reply (ACE_Token_Reply::SUCCESS);
+    return this->send_reply (0);
 }
 
 // Try to acquire the token.  Never block.
@@ -160,14 +172,16 @@ ACE_Token_Handler::try_acquire (ACE_Token_Proxy *proxy)
 {
   ACE_TRACE ("ACE_Token_Handler::try_acquire");
 
+#if 0
   ACE_DEBUG ((LM_DEBUG, "in try_acquire for client id = %s\n",
-	     proxy->client_id ()));
+             proxy->client_id ()));
+#endif /* 0 */
 
   // @@ add notify in token request reply
   if (proxy->tryacquire () == -1)
     return this->send_reply (errno);
   else
-    return this->send_reply (ACE_Token_Reply::SUCCESS);
+    return this->send_reply (0);
 }
 
 // Release the token and allow the next client that is waiting to
@@ -177,9 +191,11 @@ ACE_Token_Handler::try_acquire (ACE_Token_Proxy *proxy)
 ACE_Token_Handler::release (ACE_Token_Proxy *proxy)
 {
   ACE_TRACE ("ACE_Token_Handler::release");
+#if 0
   ACE_DEBUG ((LM_DEBUG,
-	      "in release for client id = %s\n",
-	      proxy->client_id ()));
+              "in release for client id = %s\n",
+              proxy->client_id ()));
+#endif /* 0 */
 
   if (proxy->release (ACE_Synch_Options::asynch) == -1)
     // oops, it failed
@@ -192,7 +208,7 @@ ACE_Token_Handler::release (ACE_Token_Proxy *proxy)
       this->timeout_id_ = 0;
     }
 
-  return this->send_reply (ACE_Token_Reply::SUCCESS);
+  return this->send_reply (0);
 }
 
 // Yield the token if any clients are waiting, otherwise keep the
@@ -203,44 +219,51 @@ ACE_Token_Handler::renew (ACE_Token_Proxy *proxy)
 {
   ACE_TRACE ("ACE_Token_Handler::renew");
 
+#if 0
   ACE_DEBUG ((LM_DEBUG, "in renew for client id = %s\n",
-	     proxy->client_id ()));
+             proxy->client_id ()));
+#endif /* 0 */
 
   if (proxy->renew (token_request_.requeue_position (),
-		    ACE_Synch_Options::asynch) == -1)
+                    ACE_Synch_Options::asynch) == -1)
     {
       int result = ACE_LOG_MSG->errnum ();
       if (result != EWOULDBLOCK)
-	// bad bad bad
-	return this->send_reply (result);
+        // bad bad bad
+        return this->send_reply (result);
 
       // acquire would block
       if (request_options_[ACE_Synch_Options::USE_TIMEOUT] == 1)
-	{
-	  this->timeout_id_ = this->reactor ()->schedule_timer
-	    (this, 0, request_options_.timeout ());
-	  if (timeout_id_ == -1)
-	    {
-	      ACE_ERROR ((LM_ERROR, "%p\n", "schedule_timer"));
-	      return this->send_reply (ACE_LOG_MSG->errnum ());
-	    }
-	}
+        {
+          this->timeout_id_ = this->reactor ()->schedule_timer
+            (this, 0, request_options_.timeout ());
+          if (timeout_id_ == -1)
+            {
+              ACE_ERROR ((LM_ERROR, ACE_TEXT ("%p\n"),
+                          ACE_TEXT ("schedule_timer")));
+              return this->send_reply (ACE_LOG_MSG->errnum ());
+            }
+        }
       // Send no reply.  wait until we acquire it or until the timer
       // goes off.
       return 0;
     }
   else
     // Success, we still hold the token.
-    return this->send_reply (ACE_Token_Reply::SUCCESS);
+    return this->send_reply (0);
 }
 
 /* VIRTUAL */ int
-ACE_Token_Handler::remove (ACE_Token_Proxy *proxy)
+ACE_Token_Handler::remove (ACE_Token_Proxy * /* proxy */)
 {
   ACE_TRACE ("ACE_Token_Handler::remove");
+#if 0
   ACE_DEBUG ((LM_DEBUG, "in remove for client id = %s\n",
-	     proxy->client_id ()));
-  ACE_ERROR ((LM_ERROR, "sorry: ACE_Token_Handler::remove() is not implemented"));
+             proxy->client_id ()));
+#endif /* 0 */
+  ACE_ERROR
+    ((LM_ERROR,
+      ACE_TEXT ("sorry: ACE_Token_Handler::remove() is not implemented")));
 
   return this->send_reply (ENOTSUP);
 }
@@ -250,7 +273,7 @@ ACE_Token_Handler::remove (ACE_Token_Proxy *proxy)
 
 /* VIRTUAL */ int
 ACE_Token_Handler::handle_timeout (const ACE_Time_Value &,
-				   const void *tp)
+                                   const void *tp)
 {
   ACE_TRACE ("ACE_Token_Handler::handle_timeout");
 
@@ -264,8 +287,10 @@ ACE_Token_Handler::handle_timeout (const ACE_Time_Value &,
 
   ACE_Token_Proxy *proxy = (ACE_Token_Proxy *) tp;
 
+#if 0
   ACE_DEBUG ((LM_DEBUG, "in handle_timeout for client id = %s\n",
-	     proxy->client_id ()));
+             proxy->client_id ()));
+#endif /* 0 */
 
   // Remove ourselves from the waiter list.
   proxy->release ();
@@ -291,14 +316,14 @@ ACE_Token_Handler::get_proxy (void)
 
       // Put the new_proxy in this client_id's collection.
       if (collection_.insert (*proxy) == -1)
-	ACE_ERROR_RETURN ((LM_ERROR, "insert failed\n"), 0);
+        ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("insert failed\n")), 0);
 
       // Delete our copy (one was created in the collection).
       delete proxy;
       proxy = collection_.is_member (token_request_.token_name ());
 
       if (proxy == 0)
-	ACE_ERROR_RETURN ((LM_ERROR, "is_member failed\n"), 0);
+        ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("is_member failed\n")), 0);
 
       // Set the client_id (it was set to 1 since we're
       // single-threaded.
@@ -311,7 +336,7 @@ ACE_Token_Handler::get_proxy (void)
 ACE_Token_Proxy *
 ACE_Token_Handler::create_proxy (void)
 {
-  ACE_TRACE ("ACE_Token_Handler::new_proxy");
+  ACE_TRACE ("ACE_Token_Handler::create_proxy");
 
   ACE_Token_Proxy *proxy;
 
@@ -319,18 +344,18 @@ ACE_Token_Handler::create_proxy (void)
     {
     case ACE_Tokens::RWLOCK:
       if (token_request_.proxy_type () == ACE_RW_Token::READER)
-	ACE_NEW_RETURN (proxy,
-			ACE_TS_RLock (token_request_.token_name (), this),
-			0);
+        ACE_NEW_RETURN (proxy,
+                        ACE_TS_RLock (token_request_.token_name (), this),
+                        0);
       else
-	ACE_NEW_RETURN (proxy,
-			ACE_TS_WLock (token_request_.token_name (), this),
-			0);
+        ACE_NEW_RETURN (proxy,
+                        ACE_TS_WLock (token_request_.token_name (), this),
+                        0);
       break;
     case ACE_Tokens::MUTEX:
       ACE_NEW_RETURN (proxy,
-		      ACE_TS_Mutex (token_request_.token_name (), this),
-		      0);
+                      ACE_TS_Mutex (token_request_.token_name (), this),
+                      0);
       break;
     default:
       // Nonexistent token type.
@@ -368,8 +393,8 @@ ACE_Token_Handler::dispatch (void)
     case ACE_Token_Request::REMOVE:
       return this->remove (proxy);
     default:
-      ACE_ERROR_RETURN ((LM_ERROR, "invalid type = %d\n",
-			this->token_request_.operation_type ()), -1);
+      ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("invalid type = %d\n"),
+                        this->token_request_.operation_type ()), -1);
       /* NOTREACHED */
     }
 }
@@ -387,15 +412,15 @@ ACE_Token_Handler::recv_request (void)
   // This implementation assumes that the first 4 bytes are
   // the length of the message.
   n = this->peer ().recv ((void *) &this->token_request_,
-			  sizeof (ACE_UINT32));
+                          sizeof (ACE_UINT32));
 
   switch (n)
     {
     case -1:
       /* FALLTHROUGH */
     default:
-      ACE_ERROR ((LM_ERROR, "%p got %d bytes, expected %d bytes\n",
-		 "recv failed", n, sizeof (ACE_UINT32)));
+      ACE_ERROR ((LM_ERROR, ACE_TEXT ("%p got %d bytes, expected %d bytes\n"),
+                  ACE_TEXT ("recv failed"), n, sizeof (ACE_UINT32)));
       /* FALLTHROUGH */
     case 0:
       // We've shutdown unexpectedly, let's abandon the connection.
@@ -404,39 +429,40 @@ ACE_Token_Handler::recv_request (void)
       /* NOTREACHED */
     case sizeof (ACE_UINT32):
       {
-	// Transform the length into host byte order.
-	ssize_t length = this->token_request_.length ();
+        // Transform the length into host byte order.
+        ssize_t length = this->token_request_.length ();
 
-	// Do a sanity check on the length of the message.
-	if (length > (ssize_t) sizeof this->token_request_)
-	  {
-	    ACE_ERROR ((LM_ERROR, "length %d too long\n", length));
-	    return this->abandon (1);
-	  }
+        // Do a sanity check on the length of the message.
+        if (length > (ssize_t) sizeof this->token_request_)
+          {
+            ACE_ERROR ((LM_ERROR, ACE_TEXT ("length %d too long\n"), length));
+            return this->abandon (1);
+          }
 
-	// Receive the rest of the request message.
-	// @@ beware of blocking read!!!.
-	n = this->peer ().recv ((void *) (((char *) &this->token_request_)
-					  + sizeof (ACE_UINT32)),
-				length - sizeof (ACE_UINT32));
+        // Receive the rest of the request message.
+        // @@ beware of blocking read!!!.
+        n = this->peer ().recv ((void *) (((char *) &this->token_request_)
+                                          + sizeof (ACE_UINT32)),
+                                length - sizeof (ACE_UINT32));
 
-	// Subtract off the size of the part we skipped over...
-	if (n != (length - (ssize_t) sizeof (ACE_UINT32)))
-	  {
-	    ACE_ERROR ((LM_ERROR, "%p expected %d, got %d\n",
-		       "invalid length", length, n));
-	    return this->abandon (1);
-	  }
+        // Subtract off the size of the part we skipped over...
+        if (n != (length - (ssize_t) sizeof (ACE_UINT32)))
+          {
+            ACE_ERROR ((LM_ERROR, ACE_TEXT ("%p expected %d, got %d\n"),
+                        ACE_TEXT ("invalid length"), length, n));
+            return this->abandon (1);
+          }
 
-	// Decode the request into host byte order.
-	if (this->token_request_.decode () == -1)
-	  {
-	    ACE_ERROR ((LM_ERROR, "%p\n", "decode failed"));
-	    return this->abandon (1);
-	  }
+        // Decode the request into host byte order.
+        if (this->token_request_.decode () == -1)
+          {
+            ACE_ERROR
+              ((LM_ERROR, ACE_TEXT ("%p\n"), ACE_TEXT ("decode failed")));
+            return this->abandon (1);
+          }
 
-	// if (OS::debug)
-	this->token_request_.dump ();
+        // if (OS::debug)
+        this->token_request_.dump ();
       }
     }
   return 0;
@@ -450,7 +476,9 @@ ACE_Token_Handler::handle_input (ACE_HANDLE)
 {
   ACE_TRACE ("ACE_Token_Handler::handle_input");
 
+#if 0
   ACE_DEBUG ((LM_DEBUG, "****************** in handle_input\n"));
+#endif /* 0 */
 
   if (this->recv_request () == -1)
     return -1;
@@ -477,7 +505,7 @@ ACE_Token_Handler::token_acquired (ACE_TPQ_Entry *)
       this->timeout_id_ = 0;
     }
 
-  this->send_reply (ACE_Token_Reply::SUCCESS);
+  this->send_reply (0);
 }
 
 int
@@ -505,8 +533,8 @@ ACE_Token_Handler::abandon (int send_error)
 // ************************************************************
 // ************************************************************
 
-ACE_TS_Mutex::ACE_TS_Mutex (const char *name,
-			    ACE_Token_Handler *th)
+ACE_TS_Mutex::ACE_TS_Mutex (const ACE_TCHAR *name,
+                            ACE_Token_Handler *th)
 : ACE_Local_Mutex (name, 0, 1), // The 1 is debug.
   th_ (th)
 {
@@ -549,8 +577,8 @@ ACE_TS_Mutex::clone (void) const
 
 // ************************************************************
 
-ACE_TS_RLock::ACE_TS_RLock (const char *name,
-			    ACE_Token_Handler *th)
+ACE_TS_RLock::ACE_TS_RLock (const ACE_TCHAR *name,
+                            ACE_Token_Handler *th)
 : ACE_Local_RLock (name, 0, 1), // The 1 is debug.
   th_ (th)
 {
@@ -594,8 +622,8 @@ ACE_TS_RLock::clone (void) const
 
 // ************************************************************
 
-ACE_TS_WLock::ACE_TS_WLock (const char *name,
-			    ACE_Token_Handler *th)
+ACE_TS_WLock::ACE_TS_WLock (const ACE_TCHAR *name,
+                            ACE_Token_Handler *th)
 : ACE_Local_WLock (name, 0, 1), // The 1 is debug.
   th_ (th)
 {
@@ -637,21 +665,4 @@ ACE_TS_WLock::clone (void) const
   return temp;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Acceptor<ACE_Token_Handler, ACE_SOCK_ACCEPTOR>;
-template class ACE_Accept_Strategy<ACE_Token_Handler, ACE_SOCK_ACCEPTOR>;
-template class ACE_Concurrency_Strategy<ACE_Token_Handler>;
-template class ACE_Creation_Strategy<ACE_Token_Handler>;
-template class ACE_Schedule_All_Reactive_Strategy<ACE_Token_Handler>;
-template class ACE_Scheduling_Strategy<ACE_Token_Handler>;
-template class ACE_Strategy_Acceptor<ACE_Token_Handler, ACE_SOCK_ACCEPTOR>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Acceptor<ACE_Token_Handler, ACE_SOCK_ACCEPTOR>
-#pragma instantiate ACE_Accept_Strategy<ACE_Token_Handler, ACE_SOCK_ACCEPTOR>
-#pragma instantiate ACE_Concurrency_Strategy<ACE_Token_Handler>
-#pragma instantiate ACE_Creation_Strategy<ACE_Token_Handler>
-#pragma instantiate ACE_Schedule_All_Reactive_Strategy<ACE_Token_Handler>
-#pragma instantiate ACE_Scheduling_Strategy<ACE_Token_Handler>
-#pragma instantiate ACE_Strategy_Acceptor<ACE_Token_Handler, ACE_SOCK_ACCEPTOR>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
+#endif /* ACE_HAS_TOKENS_LIBRARY */

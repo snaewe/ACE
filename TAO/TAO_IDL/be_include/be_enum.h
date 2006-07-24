@@ -20,56 +20,40 @@
 //
 // ============================================================================
 
-#if !defined (BE_ENUM_H)
+#ifndef BE_ENUM_H
 #define BE_ENUM_H
 
-/*
- * BE_Enum
- */
+#include "be_scope.h"
+#include "be_type.h"
+#include "ast_enum.h"
+
+class be_visitor;
+
 class be_enum : public virtual AST_Enum,
                 public virtual be_scope,
                 public virtual be_type
 {
 public:
-  // Operations
-
   be_enum (void);
-  // default constructor
+  // Default constructor.
 
-  be_enum (UTL_ScopedName *n, UTL_StrList *p);
-  // constructor
+  be_enum (UTL_ScopedName *n,
+           bool local,
+           bool abstract);
+  // Constructor.
 
-  virtual int gen_typecode (void);
-  // generate the typecode
+  virtual void destroy (void);
+  // Cleanup method.
 
-  virtual int gen_encapsulation (void);
-  // encapsulation for parameters
-
-  virtual long tc_size (void);
-  // return typecode size
-
-  virtual long tc_encap_len (void);
-  // return length of encapsulation
-
-  virtual int member_count (void);
-  // return the count of members
-
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
 
-  // Narrowing
+  // Narrowing.
   DEF_NARROW_METHODS3 (be_enum, AST_Enum, be_scope, be_type);
   DEF_NARROW_FROM_DECL (be_enum);
   DEF_NARROW_FROM_SCOPE (be_enum);
 
 private:
-  //=helper
-
-  int compute_member_count (void);
-  // count the number of members
-
-  int member_count_;
-  // number of members
 };
 
 #endif

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,55 +67,46 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _UTL_EXCEPTLIST_UTL_EXCEPTLIST_HH
 #define _UTL_EXCEPTLIST_UTL_EXCEPTLIST_HH
 
-// utl_exceptlist.hh
-//
-// List of AST_Exception nodes
+#include "utl_list.h"
+
+class AST_Exception;
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-/*
-** DEPENDENCIES: utl_list.hh, ast_exception.hh
-**
-** USE: Included from util.hh
-*/
-
-class	UTL_ExceptList : public UTL_List
+class TAO_IDL_FE_Export UTL_ExceptList : public UTL_List
 {
 public:
-  // Operations
+  UTL_ExceptList (AST_Exception *s, 
+                  UTL_ExceptList *cdr);
 
-  // Constructor(s)
-  UTL_ExceptList(AST_Exception *s, UTL_ExceptList *cdr);
-
-  // Get list item
-  AST_Exception		*head();
+  // Get list item.
+  AST_Exception *head (void);
+  
+  // Cleanup.
+  virtual void destroy (void);
+  
+  // Copies the UTL_ExceptList pointers but not the
+  // contained AST_Exceptions.
+  virtual UTL_ExceptList *copy (void);
 
 private:
-  // Data
-  AST_Exception		*pd_car_data;	// Item of this list
+  // Data.
+  AST_Exception *pd_car_data;
 };
 
-// Active iterator for UTL_ExceptList
-class	UTL_ExceptlistActiveIterator : public UTL_ListActiveIterator
+// Active iterator for UTL_ExceptList.
+class TAO_IDL_FE_Export UTL_ExceptlistActiveIterator
+  : public UTL_ListActiveIterator
 {
 public:
-  // Operations
-
-  // Constructor(s)
-  UTL_ExceptlistActiveIterator(UTL_ExceptList *s);
+  UTL_ExceptlistActiveIterator (UTL_ExceptList *s);
 
   // Get current item
-  AST_Exception		*item();
+  AST_Exception *item (void);
 };
 
 #endif           // _UTL_EXCEPTLIST_UTL_EXCEPTLIST_HH

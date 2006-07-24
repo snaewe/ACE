@@ -4,10 +4,11 @@
 // zillions of tasks and then wait for them using both polling and the
 // ACE Thread Manager.
 
+#include "ace/OS_main.h"
 #include "ace/Task.h"
 
 #include "ace/Service_Config.h"
-#include "ace/Synch.h"
+#include "ace/Atomic_Op.h"
 
 ACE_RCSID(Threads, task_two, "$Id$")
 
@@ -48,7 +49,7 @@ Task_Test::open (void *)
 
   task_count++;
   ACE_DEBUG ((LM_DEBUG, "(%t) creating Task_Test, task count = %d\n",
-	      task_count.value ()));
+              task_count.value ()));
 
   return this->activate (THR_BOUND);
 }
@@ -60,7 +61,7 @@ Task_Test::close (u_long)
 
   task_count--;
   ACE_DEBUG ((LM_DEBUG, "(%t) destroying Task_Test, task count = %d\n",
-	      task_count.value ()));
+              task_count.value ()));
   wait_count--;
   return 0;
 }
@@ -84,7 +85,7 @@ Task_Test::svc (void)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   n_threads = argc > 1 ? ACE_OS::atoi (argv[1]) : default_threads;
   int n_iterations = argc > 2 ? ACE_OS::atoi (argv[2]) : default_iterations;
@@ -94,40 +95,40 @@ main (int argc, char *argv[])
   for (int i = 1; i <= n_iterations; i++)
     {
       ACE_DEBUG ((LM_DEBUG, "(%t) iteration = %d, max_count %d\n",
-		  i, max_count.value ()));
+                  i, max_count.value ()));
       max_count = 0;
 
       ACE_DEBUG ((LM_DEBUG, "(%t) starting %d task%s\n",
-		  n_threads, n_threads == 1 ? "" : "s"));
+                  n_threads, n_threads == 1 ? "" : "s"));
 
       // Launch the new tasks.
       for (int j = 0; j < n_threads; j++)
-	{
-	  task_array[j] = new Task_Test;
-	  // Activate the task, i.e., make it an active object.
-	  task_array[j]->open ();
-	}
+        {
+          task_array[j] = new Task_Test;
+          // Activate the task, i.e., make it an active object.
+          task_array[j]->open ();
+        }
 
       // Wait for initialization to kick in.
       while (max_count == 0)
-	ACE_Thread::yield ();
+        ACE_Thread::yield ();
 
       ACE_DEBUG ((LM_DEBUG, "(%t) waiting for threads to finish\n"));
 
       // Wait for the threads to finish this iteration.
       while (max_count != n_threads && wait_count != 0)
-	ACE_Thread::yield ();
+        ACE_Thread::yield ();
 
       ACE_DEBUG ((LM_DEBUG,
-		  "(%t) iteration %d finished, max_count %d, wait_count %d, waiting for tasks to exit\n",
-		  i, max_count.value (), wait_count.value ()));
+                  "(%t) iteration %d finished, max_count %d, wait_count %d, waiting for tasks to exit\n",
+                  i, max_count.value (), wait_count.value ()));
 
       // Wait for all the tasks to exit.
-	  ACE_Thread_Manager::instance ()->wait ();
+          ACE_Thread_Manager::instance ()->wait ();
 
       // Delete the existing tasks.
       for (int k = 0; k < n_threads; k++)
-	delete task_array[k];
+        delete task_array[k];
     }
 
   delete [] task_array;
@@ -136,16 +137,9 @@ main (int argc, char *argv[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Atomic_Op<ACE_Thread_Mutex, int>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Atomic_Op<ACE_Thread_Mutex, int>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
-
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

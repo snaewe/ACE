@@ -1,85 +1,112 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    IO_Cntl_Msg.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//==========================================================================
+/**
+ *  @file    IO_Cntl_Msg.h
+ *
+ *  $Id$
+ *
+ *  @author Doug Schmidt
+ */
+//==========================================================================
 
-#if !defined (ACE_IO_CNTL_MSG_H)
+
+#ifndef ACE_IO_CNTL_MSG_H
 #define ACE_IO_CNTL_MSG_H
 
+#include /**/ "ace/pre.h"
+
+#include "ace/ACE_export.h"
+#include "ace/os_include/os_stddef.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class ACE_IO_Cntl_Msg
+ *
+ * @brief Data format for IOCTL messages
+ */
 class ACE_Export ACE_IO_Cntl_Msg
 {
-  // = TITLE
-  //     Data format for IOCTL messages 
 public:
-  enum ACE_IO_Cntl_Cmds
+  enum
   {
-    SET_LWM    = 1, // Set the low water mark.
-    GET_LWM    = 2, // Get the low water mark.
-    SET_HWM    = 3, // Set the high water mark.
-    GET_HWM    = 4, // Get the high water mark.
-    MOD_LINK   = 5, // Link modules
-    MOD_UNLINK = 6  // Unlink modules
+    /// Set the low water mark.
+    SET_LWM    = 1,
+    /// Get the low water mark.
+    GET_LWM    = 2,
+    /// Set the high water mark.
+    SET_HWM    = 3,
+    /// Get the high water mark.
+    GET_HWM    = 4,
+    /// Link modules
+    MOD_LINK   = 5,
+    /// Unlink modules
+    MOD_UNLINK = 6
   };
 
+  typedef unsigned short ACE_IO_Cntl_Cmds;
+
   // = Initialization method.
-  ACE_IO_Cntl_Msg (ACE_IO_Cntl_Cmds c) { this->cmd_ = c; }
-  // Initialize the control message.
+  /// Initialize the control message.
+  ACE_IO_Cntl_Msg (ACE_IO_Cntl_Cmds c);
 
   // = Get/set methods
 
-  ACE_IO_Cntl_Cmds cmd (void) { return this->cmd_; }
-  // Get command.
+  /// Get command.
+  ACE_IO_Cntl_Cmds cmd (void);
 
-  void cmd (ACE_IO_Cntl_Cmds c) { this->cmd_ = c; }
-  // Set command.
+  /// Set command.
+  void cmd (ACE_IO_Cntl_Cmds c);
 
-  size_t count (void) { return this->count_; }
-  // Get count.
+  /// Get count.
+  size_t count (void);
 
-  void count (size_t c) { this->count_ = c; }
-  // Set count.
+  /// Set count.
+  void count (size_t c);
 
-  int error (void) { return this->error_; }
-  // Get error.
+  /// Get error.
+  int error (void);
 
-  void error (int e) { this->error_ = e; }
-  // Set error.
+  /// Set error.
+  void error (int e);
 
-  int rval (void) { return this->rval_; }
-  // Get return value.
+  /// Get return value.
+  int rval (void);
 
-  void rval (int r) { this->rval_ = r; }
-  // Set return value.
+  /// Set return value.
+  void rval (int r);
 
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 private:
+  /// Command.
   ACE_IO_Cntl_Cmds cmd_;
-  // Command.
 
+  /// Count.
   size_t count_;
-  // Count.
 
+  /// Error.
   int error_;
-  // Error.
 
+  /// Return value
   int rval_;
-  // Return value
 };
+
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#if defined (__ACE_INLINE__)
+#include "ace/IO_Cntl_Msg.inl"
+#endif /* __ACE_INLINE__ */
+
+#include /**/ "ace/post.h"
 
 #endif /* ACE_IO_CNTL_MSG_H */

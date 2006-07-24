@@ -18,14 +18,14 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_OPERATION_OPERATION_SH_H_)
+#ifndef _BE_VISITOR_OPERATION_OPERATION_SH_H_
 #define _BE_VISITOR_OPERATION_OPERATION_SH_H_
 
 // ************************************************************
 // Operation visitor for server header
 // ************************************************************
 
-class be_visitor_operation_sh : public be_visitor_scope
+class be_visitor_operation_sh : public be_visitor_operation
 {
   //
   // = TITLE
@@ -43,8 +43,7 @@ public:
   // destructor
 
   virtual int visit_operation (be_operation *node);
-  // visit operation. We provide code for this method in the derived class
-
+  // visit operation.
 };
 
 #endif /* _BE_VISITOR_OPERATION_OPERATION_SH_H_ */

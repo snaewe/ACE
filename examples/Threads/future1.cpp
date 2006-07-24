@@ -17,14 +17,18 @@
 //
 // ============================================================================
 
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/ACE.h"
 #include "ace/Task.h"
-#include "ace/Synch.h"
+#include "ace/Thread_Mutex.h"
 #include "ace/Message_Queue.h"
 #include "ace/Future.h"
-#include "ace/Method_Object.h"
+#include "ace/Method_Request.h"
 #include "ace/Activation_Queue.h"
 #include "ace/Auto_Ptr.h"
+#include "ace/Atomic_Op.h"
 
 ACE_RCSID(Threads, future1, "$Id$")
 
@@ -51,7 +55,7 @@ class Scheduler : public ACE_Task_Base
   // = TITLE
   //     Active Object Scheduler.
 {
-  friend class Method_ObjectWork;
+  friend class Method_RequestWork;
 public:
   Scheduler (const char *, Scheduler * = 0);
   virtual ~Scheduler (void);
@@ -73,13 +77,13 @@ private:
   Scheduler *scheduler_;
 };
 
-class Method_Object_work : public ACE_Method_Object
+class Method_Request_work : public ACE_Method_Request
   // = TITLE
   //     Reification of the <work> method.
 {
 public:
-  Method_Object_work (Scheduler *, u_long, int, ACE_Future<u_long> &);
-  virtual ~Method_Object_work (void);
+  Method_Request_work (Scheduler *, u_long, int, ACE_Future<u_long> &);
+  virtual ~Method_Request_work (void);
   virtual int call (void);
 
 private:
@@ -89,7 +93,7 @@ private:
   ACE_Future<u_long> future_result_;
 };
 
-Method_Object_work::Method_Object_work (Scheduler* new_Scheduler,
+Method_Request_work::Method_Request_work (Scheduler* new_Scheduler,
                                         u_long new_param,
                                         int new_count,
                                         ACE_Future<u_long> &new_result)
@@ -99,28 +103,28 @@ Method_Object_work::Method_Object_work (Scheduler* new_Scheduler,
       future_result_ (new_result)
 {
   ACE_DEBUG ((LM_DEBUG,
-              "(%t) Method_Object_work created\n"));
+              "(%t) Method_Request_work created\n"));
 }
 
-Method_Object_work::~Method_Object_work (void)
+Method_Request_work::~Method_Request_work (void)
 {
-  ACE_DEBUG ((LM_DEBUG, "(%t) Method_Object_work will be deleted.\n"));
+  ACE_DEBUG ((LM_DEBUG, "(%t) Method_Request_work will be deleted.\n"));
 }
 
 
 int
-Method_Object_work::call (void)
+Method_Request_work::call (void)
 {
   return this->future_result_.set (this->scheduler_->work_i (this->param_, this->count_));
 }
 
-class Method_Object_name : public ACE_Method_Object
+class Method_Request_name : public ACE_Method_Request
   // = TITLE
   //     Reification of the <name> method.
 {
 public:
-  Method_Object_name (Scheduler *, ACE_Future<const char*> &);
-  virtual ~Method_Object_name (void);
+  Method_Request_name (Scheduler *, ACE_Future<const char*> &);
+  virtual ~Method_Request_name (void);
   virtual int call (void);
 
 private:
@@ -128,34 +132,34 @@ private:
   ACE_Future<const char *> future_result_;
 };
 
-Method_Object_name::Method_Object_name (Scheduler *new_scheduler,
+Method_Request_name::Method_Request_name (Scheduler *new_scheduler,
                                         ACE_Future<const char *> &new_result)
   : scheduler_ (new_scheduler),
     future_result_ (new_result)
 {
   ACE_DEBUG ((LM_DEBUG,
-              "(%t) Method_Object_name created\n"));
+              "(%t) Method_Request_name created\n"));
 }
 
-Method_Object_name::~Method_Object_name (void)
+Method_Request_name::~Method_Request_name (void)
 {
   ACE_DEBUG ((LM_DEBUG,
-              "(%t) Method_Object_name will be deleted.\n"));
+              "(%t) Method_Request_name will be deleted.\n"));
 }
 
 int
-Method_Object_name::call (void)
+Method_Request_name::call (void)
 {
   return future_result_.set (scheduler_->name_i ());
 }
 
-class Method_Object_end : public ACE_Method_Object
+class Method_Request_end : public ACE_Method_Request
   // = TITLE
   //     Reification of the <end> method.
 {
 public:
-  Method_Object_end (Scheduler *new_scheduler): scheduler_ (new_scheduler) {}
-  virtual ~Method_Object_end (void) {}
+  Method_Request_end (Scheduler *new_scheduler): scheduler_ (new_scheduler) {}
+  virtual ~Method_Request_end (void) {}
   virtual int call (void) { return -1; }
 
 private:
@@ -206,7 +210,7 @@ Scheduler::svc (void)
     {
       // Dequeue the next method object (we use an auto pointer in
       // case an exception is thrown in the <call>).
-      auto_ptr<ACE_Method_Object> mo (this->activation_queue_.dequeue ());
+      auto_ptr<ACE_Method_Request> mo (this->activation_queue_.dequeue ());
 
       ACE_DEBUG ((LM_DEBUG, "(%t) calling method object\n"));
       // Call it.
@@ -222,7 +226,7 @@ Scheduler::svc (void)
 void
 Scheduler::end (void)
 {
-  this->activation_queue_.enqueue (new Method_Object_end (this));
+  this->activation_queue_.enqueue (new Method_Request_end (this));
 }
 
 
@@ -259,7 +263,7 @@ Scheduler::name (void)
 
       // @@ What happens if new fails here?
       this->activation_queue_.enqueue
-        (new Method_Object_name (this, new_future));
+        (new Method_Request_name (this, new_future));
 
       return new_future;
     }
@@ -276,7 +280,7 @@ Scheduler::work (u_long newparam,
     ACE_Future<u_long> new_future;
 
     this->activation_queue_.enqueue
-      (new Method_Object_work (this, newparam, newcount, new_future));
+      (new Method_Request_work (this, newparam, newcount, new_future));
     return new_future;
   }
 }
@@ -287,7 +291,7 @@ Scheduler::work (u_long newparam,
 static size_t n_loops = 100;
 
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   Scheduler *andres, *peter, *helmut, *matias;
 
@@ -353,7 +357,7 @@ main (int, char *[])
         ACE_DEBUG ((LM_DEBUG, "(%t) result d %u\n", (u_int) resultc));
         ACE_DEBUG ((LM_DEBUG, "(%t) result e %u\n", (u_int) resultd));
 
-        const char *name;
+        const char *name = 0;
 
         fname.get (name);
 
@@ -390,28 +394,9 @@ main (int, char *[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Atomic_Op<ACE_Thread_Mutex, int>;
-template class ACE_Future<const char *>;
-template class ACE_Future<u_long>;
-template class ACE_Future_Rep<char const *>;
-template class ACE_Future_Rep<u_long>;
-template class auto_ptr<ACE_Method_Object>;
-template class ACE_Auto_Basic_Ptr<ACE_Method_Object>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Atomic_Op<ACE_Thread_Mutex, int>
-#pragma instantiate ACE_Future<const char *>
-#pragma instantiate ACE_Future<u_long>
-#pragma instantiate ACE_Future_Rep<char const *>
-#pragma instantiate ACE_Future_Rep<u_long>
-#pragma instantiate auto_ptr<ACE_Method_Object>
-#pragma instantiate ACE_Auto_Basic_Ptr<ACE_Method_Object>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
-
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

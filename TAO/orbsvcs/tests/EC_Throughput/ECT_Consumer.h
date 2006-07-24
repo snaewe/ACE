@@ -10,105 +10,87 @@
 //
 // ============================================================================
 
-#if !defined (ECT_CONSUMER_H)
+#ifndef ECT_CONSUMER_H
 #define ECT_CONSUMER_H
 
-#include "ace/Task.h"
-#include "orbsvcs/Channel_Clients_T.h"
+#include "ECT_Driver.h"
 
-class Driver;
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "orbsvcs/Channel_Clients_T.h"
+#include "orbsvcs/RtecSchedulerC.h"
+#include "orbsvcs/RtecEventChannelAdminC.h"
+#include "ace/Task.h"
+#include "ace/OS_NS_time.h"
 
 class Test_Consumer : public POA_RtecEventComm::PushConsumer
 {
-  //
   // = TITLE
   //   Receive the events.
   //
   // = DESCRIPTION
+  //   This class is a consumer of events. It subscribes for a
+  //   continous ranges of event types, this permits studying the
+  //   effect of the number of subscriptions for each particular kind
+  //   of event on the EC.
+  //
 public:
-  Test_Consumer (Driver* driver, void* cookie);
+  Test_Consumer (ECT_Driver* driver,
+                 void* cookie,
+                 int n_suppliers);
 
-  void connect (const char* name,
-		int event_a,
-		int event_b,
-		RtecEventChannelAdmin::EventChannel_ptr ec,
-		CORBA::Environment& _env);
+  void connect (RtecScheduler::Scheduler_ptr scheduler,
+                const char* name,
+                int type_start,
+                int type_count,
+                RtecEventChannelAdmin::EventChannel_ptr ec
+                ACE_ENV_ARG_DECL);
   // This method connects the consumer to the EC.
 
-  void disconnect (CORBA::Environment &_env);
+  void disconnect (ACE_ENV_SINGLE_ARG_DECL);
   // Disconnect from the EC.
 
-  virtual void push (const RtecEventComm::EventSet& events,
-		     CORBA::Environment &_env);
-  virtual void disconnect_push_consumer (CORBA::Environment &);
+  void dump_results (const char* name,
+                     ACE_UINT32 global_scale_factor);
+  // Print out the results
+
+  void accumulate (ACE_Throughput_Stats& stats) const;
+  // Add our throughput and latency statistics to <stats>
+
+  virtual void push (const RtecEventComm::EventSet& events
+                     ACE_ENV_ARG_DECL)
+      ACE_THROW_SPEC ((CORBA::SystemException));
+  virtual void disconnect_push_consumer (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+      ACE_THROW_SPEC ((CORBA::SystemException));
   // The skeleton methods.
 
 private:
-  Driver* driver_;
+  ECT_Driver* driver_;
   // The main driver for the test.
 
   void* cookie_;
   // A magic cookie passed by the driver that we pass back in our
   // callbacks.
-  
+
+  int n_suppliers_;
+  // The number of suppliers that are feeding this consumer, we
+  // terminate once we receive a shutdown event from each supplier.
+
   RtecEventChannelAdmin::ProxyPushSupplier_var supplier_proxy_;
   // We talk to the EC using this proxy.
-};
 
-class Driver
-{
-  //
-  // = TITLE
-  //
-  // = DESCRIPTION
-  //
-public:
-  Driver (void);
-
-  enum {
-    MAX_CONSUMERS = 16
-    // Maximum number of consumers.
-  };
-
-  int run (int argc, char* argv[]);
-  // Execute the test.
-
-  void push_consumer (void* consumer_cookie,
-		      ACE_hrtime_t arrival,
-		      const RtecEventComm::EventSet& events,
-		      CORBA::Environment&);
-  // Callback method for consumers, if any of our consumers has
-  // received events it will invoke this method.
-
-private:
-  int parse_args (int argc, char* argv[]);
-  // parse the command line args
-
-  void connect_consumers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-			  CORBA::Environment &_env);
-  void disconnect_consumers (CORBA::Environment &_env);
-  // Connect and disconnect the consumers.
-
-private:
-  Test_Consumer* consumers_[Driver::MAX_CONSUMERS];
-  // The consumer array.
-
-  int n_consumers_;
-  // The number of consumers.
-
-  int event_count_;
-  // How many messages we will send in the suppliers
-
-  int event_a_;
-  int event_b_;
-  // We send two types of events, with different contents.
-
-  const char* pid_file_name_;
-  // The name of a file where the process stores its pid
-
-  ACE_SYNCH_MUTEX recv_count_mutex_;
+  TAO_SYNCH_MUTEX lock_;
   int recv_count_;
+  ACE_hrtime_t first_event_;
   // How many events we have received.
+
+  ACE_Throughput_Stats throughput_;
+  // Used for reporting stats.
+
+  int shutdown_count_;
+  // How many shutdown events we have received.
 };
 
 #endif /* ECT_CONSUMER_H */

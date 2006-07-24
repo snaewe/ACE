@@ -1,58 +1,97 @@
 // $Id$
 
-The following TAO applications illustate various Portable Object
-Adapter (POA) interfaces and their usage scenarios.
+The following TAO applications test and illustate various Portable
+Object Adapter (POA) interfaces and their usage scenarios.
 
-        Individual README files in the respective directories explain
-these applications further. 
+        . Identity
 
-        . RootPOA
+                The example shows the identity between servants, ids,
+                and references.
 
-                This example explains how to obtain the name of the
-                RootPOA.
+        . POA_Destruction
 
-        . NewPOA
+                The program tests the destruction of a POA during an
+                upcall.
 
-                This example explains the operations involved in
-                creation of new POAs.
+        . Default_Servant
 
-        . FindPOA
+                This program tests the behavior of
+                POA::id_to_servant() and POA::reference_to_servant()
+                with the use of default servants.
 
-                This example explains registering an adapter activator
-                for a POA and also the find_POA operation.
+        . Object_Reactivation
 
-        . Generic_Servant
+                This program tests the reactivation of a servant that
+                has been deactivated but not removed from the Active
+                Object Map yet.
 
-                A simple interface (Foo) is defined here and its
-                implementations, server and client programs are
-                available, which can be used for testing POA
-                applications.  Several servers for that interface are
-                implemented using different POA policies; a common
-                client for all the servers is also provided.
+        . Excessive_Object_Deactivations
 
-        . On_Demand_Activation 
-                
-                Contains programs that test the POA's 2 types of
-                activation of objects on demand, namely , Servant
-                Activator approach and Servant Locator , which depend
-                on the RETAIN/NON-RETAIN policy of a POA.
+                This program tests for excessive deactivations of a
+                servant.  The test checks excessive deactivations in a
+                POA with SYSTEM_ID and other POA with USER_ID.  The
+                test also check for excessive deactivations during
+                upcalls.
 
-        . Default_Servant 
-		
-		Contains a File IDL module and its implementation and
-		a server,client to test the File Module interfaces.
-		The System interface uses the USE_DEFAULT_MANAGER policy
-		to create a POA and registers a single File Descriptor
-		object as the default servant. The default servant serves
-		requests for many Descriptor objects.
+        . Non_Servant_Upcalls
 
-        . Explicit_Activation
+                This program check the users ability to make calls on
+                a POA during non-servant upcalls.  In this example, a
+                servant which is being destroyed during because of a
+                deactivate_object() call, tries to deactivate another
+                object in its destructor.
 
-                This application explains various operations involved
-                in the explicit activation of objects; including the
-                creation of objects without servants (the servant is
-                created on demand).  NOTE: Currently the example does
-                not work.  < It compiles; but at runtime, _narrow()
-                raises an exception on the client. >
-        
-        
+        . wait_for_completion
+
+                This program tests the <wait_for_completion> feature
+                of the POA.
+
+        . Single_Threaded_POA 
+
+                This program tests to make sure that two threads
+                cannot call servants in a single threaded POA
+                simultaneously.  At the same time, it makes sure that
+                a servant can call itself or other servants in the
+                same POA while in an upcall.
+
+        . Etherealization
+
+                This program tests for deactivation and
+                etherealization of reference counted and non reference
+                counted servants.
+
+        . Persistent_ID 
+
+                This test checks the combination of PERSISTENT &
+                SYSTEM_ID POA policies.
+
+        . Policies
+
+                This program tests the construction of POA policies,
+                both through the generic ORB::create_policy interface
+                and the PortableServer specific interfaces.
+
+        . MT_Servant_Locator
+
+                This program tests that multiple calls to the Servant
+                Locator can take place simultaneously.
+
+        . Nested_Non_Servant_Upcalls
+
+                This program tests that nested non-servant upcalls are
+                handled correctly.
+
+        . POAManagerFactory
+   
+                The program tests the POAManagerFactory interface. Test may
+                be run by hand using "POAManagerFactory -v" to get a verbose 
+                report of individual tests being run.
+
+        . EndpointPolicy 
+
+                Tests for the endpoint policy, the server listens on two
+                endpoints, one with an alias rendering it unreachable. The 
+                server uses the endpoint policy to create two IORs, one with
+                the only the good endpoint and another with only the bad. The
+                client expects to reach the good ior and expects to fail with
+                the bad ior.

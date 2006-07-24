@@ -1,114 +1,76 @@
 // This may look like C, but it's really -*- C++ -*-
-// $Id$
 
-// ============================================================================
-//
-// = LIBRARY
-//     TAO
-//
-// = FILENAME
-//     default_server.h
-//
-// = AUTHOR
-//     Chris Cleeland
-//
-// ============================================================================
+//=============================================================================
+/**
+ *  @file     default_server.h
+ *
+ *  $Id$
+ *
+ *  @author  Chris Cleeland
+ */
+//=============================================================================
 
-#if !defined (TAO_DEFAULT_SERVER_FACTORY_H)
-#  define TAO_DEFAULT_SERVER_FACTORY_H
 
-#include "tao/corba.h"
-#include "tao/ORB_Strategies_T.h"
+#ifndef TAO_DEFAULT_SERVER_FACTORY_H
+#define TAO_DEFAULT_SERVER_FACTORY_H
 
-class TAO_Default_Server_Strategy_Factory : public TAO_Server_Strategy_Factory
+#include /**/ "ace/pre.h"
+
+#include "tao/Server_Strategy_Factory.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "ace/Service_Config.h"
+#include "ace/Time_Value.h"
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class TAO_Default_Server_Strategy_Factory
+ *
+ * @brief This is the default strategy factory for CORBA servers.  It
+ * allows developers to choose strategies via argument flags.
+ * This design gives substantial freedom for experimentation.
+ *
+ */
+class TAO_Export TAO_Default_Server_Strategy_Factory
+  : public TAO_Server_Strategy_Factory
 {
-  // = TITLE
-  //   This is the default strategy factory for CORBA servers.  It
-  //   allows developers to choose strategies via argument flags.
-  //   This design gives substantial freedom for experimentation.
 public:
   // = Initialization and termination methods.
   TAO_Default_Server_Strategy_Factory (void);
   virtual ~TAO_Default_Server_Strategy_Factory (void);
 
-  virtual int open (void);
-  // Call <open> for our strategies.
-
-  // = Server-side ORB Strategy Factory Methods.
-  virtual CONCURRENCY_STRATEGY *concurrency_strategy (void);
-
-  virtual TAO_Object_Table_Impl *create_object_table (void);
-  // Factory method for object tables.
-
-  virtual ACE_Lock *create_poa_lock (void);
-  // Creates and returns a lock for POA based on the setting for
-  // <-ORBpoalock>.  A setting of <thread> returns an
-  // <ACE_Lock_Adapter\<ACE_Thread_Mutex\>>; a setting of <null>
-  // returns an <ACE_Lock_Adapter\<ACE_NULL_Mutex\>>.
-
-  virtual ACE_Lock *create_poa_mgr_lock (void);
-  // Creates and returns a lock for a POA Manager based on the setting
-  // for <-ORBpoamgrlock>.  A setting of <thread> returns an
-  // <ACE_Lock_Adapter\<ACE_Thread_Mutex\>>; a setting of <null>
-  // returns an <ACE_Lock_Adapter\<ACE_NULL_Mutex\>>.
-
-  virtual ACE_Lock *create_servant_lock (void);
-  // Creates and returns a lock for servants based on the setting of
-  // POA, and concurrency strategy as follows:
-  // 1. If concurrency policy is reactive and POA is TSS
-  //    then return ACE_Null_Mutex via ACE_Lock_Adapter.
-  //
-  // 2. If concurrency policy is non-reactive then
-  //    return ACE_Thread_Mutex ...
-  //
-  // 3. If the POA is global then, return
-  //    ACE_Null_Mutex iff ORB_init count == 1,
-  //    else if ORB_init count > 1 return
-  //    ACE_Thread_Mutex.
-
-  virtual ACE_Lock *create_event_loop_lock (void);
-  // Creates and returns a lock for the event loop.
-  // If the ORB is single threaded or some form of ORB-per-thread then
-  // it is more efficient to use a Null_Mutex for the variables
-  // controlling the event loop (termination). Otherwise a
-  // Recursive_Thread_Mutex or Thread_Mutex may be required.
-
-  virtual ACE_Lock *create_collocation_table_lock (void);
-  // Creates and returns the lock for the global collocation table.
-
-  virtual ACE_Lock *create_cached_connector_lock (void);
-  // Creates and returns the lock for the global collocation table.
-
   // = Service Configurator hooks.
-  virtual int init (int argc, char *argv[]);
-  // Initialize the ORB when it's linked dynamically.
+  virtual int init (int argc, ACE_TCHAR* argv[]);
 
-  int parse_args (int argc, char *argv[]);
-  // Arguments are in the form of -ORBxxx.  Valid arguments are:
-  // <-ORBconcurrency> <{which}>
-  //   where <{which}> is one of <reactive> or <thread-per-connection>.
-  // <-ORBtablesize> <{num}>
-  //   to set the table size
-  // <-ORBdemuxstrategy> <{which}>
-  //   where <{which}> is one of <dynamic>, <linear>, or <active>
-  // <-ORBpoalock> <{which}>
-  //   where <{which}> is one of <thread> or <null> (default <thread>)
-  // <-ORBpoamgrlock> <{which}>
-  //   where <{which}> is one of <thread> or <null> (default <thread>)
-  // <-ORBeventlock> <{which}>
-  //   where <{which}> is one of <thread> or <null> (default <null>)
+  // = The TAO_Server_Strategy_Factory methods, please read the
+  //   documentation in "tao/Server_Strategy_Factory.h"
+  virtual int open (TAO_ORB_Core*);
+  virtual int enable_poa_locking (void);
+  virtual int activate_server_connections (void);
+  virtual int thread_per_connection_timeout (ACE_Time_Value &timeout);
+  virtual int server_connection_thread_flags (void);
+  virtual int server_connection_thread_count (void);
 
-private:
-  void tokenize (char *flag_string);
+  /// Parse the arguments, check the documentation in
+  /// $TAO_ROOT/docs/Options.html for details
+  int parse_args (int argc, ACE_TCHAR* argv[]);
 
-  u_long thread_flags_;
-  // Default thread flags passed to thr_create().
+protected:
+  void tokenize (ACE_TCHAR* flag_string);
 
-  u_long object_table_size_;
-  // Default size of object lookup table.
+  void report_option_value_error (const ACE_TCHAR* option_name,
+                                  const ACE_TCHAR* option_value);
 
-  TAO_Demux_Strategy object_lookup_strategy_;
-  // The type of lookup/demultiplexing strategy being used
+protected:
+  /// Should the server connection handlers run in their own thread?
+  int activate_server_connections_;
+
+  /// Default thread flags passed to thr_create().
+  int thread_flags_;
 
   enum Lock_Type
   {
@@ -116,45 +78,18 @@ private:
     TAO_THREAD_LOCK
   };
 
+  /// The type of lock to be returned by <create_poa_lock()>.
   Lock_Type poa_lock_type_;
-  // The type of lock to be returned by <create_poa_lock()>.
 
-  Lock_Type poa_mgr_lock_type_;
-  // The type of lock to be returned by <create_poa_mgr_lock()>.
-
-  Lock_Type event_loop_lock_type_;
-  // The type of lock to be returned by <create_event_loop_lock()>.
-
-  Lock_Type collocation_table_lock_type_;
-  // Type of lock used by the collocation table.
-
-  Lock_Type cached_connector_lock_type_;
-  // Type of lock used by the cached connector.
-
-  // = Strategies Used.
-  TAO_Reactive_Strategy<TAO_Server_Connection_Handler> reactive_strategy_;
-  // A strategy for passively establishing connections which utilizes
-  // the Reactor.
-
-  ACE_Thread_Strategy<TAO_Server_Connection_Handler> threaded_strategy_;
-  // The threaded strategy used for passively establishing
-  // connections.
-
-  CONCURRENCY_STRATEGY *concurrency_strategy_;
-  // concrete concurrency strategy.
-
-#if 0
-  // Someday we'll need these!
-  CREATION_STRATEGY *creation_strategy_;
-  ACCEPT_STRATEGY *accept_strategy_;
-  SCHEDULING_STRATEGY *scheduling_strategy_;
-#endif /* 0 */
+  /// The timeout flag and value for the thread-per-connection model
+  int thread_per_connection_use_timeout_;
+  ACE_Time_Value thread_per_connection_timeout_;
 };
 
-#if defined (__ACE_INLINE__)
-# include "tao/default_server.i"
-#endif /* __ACE_INLINE__ */
+TAO_END_VERSIONED_NAMESPACE_DECL
 
+ACE_STATIC_SVC_DECLARE_EXPORT (TAO, TAO_Default_Server_Strategy_Factory)
 ACE_FACTORY_DECLARE (TAO, TAO_Default_Server_Strategy_Factory)
 
+#include /**/ "ace/post.h"
 #endif /* TAO_DEFAULT_SERVER_FACTORY_H */

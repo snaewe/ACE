@@ -16,11 +16,22 @@
 //
 // ============================================================================
 
+#include "ace/OS_main.h"
 #include "ace/Reactor.h"
 #include "ace/SOCK_Dgram.h"
 #include "ace/INET_Addr.h"
 #include "ace/ACE.h"
 #include "ace/Get_Opt.h"
+#include "ace/High_Res_Timer.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_ctype.h"
+#include "ace/OS_NS_arpa_inet.h"
+#include "ace/OS_NS_string.h"
+#include "ace/os_include/os_netdb.h"
+#include "ace/OS_NS_unistd.h"
+
+// FUZZ: disable check_for_math_include
 #include <math.h>
 
 ACE_RCSID(UDP, udp_test, "$Id$")
@@ -34,8 +45,8 @@ static const int DEFINTERVAL = 1000; // 1000 usecs.
 static const int DEFWINDOWSZ = 10; // 10 microsecond.
 static char SendBuf[MAXPKTSZ];
 static char RxBuf[MAXPKTSZ];
-static char **cmd;
-static char datafile[MAXHOSTNAMELEN];
+static ACE_TCHAR **cmd;
+static ACE_TCHAR datafile[MAXHOSTNAMELEN];
 
 static ACE_UINT32 nsamples = DEFITERATIONS;
 static int usdelay = DEFINTERVAL;
@@ -73,9 +84,9 @@ usage (void)
 
 static ACE_hrtime_t *Samples;
 static u_int *Dist;
-static char sumfile[30];
-static char distfile[30];
-static char sampfile[30];
+static ACE_TCHAR sumfile[30];
+static ACE_TCHAR distfile[30];
+static ACE_TCHAR sampfile[30];
 
 class Client : public ACE_Event_Handler
 {
@@ -194,8 +205,7 @@ Client::run (void)
   char *sbuf = SendBuf;
   char *rbuf = RxBuf;
 
-  ACE_hrtime_t start;
-  ACE_hrtime_t end;
+  ACE_High_Res_Timer timer;
   ACE_hrtime_t sample;
 
 #if defined (ACE_LACKS_FLOATING_POINT)
@@ -207,7 +217,8 @@ Client::run (void)
   double sample_mean = 0.0;
 #endif /* ! ACE_LACKS_FLOATING_POINT */
 
-  ACE_hrtime_t last_over = 0;
+  int                tracking_last_over = 0;
+  ACE_High_Res_Timer since_over;
   ACE_hrtime_t psum = 0;
   ACE_hrtime_t sum = 0;
   ACE_hrtime_t max = 0;
@@ -235,29 +246,35 @@ Client::run (void)
 
   for (i = -1, *seq = 0, j = 0;
        i < (ACE_INT32) nsamples;
-       (*seq)++, i++, j++)
+       (*seq)++, i++, j++, timer.reset ())
     {
-      start = ACE_OS::gethrtime ();
+      timer.start ();
       if (send (sbuf, bufsz) <= 0)
         ACE_ERROR_RETURN ((LM_ERROR, "(%P) %p\n", "send"), -1);
 
       if ((n = get_response (rbuf, bufsz)) <= 0)
         ACE_ERROR_RETURN ((LM_ERROR, "(%P) %p\n", "get_response"), -1);
 
-      end = ACE_OS::gethrtime ();
+      timer.stop ();
 
       if (n <= 0)
         ACE_ERROR_RETURN ((LM_ERROR,
                            "\nTrouble receiving from socket!\n\n"),
                           -1);
 
-      sample = end - start; // in nanoseconds.
+      timer.elapsed_time (sample);     // in nanoseconds.
 
       if (i < 0 )
         {
+#ifndef ACE_LACKS_LONGLONG_T
           ACE_DEBUG ((LM_DEBUG,
                       "Ignoring first sample of %u usecs\n",
-                      (ACE_UINT32) (sample / (ACE_UINT32) 1000)));
+                       (ACE_UINT32) (sample)));
+#else
+          ACE_DEBUG ((LM_DEBUG,
+                      "Ignoring first sample of %u usecs\n",
+                      (ACE_UINT32) (sample.lo())));
+#endif
           continue;
         }
       else if (max_allow > 0  &&  sample > max_allow)
@@ -268,12 +285,19 @@ Client::run (void)
                       (ACE_UINT32) (sample / (ACE_UINT32) 1000000),
                       (ACE_UINT32) (max_allow / (ACE_UINT32) 1000000)));
 
-          if (last_over > 0)
-            ACE_DEBUG ((LM_DEBUG,
-                        "\tTime since last over = %u msec!\n",
-                        (ACE_UINT32) ((end - last_over) /
-                                      (ACE_UINT32) 1000000)));
-          last_over = end;
+          if (tracking_last_over)
+            {
+              since_over.stop ();
+              ACE_Time_Value over_time;
+              since_over.elapsed_time (over_time);
+              ACE_DEBUG ((LM_DEBUG,
+                          "\tTime since last over = %u msec!\n",
+                          over_time.msec ()));
+              since_over.reset ();
+            }
+
+          tracking_last_over = 1;
+          since_over.start ();
           i--;
           continue;
         }
@@ -320,11 +344,11 @@ Client::run (void)
 
   if (logfile)
     {
-      ACE_OS::sprintf (sumfile, "%s.sum", datafile);
-      ACE_OS::sprintf (distfile, "%s.dist", datafile);
-      ACE_OS::sprintf (sampfile, "%s.samp", datafile);
+      ACE_OS::sprintf (sumfile, ACE_TEXT("%s.sum"), datafile);
+      ACE_OS::sprintf (distfile, ACE_TEXT("%s.dist"), datafile);
+      ACE_OS::sprintf (sampfile, ACE_TEXT("%s.samp"), datafile);
 
-      distfp = ACE_OS::fopen(distfile, "w");
+      distfp = ACE_OS::fopen(distfile, ACE_TEXT("w"));
 
       if (distfp == NULL)
         {
@@ -332,14 +356,14 @@ Client::run (void)
                       "Unable to open dist file!\n\n"));
           logfile = 0;
         }
-      if (logfile && (sampfp = ACE_OS::fopen (sampfile, "w")) == NULL)
+      if (logfile && (sampfp = ACE_OS::fopen (sampfile, ACE_TEXT("w"))) == NULL)
         {
           ACE_OS::fclose (distfp);
           ACE_DEBUG ((LM_DEBUG,
                       "Unable to open sample file!\n\n"));
           logfile = 0;
         }
-      if (logfile && (sumfp = ACE_OS::fopen (sumfile, "w")) == NULL)
+      if (logfile && (sumfp = ACE_OS::fopen (sumfile, ACE_TEXT("w"))) == NULL)
         {
           ACE_OS::fclose (distfp);
           ACE_OS::fclose (sampfp);
@@ -578,38 +602,38 @@ Server::handle_close (ACE_HANDLE,
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   int c, dstport = DEFPORT;
   int so_bufsz = 0;
 
   cmd = argv;
 
-  ACE_Get_Opt getopt (argc, argv, "x:w:f:vs:I:p:rtn:b:a");
+  ACE_Get_Opt getopt (argc, argv, ACE_TEXT("x:w:f:vs:I:p:rtn:b:a"));
 
   while ((c = getopt ()) != -1)
     {
       switch ((char) c)
         {
         case 'x':
-          max_allow = ACE_OS::atoi (getopt.optarg);
+          max_allow = ACE_OS::atoi (getopt.opt_arg ());
           break;
         case 'w':
-          window = ACE_OS::atoi (getopt.optarg);
+          window = ACE_OS::atoi (getopt.opt_arg ());
           if (window < 0)
             ACE_ERROR_RETURN ((LM_ERROR,
                                "Invalid window!\n\n"),
                               1);
           break;
         case 'f':
-          ACE_OS::strcpy (datafile, getopt.optarg);
+          ACE_OS::strcpy (datafile, getopt.opt_arg ());
           logfile = 1;
           break;
         case 'v':
           VERBOSE = 1;
           break;
         case 'b':
-          bufsz = ACE_OS::atoi (getopt.optarg);
+          bufsz = ACE_OS::atoi (getopt.opt_arg ());
 
           if (bufsz <= 0)
             ACE_ERROR_RETURN ((LM_ERROR,
@@ -617,7 +641,7 @@ main (int argc, char *argv[])
                               1);
 
         case 'n':
-          nsamples = ACE_OS::atoi (getopt.optarg);
+          nsamples = ACE_OS::atoi (getopt.opt_arg ());
           if (nsamples <= 0)
             ACE_ERROR_RETURN ((LM_ERROR,
                                "\nIterations must be greater than 0!\n\n"),
@@ -627,7 +651,7 @@ main (int argc, char *argv[])
           use_reactor = 1;
           break;
         case 's':
-          so_bufsz = ACE_OS::atoi (getopt.optarg);
+          so_bufsz = ACE_OS::atoi (getopt.opt_arg ());
 
           if (so_bufsz <= 0)
             ACE_ERROR_RETURN ((LM_ERROR,
@@ -635,17 +659,17 @@ main (int argc, char *argv[])
                               1);
           break;
         case 'I':
-          usdelay = ACE_OS::atoi (getopt.optarg);
+          usdelay = ACE_OS::atoi (getopt.opt_arg ());
 
           if (usdelay == 0)
             ACE_ERROR_RETURN ((LM_ERROR,
                                "%s: bad usdelay: %s\n",
                                argv[0],
-                               getopt.optarg),
+                               getopt.opt_arg ()),
                               1);
           break;
         case 'p':
-          dstport = ACE_OS::atoi (getopt.optarg);
+          dstport = ACE_OS::atoi (getopt.opt_arg ());
           if (dstport <= 0)
             ACE_ERROR_RETURN ((LM_ERROR,
                                "\nInvalid port number!\n\n"),
@@ -665,7 +689,7 @@ main (int argc, char *argv[])
         }
     }
 
-  if (getopt.optind >= argc && client || argc == 1)
+  if (getopt.opt_ind () >= argc && client || argc == 1)
     {
       usage ();
       return 1;
@@ -697,25 +721,25 @@ main (int argc, char *argv[])
                           1);
       ACE_INET_Addr remote_addr;
 
-      if (isdigit(argv[getopt.optind][0]))
+      if (ACE_OS::ace_isdigit(argv[getopt.opt_ind ()][0]))
         {
           if (remote_addr.set (dstport,
                                (ACE_UINT32) ACE_OS::inet_addr
-                                 (argv[getopt.optind])) == -1)
+                                 (ACE_TEXT_ALWAYS_CHAR(argv[getopt.opt_ind ()]))) == -1)
             ACE_ERROR_RETURN ((LM_ERROR,
                                "invalid IP address: %s\n",
-                               argv[getopt.optind]),
+                               argv[getopt.opt_ind ()]),
                               1);
         }
       else
         {
-          if (remote_addr.set (dstport, argv[getopt.optind]) == -1)
+          if (remote_addr.set (dstport, argv[getopt.opt_ind ()]) == -1)
             ACE_ERROR_RETURN ((LM_ERROR,
                                "invalid IP address: %s\n",
-                               argv[getopt.optind]),
+                               argv[getopt.opt_ind ()]),
                               1);
         }
-      getopt.optind++;
+      getopt.opt_ind ()++;
 
       Client client (addr, remote_addr);
 

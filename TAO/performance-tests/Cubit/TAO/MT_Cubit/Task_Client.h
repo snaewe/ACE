@@ -10,14 +10,20 @@
 //    Task_Client.h
 //
 // = AUTHOR
-//    Andy Gokhale, Sumedh Mungee and Sergio Flores-Gaitan
+//    Andy Gokhale, Sumedh Mungee, Sergio Flores-Gaitan, and
+//    Nagarajan Surendran.
 //
 // ============================================================================
 
-#if !defined (TASK_CLIENT_H)
+#ifndef TASK_CLIENT_H
 #define TASK_CLIENT_H
 
-#include "ace/Synch.h"
+#include "ace/config-all.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Task.h"
 #include "ace/Thread_Manager.h"
 #include "ace/Get_Opt.h"
@@ -25,48 +31,49 @@
 #include "ace/ARGV.h"
 #include "ace/Sched_Params.h"
 #include "ace/High_Res_Timer.h"
+#include "ace/Containers.h"
 
-#include "orbsvcs/CosNamingC.h"
-#include "orbsvcs/Naming/Naming_Utils.h"
 #include "cubitC.h"
+#include "cubit_i.h"
+#include "Globals.h"
+#include "Timer.h"
 
-#if defined (CHORUS)
-#include "pccTimer.h"
-#endif /* CHORUS */
+#if defined (CHORUS_MVME)
+# include "pccTimer.h"
+#endif /* CHORUS_MVME */
 
-#include <math.h>
+// FUZZ: disable check_for_math_include
+#if defined(ACE_HAS_EXCEPTIONS) && !defined (__KCC) && !defined (__xlC__) && \
+    (!defined __GNUG__ || !defined (DIGITAL_UNIX))
+  // Some plaforms define an exception structure in math.h...
+# if defined (__GNUG__)
+    // And some compilers have this workaround.  Disable it with this
+    // #define, to avoid warning about multiple #defines of exception.
+#   define _MATH_H_WRAPPER
+# endif /* __GNUG__ */
+# define exception _math_exception
+# include /**/ <math.h>
+# undef exception
+#else
+# include /**/ <math.h>
+#endif /* ACE_HAS_EXCEPTIONS */
 
-// @@ Should we put this into a more general file, e.g., OS.h?
-//
-// I will integrate this, together with the sqrt() function when
-// the implementation is complete.  --Sergio.
-// @@ Sergio, can you please use the ACE_timer_t type for this instead
-// of #define'ing double?!  
 #if defined (ACE_LACKS_FLOATING_POINT)
-#define double ACE_UINT32
-#define fabs(X) ((X) >= 0 ? (X) : -(X))
-// the following is just temporary, until we finish the sqrt()
+// The following is just temporary, until we finish the sqrt()
 // implementation.
 #define sqrt(X) (1)
 #endif /* ACE_LACKS_FLOATING_POINT */
 
-#if !defined (ACE_HAS_THREADS)
-class NOOP_ACE_Barrier
-{
-public:
-  NOOP_ACE_Barrier (int) {}
-  void wait (void) {}
-};
-#define ACE_Barrier NOOP_ACE_Barrier
-#endif /* ACE_HAS_THREADS */
+#if defined (ACE_HAS_QUANTIFY)
+# define START_QUANTIFY quantify_start_recording_data ();
+# define STOP_QUANTIFY quantify_stop_recording_data();
+# define CLEAR_QUANTIFY quantify_clear_data ();
+#else /* ! ACE_HAS_QUANTIFY */
+# define START_QUANTIFY
+# define STOP_QUANTIFY
+# define CLEAR_QUANTIFY
+#endif /* ! ACE_HAS_QUANTIFY */
 
-// Arbitrary generator used by the client to create the numbers to be
-// cubed.
-static inline int
-func (u_int i)
-{
-  return i - 117;
-}
 
 enum Cubit_Datatypes
 {
@@ -91,6 +98,9 @@ enum Cubit_Datatypes
   CB_LOW_PRIORITY_RATE = 10
 };
 
+typedef ACE_Unbounded_Queue<ACE_timer_t> JITTER_ARRAY;
+typedef ACE_Unbounded_Queue_Iterator<ACE_timer_t> JITTER_ARRAY_ITERATOR;
+
 class Task_State
 {
   // = TITLE
@@ -100,21 +110,20 @@ class Task_State
   //     This class maintains state which is common to the potentially
   //     multiple concurrent clients.
 public:
+  Task_State (void);
+  // Constructor.
+
   int parse_args (int argc,char **argv);
-  // parses the arguments
+  // parses the arguments with the provided argc and argv.
+
+  ~Task_State (void);
+  // Destructor
 
   ACE_Barrier *barrier_;
   // Barrier for the multiple clients to synchronize after binding to
   // the servants.
 
-  Task_State (int argc, char **argv);
-  // Constructor. Takes the command line arguments, which are later
-  // passed into ORB_init.
-
-  ~Task_State (void);
-  // Destructor
-
-  CORBA::String key_;
+  const char *key_;
   // All cubit objects will have this as prefix to its key.
 
   u_int loop_count_;
@@ -123,7 +132,7 @@ public:
   u_int thread_count_;
   // Number of concurrent clients to create.
 
-  double *latency_;
+  ACE_timer_t *latency_;
   // Array to store the latency for every client, indexed by
   // thread-id.
 
@@ -133,17 +142,13 @@ public:
   Cubit_Datatypes datatype_;
   // Which datatype to use to make the calls.
 
-  ACE_SYNCH_MUTEX lock_;
+  TAO_SYNCH_MUTEX lock_;
   // Lock to protect access to this object.
-
-  // = Command line arguments.
-  int argc_;
-  char **argv_;
 
   u_int thread_per_rate_;
   // Flag for the thread_per_rate test.
 
-  double **global_jitter_array_;
+  JITTER_ARRAY **global_jitter_array_;
   // This array stores the latency seen by each client for each
   // request, to be used later to compute jitter.
 
@@ -159,8 +164,8 @@ public:
   // Flag that indicates if we are going to use oneway calls instead
   // of two-way.
 
-  u_int use_name_service_;
-  // Flag that say if we are using the or not the name service.
+  char *one_ior_;
+  // Ior array used if utilization test is run.
 
   u_int one_to_n_test_;
   // indicates whether we are running the "1 to n" test, which has 1
@@ -195,7 +200,7 @@ public:
   // maintain high priority traffic as long as low priority traffic is
   // going through.
 
-  ACE_Thread_Semaphore *semaphore_;
+  ACE_SYNCH_SEMAPHORE *semaphore_;
   // semaphore in order for the high priority client to keep running
   // as long as the low priority clients are running.  See explanation
   // of "high_priority_loop_count_" member in this class.
@@ -205,31 +210,26 @@ public:
   // priority clients.  By default we use only one priority for all
   // client threads.
 
-  int utilization_task_started_;
-  // Indicates whether the utilization task has started.
-
   ACE_High_Res_Timer timer_;
   // global timer to be started by the utilization task.
-
-  u_int run_server_utilization_test_;
-  // flag to indicate we are to run the utilization test of the server.
-  // This means we are not sending requests at a determined frequency,
-  // but rather "let it rip"!
-
-  u_int util_time_;
-  // the amount of time in seconds that the utilization test will run.
 
   int ready_;
   // ready flag used by the high priority thread to wake up the low
   // priority threads after it's parsed the arguments.
 
-  ACE_SYNCH_MUTEX ready_mtx_;
+  TAO_SYNCH_MUTEX ready_mtx_;
   // mutex for the condition variable.
 
-  ACE_Condition<ACE_SYNCH_MUTEX> ready_cnd_;
-  // condition variable for the low priority threads to wait 
+  TAO_SYNCH_CONDITION ready_cnd_;
+  // condition variable for the low priority threads to wait
   //until the high priority thread is done with the arguments parsing.
 
+  u_int remote_invocations_;
+  // flag to indicate whether we make remote versus local invocations
+  // to calculate accurately the ORB overhead.
+
+  ACE_timer_t util_test_time_;
+  // holds the total time for the utilization test to complete.
 };
 
 class Client : public ACE_Task<ACE_SYNCH>
@@ -241,30 +241,80 @@ class Client : public ACE_Task<ACE_SYNCH>
   //     This class implements the Cubit Client, which is an active object.
   //     `n' threads execute svc, and make 2way CORBA calls on the server
 public:
-  Client (ACE_Thread_Manager *, Task_State *ts, u_int id);
+  Client (ACE_Thread_Manager *,
+          Task_State *ts,
+          int argc,
+          char **argv,
+          u_int id);
   // Constructor, with a pointer to the common task state.
+
+  ~Client (void);
+  // destructor.
 
   virtual int svc (void);
   // The thread function.
 
-  double get_high_priority_latency (void);
-  double get_low_priority_latency (void);
-  double get_high_priority_jitter (void);
-  double get_low_priority_jitter (void);
-  double get_latency (u_int thread_id);
-  double get_jitter (u_int id);
-  // Accessors to get the various measured quantities.
+  ACE_timer_t get_high_priority_latency (void);
+  // Returns the latency of the high priority thread in usecs.
+
+  ACE_timer_t get_low_priority_latency (void);
+  // Returns the average latency found for the low
+  // priority threads in usecs.
+
+  ACE_timer_t get_high_priority_jitter (void);
+  // Returns the high priority jitter in usecs.
+
+  ACE_timer_t get_low_priority_jitter (void);
+  // Returns the jitter for all the low priority
+  // thread request in usecs.
+
+  ACE_timer_t get_latency (u_int thread_id);
+  // gets the average latency for that thread.
+
+  ACE_timer_t get_jitter (u_int id);
+  // gets the jitter for this thread.
+
+  static int func (u_int i);
+  // Arbitrary generator used by the client to create the numbers to be
+  // cubed.
 
 private:
-  int run_tests (Cubit_ptr,
-                 u_int,
-                 u_int,
-                 Cubit_Datatypes,
-                 double frequency);
-  // Makes the calls to the servant.
+  CORBA::ORB_ptr init_orb (ACE_ENV_SINGLE_ARG_DECL);
+  // initialize the ORB.
 
-  void put_latency (double *jitter,
-                    double latency,
+  void read_ior (void);
+  // reads the cubit ior from a file.
+
+  int get_cubit (CORBA::ORB_ptr orb
+                 ACE_ENV_ARG_DECL);
+  // gets the cubit object.
+
+  int run_tests (void);
+  // Run the various tests.
+
+  int make_request (void);
+  // make a CORBA request depending on the datatype.
+
+  int do_test (void);
+  // makes the corba requests.
+
+  int cube_octet (void);
+  // call cube_octet method on the cubit object.
+
+  int cube_short (void);
+  // call cube short on the cubit object.
+
+  int cube_long (void);
+  // call cube long on the cubit object.
+
+  int cube_struct (void);
+  // call cube struct on the cubit object.
+
+  void print_stats (void);
+  // prints the latency stats.
+
+  void put_latency (JITTER_ARRAY *jitter,
+                    ACE_timer_t latency,
                     u_int thread_id,
                     u_int count);
   // Records the latencies in the <Task_State>.
@@ -272,20 +322,51 @@ private:
   int parse_args (int, char **);
   // Parses the arguments.
 
+  void find_frequency (void);
+  // determines the frequency at which to make calls depending on the
+  // id of the thread.
+
+  ACE_timer_t calc_delta (ACE_timer_t real_time,
+                          ACE_timer_t delta);
+  // calculate the delta value.
+
+  Cubit_ptr cubit_;
+  // pointer to the cubit object.
+
+  Cubit_i cubit_impl_;
+  // cubit implementation object.
+
   Task_State *ts_;
   // Pointer to shared state.
+
+  u_int num_;
+  // number used for cubing.
 
   u_int id_;
   // unique id of the task
 
-  //  CosNaming::NamingContext_var naming_context_;
-  // Object reference to the naming service.
+  u_int call_count_;
+  // count of the number of calls made.
 
-  CosNaming::NamingContext_var mt_cubit_context_;
-  // Object reference to the cubit context "MT_Cubit".
+  u_int error_count_;
+  // number of calls that failed.
 
-  TAO_Naming_Client my_name_client_;
-  // Naming Client intermediary to naming service stuff
+  JITTER_ARRAY *my_jitter_array_;
+  // ACE Unbounded set holding the latency values for all the
+  // requests of this thread.
+
+  MT_Cubit_Timer *timer_;
+  // Timer using pccTimer for chorus and ACE_Timer for other platforms.
+
+  ACE_timer_t frequency_;
+  // frequency of CORBA requests.
+
+  ACE_timer_t latency_;
+  // aggregate latency of the requests.
+
+  // command-line arguments.
+  int argc_;
+  char **argv_;
 };
 
 #endif /* !defined (TASK_CLIENT_H) */

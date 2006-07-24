@@ -9,7 +9,7 @@
 //    Object_B_i.cpp
 //
 // = DESCRIPTION
-//    This class implements the Object B  of the 
+//    This class implements the Object B  of the
 //    Nested Upcalls - Triangle test.
 //
 // = AUTHORS
@@ -17,8 +17,9 @@
 //
 // ============================================================================
 
-#include "tao/corba.h"
+#include "tao/Exception.h"
 #include "Object_B_i.h"
+#include "ace/OS_NS_unistd.h"
 
 ACE_RCSID(Triangle_Test, Object_B_i, "$Id$")
 
@@ -35,20 +36,18 @@ Object_B_i::~Object_B_i (void)
 
 
 void
-Object_B_i::foo (Object_A_ptr object_A_ptr,
-                    CORBA::Environment &env)
+Object_B_i::foo (Object_A_ptr theObject_A_ptr
+                 ACE_ENV_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
-  ACE_DEBUG ((LM_DEBUG,
-              "(%P|%t) BEGIN Object_B_i::foo ()\n"));
-
-  TAO_TRY
+  ACE_TRY
     {
-      
+
       ACE_DEBUG ((LM_DEBUG,
                   "(%P|%t) BEGIN Object_B_i::foo: Trying to call Object A\n"));
 
-      object_A_ptr->finish (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      theObject_A_ptr->finish (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       // Start to wait on this variable, it is set to true
       // by the method finish ()
@@ -58,13 +57,10 @@ Object_B_i::foo (Object_A_ptr object_A_ptr,
       ACE_OS::sleep(pause);
 
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("calling the initiator");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "calling the initiator");
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
 
-  ACE_DEBUG ((LM_DEBUG,
-              "(%P|%t) END Object_B_i::foo ()\n"));
 }
-

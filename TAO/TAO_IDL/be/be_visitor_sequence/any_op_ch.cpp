@@ -18,21 +18,17 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_sequence.h"
-
-ACE_RCSID(be_visitor_sequence, any_op_ch, "$Id$")
-
+ACE_RCSID (be_visitor_sequence,
+           any_op_ch,
+           "$Id$")
 
 // ***************************************************************************
 // Sequence visitor for generating Any operator declarations in the client header
 // ***************************************************************************
 
-be_visitor_sequence_any_op_ch::be_visitor_sequence_any_op_ch
-(be_visitor_context *ctx)
+be_visitor_sequence_any_op_ch::be_visitor_sequence_any_op_ch (
+    be_visitor_context *ctx
+  )
   : be_visitor_decl (ctx)
 {
 }
@@ -44,23 +40,44 @@ be_visitor_sequence_any_op_ch::~be_visitor_sequence_any_op_ch (void)
 int
 be_visitor_sequence_any_op_ch::visit_sequence (be_sequence *node)
 {
-  if (node->cli_hdr_any_op_gen () || node->imported ())
-    return 0;
+  if (node->cli_hdr_any_op_gen ()
+      || node->imported ())
+    {
+      return 0;
+    }
 
-  TAO_OutStream *os = tao_cg->client_header ();
+  TAO_OutStream *os = this->ctx_->stream ();
+  const char *macro = this->ctx_->export_macro ();
 
-  // generate the Any <<= and >>= operators
-  os->indent ();
-  *os << "void " << idl_global->export_macro ()
-      << " operator<<= (CORBA::Any &, const " << node->name ()
-      << " &); // copying version" << be_nl;
-  *os << "void " << idl_global->export_macro ()
-      << " operator<<= (CORBA::Any &, " << node->name ()
-      << "*); // noncopying version" << be_nl;
-  *os << "CORBA::Boolean " << idl_global->export_macro ()
-      << " operator>>= (const CORBA::Any &, "
-      << node->name () << " *&);\n";
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__ << be_nl << be_nl;
 
+  *os << be_global->core_versioning_begin () << be_nl;
+  
+  // Generate the Any <<= and >>= operators.
+  *os << macro;
+  *os << " void"
+      << " operator<<= ( ::CORBA::Any &, const ";
+  *os << node->name ();
+  *os << " &); // copying version" << be_nl;
+  *os << macro;
+  *os << " void"
+      << " operator<<= ( ::CORBA::Any &, ";
+  *os << node->name ();
+  *os << "*); // noncopying version" << be_nl;
+  *os << macro;
+  *os << " ::CORBA::Boolean"
+      << " operator>>= (const ::CORBA::Any &, ";
+  *os << node->name ();
+  *os << " *&); // deprecated" << be_nl;
+  *os << macro;
+  *os << " ::CORBA::Boolean"
+      << " operator>>= (const ::CORBA::Any &, const ";
+  *os << node->name ();
+  *os << " *&);";
+
+  *os << be_global->core_versioning_end () << be_nl;
+  
   node->cli_hdr_any_op_gen (1);
   return 0;
 }

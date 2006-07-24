@@ -19,7 +19,9 @@
 #include "helper.h"
 #include "var_array.h"
 
-ACE_RCSID(Param_Test, var_array, "$Id$")
+ACE_RCSID (Param_Test,
+           var_array, 
+           "$Id$")
 
 // ************************************************************************
 //               Test_Var_Array
@@ -44,14 +46,43 @@ Test_Var_Array::opname (void) const
   return this->opname_;
 }
 
+void
+Test_Var_Array::dii_req_invoke (CORBA::Request *req
+                                ACE_ENV_ARG_DECL)
+{
+  req->add_in_arg ("s1") <<= Param_Test::Var_Array_forany (this->in_);
+  req->add_inout_arg ("s2") <<= Param_Test::Var_Array_forany (this->inout_);
+  req->add_out_arg ("s3") <<= Param_Test::Var_Array_forany (this->out_.inout ());
+
+  req->set_return_type (Param_Test::_tc_Var_Array);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  Param_Test::Var_Array_forany forany;
+
+  req->return_value () >>= forany;
+  this->ret_ = Param_Test::Var_Array_dup (forany.in ());
+
+  CORBA::NamedValue_ptr o2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o2->value () >>= forany;
+  Param_Test::Var_Array_copy (this->inout_, forany.in ());
+
+  CORBA::NamedValue_ptr o3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o3->value () >>= forany;
+  this->out_ = Param_Test::Var_Array_dup (forany.in ());
+}
+
 int
-Test_Var_Array::init_parameters (Param_Test_ptr objref,
-                                 CORBA::Environment &env)
+Test_Var_Array::init_parameters (Param_Test_ptr
+                                 ACE_ENV_ARG_DECL_NOT_USED)
 {
   Generator *gen = GENERATOR::instance (); // value generator
 
-  ACE_UNUSED_ARG (objref);
-  ACE_UNUSED_ARG (env);
 
   // fill the in_ array
   for (CORBA::ULong i=0; i < Param_Test::DIM2; i++)
@@ -74,58 +105,28 @@ Test_Var_Array::reset_parameters (void)
 }
 
 int
-Test_Var_Array::run_sii_test (Param_Test_ptr objref,
-                              CORBA::Environment &env)
+Test_Var_Array::run_sii_test (Param_Test_ptr objref
+                              ACE_ENV_ARG_DECL)
 {
-  Param_Test::Var_Array_out out_arr (this->out_.out ());
-  this->ret_ = objref->test_var_array (this->in_,
-                                       this->inout_,
-                                       out_arr,
-                                       env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      Param_Test::Var_Array_out out_arr (this->out_.out ());
+      this->ret_ = objref->test_var_array (this->in_,
+                                           this->inout_,
+                                           out_arr
+                                           ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-int
-Test_Var_Array::add_args (CORBA::NVList_ptr param_list,
-			  CORBA::NVList_ptr retval,
-			  CORBA::Environment &env)
-{
-  // We provide the top level memory
-  // the Any does not own any of these
-  CORBA::Any in_arg (Param_Test::_tc_Var_Array,
-                     this->in_,
-                     CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_Var_Array::run_sii_test\n");
 
-  CORBA::Any inout_arg (Param_Test::_tc_Var_Array,
-                        this->inout_,
-                        CORBA::B_FALSE);
-
-  CORBA::Any out_arg (Param_Test::_tc_Var_Array,
-                      this->out_.inout (),
-                      CORBA::B_FALSE);
-
-  // add parameters
-  param_list->add_value ("v1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("v2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("v3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // add return value type
-  retval->item (0, env)->value ()->replace (Param_Test::_tc_Var_Array,
-                                            this->ret_.in (),
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
@@ -140,9 +141,8 @@ Test_Var_Array::check_validity (void)
 }
 
 CORBA::Boolean
-Test_Var_Array::check_validity (CORBA::Request_ptr req)
+Test_Var_Array::check_validity (CORBA::Request_ptr )
 {
-  ACE_UNUSED_ARG (req);
   return this->check_validity ();
 }
 

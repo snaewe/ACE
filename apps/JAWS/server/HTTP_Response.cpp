@@ -1,7 +1,11 @@
 // $Id$
 
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
+#include "ace/os_include/os_ctype.h"
 #include "ace/Process.h"
 #include "ace/Mem_Map.h"
+#include "ace/Log_Msg.h"
 
 #include "HTTP_Response.h"
 #include "HTTP_Request.h"
@@ -11,7 +15,11 @@
 
 ACE_RCSID(server, HTTP_Response, "$Id$")
 
-static char * const EMPTY_HEADER = (char *)"";
+#if defined (ACE_JAWS_BASELINE)
+static char * const EMPTY_HEADER = "";
+#else
+static const char * const EMPTY_HEADER = "";
+#endif /* ACE_JAWS_BASELINE */
 
 HTTP_Response::HTTP_Response (JAWS_IO &io, HTTP_Request &request)
   : io_(io), request_(request)
@@ -195,7 +203,7 @@ HTTP_Response::normal_response (void)
           char *auth
             = HTTP_Helper::HTTP_decode_base64 (ACE_OS::strcpy (buf, hvv));
 
-          if (mmapfile.map ("jaws.auth") != -1
+          if (mmapfile.map (ACE_TEXT ("jaws.auth")) != -1
 	      && auth != 0
               && ACE_OS::strstr((const char *) mmapfile.addr (), auth) != 0)
             this->io_.receive_file (this->request_.path (),
@@ -205,7 +213,7 @@ HTTP_Response::normal_response (void)
           else
             this->error_response (HTTP_Status_Code::STATUS_UNAUTHORIZED,
                                   "Invalid authorization attempt");
-          delete buf;
+          delete [] buf;
         }
       break;
 
@@ -320,7 +328,7 @@ HTTP_Response::build_headers (void)
   if (this->request_.version () == 0
       || ACE_OS::strcmp ("HTTP/0.9", this->request_.version ()) == 0)
     {
-      HTTP_HEADER = (char *) EMPTY_HEADER;
+      HTTP_HEADER = EMPTY_HEADER;
       HTTP_HEADER_LENGTH = 0;
     }
   else
@@ -336,15 +344,33 @@ HTTP_Response::build_headers (void)
       // 40 bytes is the maximum length needed to store the date
 
       if (HTTP_Helper::HTTP_date (date_ptr) != 0)
-	HTTP_HEADER_LENGTH +=
-	  ACE_OS::sprintf (HTTP_HEADER+HTTP_HEADER_LENGTH,
+        HTTP_HEADER_LENGTH +=
+	        ACE_OS::sprintf (HTTP_HEADER+HTTP_HEADER_LENGTH,
                            "Date: %s\r\n", date_ptr);
 
-      if (! this->request_.cgi ())
-	HTTP_HEADER_LENGTH +=
-	  ACE_OS::sprintf (HTTP_HEADER+HTTP_HEADER_LENGTH,
-                           "Content-type: %s\r\n\r\n",
+      if (! this->request_.cgi ()) {
+	      HTTP_HEADER_LENGTH +=
+	         ACE_OS::sprintf (HTTP_HEADER+HTTP_HEADER_LENGTH,
+                           "Content-type: %s\r\n",
                            "text/html");
+
+        struct stat file_stat;
+        // If possible, add the Content-length field to the header.
+        // @@ Note that using 'ACE_OS::stat' is a hack.  Normally, a
+        // web browser will have a 'virtual' file system. In a VFS,
+        // 'stat' might not reference the correct location.
+        if ((this->request_.type () == HTTP_Request::GET) &&
+            (ACE_OS::stat (this->request_.path (), &file_stat) == 0))
+        {
+  	      HTTP_HEADER_LENGTH +=
+	         ACE_OS::sprintf (HTTP_HEADER+HTTP_HEADER_LENGTH,
+                            "Content-length: %u\r\n", file_stat.st_size);
+        }
+
+        // Complete header with empty line and adjust header length.
+        HTTP_HEADER[HTTP_HEADER_LENGTH++] = '\r';
+        HTTP_HEADER[HTTP_HEADER_LENGTH++] = '\n';
+      }
 #else
       if (! this->request_.cgi ())
         HTTP_HEADER = "HTTP/1.0 200 OK\r\n"

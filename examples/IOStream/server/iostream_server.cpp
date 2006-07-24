@@ -7,46 +7,14 @@
 #include "ace/Acceptor.h"
 #include "ace/SOCK_Acceptor.h"
 #include "ace/Service_Config.h"
-#include "ace/IOStream.h"
+#include "ace/Signal.h"
+
+#include "iostream_server.h"
+#include "ace/OS_NS_unistd.h"
 
 ACE_RCSID(server, iostream_server, "$Id$")
 
 #if !defined (ACE_LACKS_ACE_IOSTREAM)
-
-// Declare a new type which will case an ACE_SOCK_Stream to behave
-// like an iostream.  The new ACE_SOCK_IOStream type can be used
-// anywhere an ACE_SOCK_Stream is used.
-
-typedef ACE_IOStream<ACE_SOCK_Stream> ACE_SOCK_IOStream;
-
-// Need to handle brain-dead C++ compilers.
-#if defined (ACE_HAS_TYPENAME_KEYWORD)
-#define ACE_SOCK_IOSTREAM ACE_SOCK_IOStream
-#else
-#define ACE_SOCK_IOSTREAM ACE_SOCK_IOStream, ACE_INET_Addr
-#endif /* ACE_HAS_TYPENAME_KEYWORD */
-
-class Handler : public ACE_Svc_Handler<ACE_SOCK_IOSTREAM, ACE_NULL_SYNCH>
-  // = TITLE
-  //     Extend the <ACE_Svc_Handler> template to do our bidding.
-  //
-  // = DESCRIPTION
-  //     Create an <ACE_Svc_Handler> object based on our
-  //     iostream/SOCK_Stream hybrid.  All of this is fairly standard
-  //     until we get to the <handle_input> where we begin using the
-  //     iostream characteristics of the peer.
-{
-public:
-  // = Initialization and termination methods.
-  Handler (void);
-  ~Handler (void);
-
-  // = <Svc_Handler> hooks.
-  virtual int open (void *);
-
-  // = <Event_Handler> hooks.
-  virtual int handle_input (ACE_HANDLE);
-};
 
 int
 Handler::open (void *)
@@ -118,7 +86,7 @@ typedef ACE_Acceptor<Handler, ACE_SOCK_ACCEPTOR> IOStream_Acceptor;
 #endif /* !ACE_LACKS_ACE_IOSTREAM */
 
 int
-main (int argc, char *argv [])
+ACE_TMAIN (int argc, ACE_TCHAR *argv [])
 {
 #if !defined (ACE_LACKS_ACE_IOSTREAM)
   ACE_Service_Config daemon;
@@ -138,19 +106,12 @@ main (int argc, char *argv [])
 
   IOStream_Acceptor peer_acceptor;
 
-  ACE_INET_Addr addr (argc > 1 ? atoi (argv[1]) : ACE_DEFAULT_SERVER_PORT);
+  ACE_INET_Addr addr (argc > 1 ? ACE_OS::atoi (argv[1]) : ACE_DEFAULT_SERVER_PORT);
 
   if (peer_acceptor.open (addr) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "%p\n",
                        "open"),
-                      -1);
-
-  else if (ACE_Reactor::instance ()->register_handler
-           (&peer_acceptor,
-            ACE_Event_Handler::READ_MASK) == - 1)
-    ACE_ERROR_RETURN ((LM_ERROR,
-                       "registering service with ACE_Reactor\n"),
                       -1);
 
   ACE_DEBUG ((LM_DEBUG,
@@ -162,23 +123,10 @@ main (int argc, char *argv [])
               "(%P) shutting down server daemon\n"));
 
 #else
+  ACE_UNUSED_ARG (argc);
+  ACE_UNUSED_ARG (argv);
   ACE_ERROR ((LM_ERROR, "ACE_IOSTREAM not supported on this platform\n"));
 #endif /* !ACE_LACKS_ACE_IOSTREAM */
   return 0;
 }
 
-
-#if !defined (ACE_LACKS_ACE_IOSTREAM)
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Acceptor <Handler, ACE_SOCK_ACCEPTOR>;
-template class ACE_IOStream <ACE_SOCK_Stream>;
-template class ACE_Streambuf_T <ACE_SOCK_Stream>;
-template class ACE_Svc_Handler <ACE_SOCK_IOSTREAM, ACE_NULL_SYNCH>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Acceptor <Handler, ACE_SOCK_ACCEPTOR>
-#pragma instantiate ACE_IOStream <ACE_SOCK_Stream>
-#pragma instantiate ACE_Streambuf_T <ACE_SOCK_Stream>
-#pragma instantiate ACE_Svc_Handler <ACE_SOCK_IOSTREAM, ACE_NULL_SYNCH>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
-#endif /* !ACE_LACKS_ACE_IOSTREAM */

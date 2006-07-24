@@ -62,7 +62,8 @@
 
 // Process Creation profiling
 
-#include "ace/OS.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Get_Opt.h"
 #include "ace/Process.h"
 #include "ace/Profile_Timer.h"
@@ -74,17 +75,17 @@ ACE_RCSID(Misc, childbirth_time, "$Id$")
 
 #define MAX_NO_ITERATION  10000
 #if defined (ACE_WIN32)
-#define SUBPROGRAM "date.exe"
+#define SUBPROGRAM ACE_TEXT ("date.exe")
 #else
-#define SUBPROGRAM "date"
+#define SUBPROGRAM ACE_TEXT ("date")
 #endif
 
 size_t MULTIPLY_FACTOR = 10;
 typedef double (*Profiler)(size_t);
 static int do_exec_after_fork = 0;
 
-static void *
-empty (void*)                   // do nothing thread function
+/// do nothing thread function
+extern "C" void *ace_empty (void*)
 {
   return 0;
 }
@@ -191,19 +192,19 @@ prof_native_thread (size_t iteration)
           for (size_t j = 0; j < MULTIPLY_FACTOR; j++)
             {
 #if defined (ACE_HAS_WTHREADS)
-              if (::CreateThread (NULL,
+              if (::CreateThread (0,
                                   0,
-                                  LPTHREAD_START_ROUTINE (empty),
+                                  LPTHREAD_START_ROUTINE (ace_empty),
                                   0,
                                   CREATE_SUSPENDED,
-                                  0) == NULL)
+                                  0) == 0)
 #elif defined (ACE_HAS_STHREADS)
-                if (::thr_create (NULL,
+                if (::thr_create (0,
                                   0,
-                                  empty,
+                                  &ace_empty,
                                   0,
                                   THR_SUSPENDED,
-                                  NULL) != 0)
+                                  0) != 0)
 #endif
                   ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "CreateThread"), -1);
             }
@@ -238,10 +239,10 @@ prof_ace_os_thread (size_t iteration)
           ptimer.start ();
 
           for (size_t j = 0; j < MULTIPLY_FACTOR; j++)
-            if (ACE_OS::thr_create ((ACE_THR_FUNC) empty,
+            if (ACE_OS::thr_create ((ACE_THR_FUNC) ace_empty,
                                     0,
                                     THR_SUSPENDED,
-                                    NULL) == -1)
+                                    0) == -1)
               ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "CreateThread"), -1);
 
           ptimer.stop ();
@@ -275,7 +276,7 @@ prof_tm_thread (size_t iteration)
           ptimer.start ();
 
           if (ACE_Thread_Manager::instance ()->spawn_n (MULTIPLY_FACTOR,
-                                                        (ACE_THR_FUNC) empty,
+                                                        (ACE_THR_FUNC) ace_empty,
                                                         0,
                                                         THR_SUSPENDED) == -1)
             ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "CreateThread"), -1);
@@ -333,24 +334,23 @@ prof_mutex_base (size_t iteration)
 }
 
 int
-main (int argc, char* argv[])
+ACE_TMAIN (int argc, ACE_TCHAR* argv[])
 {
-  ACE_Get_Opt get_opt (argc, argv, "n:l:pftahmxe");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT("n:l:pftahmxe"));
   int c;
   size_t iteration = 10;
   Profiler profiler = 0;
-  char *profile_name = 0 ;
+  const char *profile_name = 0 ;
 
   while ((c=get_opt ()) != -1)
     {
       switch (c)
         {
         case 'n':
-          iteration = ACE_OS::atoi (get_opt.optarg);
+          iteration = ACE_OS::atoi (get_opt.opt_arg ());
           break;
         case 'l':
-          MULTIPLY_FACTOR = ACE_static_cast (size_t,
-                                             ACE_OS::atoi (get_opt.optarg));
+          MULTIPLY_FACTOR = static_cast<size_t> (ACE_OS::atoi (get_opt.opt_arg ()));
           break;
         case 'p':                       // test ACE_Process.spawn ()
           profiler = prof_ace_process;

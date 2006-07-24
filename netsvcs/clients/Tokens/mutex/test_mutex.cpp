@@ -1,6 +1,6 @@
-// ============================================================================
 // $Id$
 
+// ============================================================================
 //
 // = LIBRARY
 //    examples
@@ -15,20 +15,19 @@
 // 
 // ============================================================================
 
-#include "ace/OS.h"
 #include "ace/Get_Opt.h"
 #include "ace/Local_Tokens.h"
 #include "ace/Remote_Tokens.h"
 #include "ace/Thread.h"
 #include "ace/Thread_Manager.h"
 
-ACE_RCSID(mutex, test_mutex, "$Id$")
+#if defined (ACE_HAS_THREADS) && defined (ACE_HAS_THREADS_LIBRARY)
 
-#if defined (ACE_HAS_THREADS)
+ACE_RCSID(mutex, test_mutex, "$Id$")
 
 static ACE_Token_Proxy *mutex;
 static int remote_mutexes = 0;
-static char *server_host = ACE_DEFAULT_SERVER_HOST;
+static const char *server_host = ACE_DEFAULT_SERVER_HOST;
 static int server_port = ACE_DEFAULT_SERVER_PORT;
 static int iterations = 100;
 static int spawn_count = 2;
@@ -77,18 +76,18 @@ parse_args (int argc, char *argv[])
       switch (c)
 	{
 	case 't':
-	  spawn_count = ACE_OS::atoi (get_opt.optarg);
+	  spawn_count = ACE_OS::atoi (get_opt.opt_arg ());
 	  break;
 	case 'h':  // specify the host machine on which the server is running
-	  server_host = get_opt.optarg;
+	  server_host = get_opt.opt_arg ();
 	  remote_mutexes = 1;
 	  break;
 	case 'p':  // specify the port on which the server is running
-	  server_port = ACE_OS::atoi (get_opt.optarg);
+	  server_port = ACE_OS::atoi (get_opt.opt_arg ());
 	  remote_mutexes = 1;
 	  break;
 	case 'n':  // specify the port on which the server is running
-	  iterations = ACE_OS::atoi (get_opt.optarg);
+	  iterations = ACE_OS::atoi (get_opt.opt_arg ());
 	  break;
 	case 'u':
 	default:

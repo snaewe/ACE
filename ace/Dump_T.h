@@ -1,54 +1,61 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
+
+//=============================================================================
+/**
+ *  @file    Dump_T.h
+ *
+ *  $Id$
+ *
+ *  @author Doug Schmidt
+ */
+//=============================================================================
 
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Dump.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
-
-#if !defined (ACE_DUMP_T_H)
+#ifndef ACE_DUMP_T_H
 #define ACE_DUMP_T_H
+#include /**/ "ace/pre.h"
 
 #include "ace/Dump.h"
 
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class ACE_Dumpable_Adapter
+ *
+ * @brief This class inherits the interface of the abstract ACE_Dumpable
+ * class and is instantiated with the implementation of the
+ * concrete component class <class Concrete>.
+ *
+ * This design is similar to the Adapter and Decorator patterns
+ * from the ``Gang of Four'' book.  Note that <class Concrete>
+ * need not inherit from a common class since ACE_Dumpable
+ * provides the uniform virtual interface!
+ */
 template <class Concrete>
 class ACE_Dumpable_Adapter : public ACE_Dumpable
 {
-  // = TITLE
-  //    This class inherits the interface of the abstract ACE_Dumpable
-  //    class and is instantiated with the implementation of the
-  //    concrete component class <class Concrete>.
-  //
-  // = DESCRIPTION 
-  //    This design is similar to the Adapter and Decorator patterns
-  //    from the ``Gang of Four'' book.  Note that <class Concrete>
-  //    need not inherit from a common class since ACE_Dumpable
-  //    provides the uniform virtual interface!
 public:
   // = Initialization and termination methods.
   ACE_Dumpable_Adapter (const Concrete *t);
   ~ACE_Dumpable_Adapter (void);
 
+  /// Concrete dump method (simply delegates to the <dump> method of
+  /// <class Concrete>).
   virtual void dump (void) const;
-  // Concrete dump method (simply delegates to the <dump> method of
-  // <class Concrete>).
 
+  /// Delegate to methods in the Concrete class.
   Concrete *operator->() const;
-  // Delegate to methods in the Concrete class.
 
 private:
+  /// Pointer to <this> of <class Concrete>.
   const Concrete *this_;
-  // Pointer to <this> of <class Concrete>.
 };
+
+ACE_END_VERSIONED_NAMESPACE_DECL
 
 // Some useful macros for conditionally compiling this feature...
 #if defined (ACE_NDEBUG)
@@ -71,4 +78,5 @@ private:
 #pragma implementation ("Dump_T.cpp")
 #endif /* ACE_TEMPLATES_REQUIRE_PRAGMA */
 
+#include /**/ "ace/post.h"
 #endif /* ACE_DUMP_T_H */

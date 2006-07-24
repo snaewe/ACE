@@ -64,50 +64,60 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
  */
 
-#ifndef	_UTL_IDENTIFIER_UTL_IDENTIFIER_HH
-#define	_UTL_IDENTIFIER_UTL_IDENTIFIER_HH
+#ifndef _UTL_IDENTIFIER_UTL_IDENTIFIER_HH
+#define _UTL_IDENTIFIER_UTL_IDENTIFIER_HH
 
-// utl_identifier.hh
-//
-// Identifier
+#include "TAO_IDL_FE_Export.h"
 
-/*
-** DEPENDENCIES: utl_string.hh
-**
-** USE: Included from util.hh
-*/
+#include "ace/iosfwd.h"
 
-#include	"idl_fwd.h"
-#include	"utl_string.h"
-
-class Identifier
+class TAO_IDL_FE_Export Identifier
 {
 public:
-  Identifier ();
-  // Default Constructor(s)
+  Identifier (void);
+  // Default Constructor.
 
-  Identifier (char *s, long x=1, long y=0, long z=I_FALSE);
-  // constructor
+  Identifier (const char *s);
+  // Constructor.
 
-  virtual ~Identifier ();
-  // destructor
+  virtual ~Identifier (void);
+  // Destructor.
 
-  // =Operations
+  // Operations
 
-  char	*get_string ();
-  // get the underlying string
+  char *get_string (void);
+  // Get the underlying string.
 
-  long	compare (Identifier *other);
-  // compare with other Identifier
+  void replace_string (const char * s);
+  // Replace the underlying string and free the old one.
 
-  // =Dumping
+  bool compare (Identifier *other);
+  // Compare with other Identifier.
 
-  virtual void	dump (ostream &o);
-  // dump to an ostream
+  bool case_compare (Identifier *other);
+  // Also check for case-only difference.
 
-  private:
-    // Storage for data
-    char	*pv_string;
+  bool case_compare_quiet (Identifier *other);
+  // Like the above but suppressing error or warning I/O
+
+  Identifier *copy (void);
+  // Create a deep copy.
+
+  bool escaped (void) const;
+  // Accessor for the member.
+
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+  // Dump to an ostream.
+
+  virtual void destroy (void);
+  // Cleanup function.
+
+private:
+    // Storage for data.
+    char *pv_string;
+
+    // Did the IDL string have a leading underscore?
+    bool escaped_;
 };
 
-#endif		// _UTL_IDENTIFIER_UTL_IDENTIFIER_HH
+#endif          // _UTL_IDENTIFIER_UTL_IDENTIFIER_HH

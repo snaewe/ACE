@@ -1,4 +1,5 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 //
 // ============================================================================
@@ -17,12 +18,18 @@
 //
 // ============================================================================
 
-#if ! defined (SCHEDULER_INTERNAL_H)
+#ifndef SCHEDULER_INTERNAL_H
 #define SCHEDULER_INTERNAL_H
+#include /**/ "ace/pre.h"
 
-#include "Scheduler.h"
+#include "orbsvcs/Sched/Scheduler.h"
+#include "ace/Unbounded_Set.h"
+#include "ace/Synch_Traits.h"
+#include "ace/Recursive_Thread_Mutex.h"
 
-class TAO_ORBSVCS_Export Scheduler_Generic : public ACE_Scheduler
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+class TAO_RTSched_Export Scheduler_Generic : public ACE_Scheduler
   // = TITLE
   //    Implementation of an off-line scheduler.
   //
@@ -50,11 +57,12 @@ public:
   // Obtains an RT_Info based on its "handle".
 
   virtual status_t lookup_config_info (Preemption_Priority priority,
-				       Config_Info* &config_info);
+                                       Config_Info* &config_info);
   // Obtains a Config_Info based on its priority.
 
   // = Computes the schedule.
-  virtual status_t schedule (void);
+  virtual status_t
+    schedule (ACE_Unbounded_Set<Scheduling_Anomaly *> &anomaly_set);
 
   // = Access a thread priority.
   virtual int priority (const handle_t handle,
@@ -100,7 +108,7 @@ private:
   // dispatchin configuration info
 
 #if defined (ACE_HAS_THREADS)
-  typedef ACE_Recursive_Thread_Mutex LOCK;
+  typedef TAO_SYNCH_RECURSIVE_MUTEX LOCK;
 #else
   typedef ACE_Null_Mutex LOCK;
 #endif /* ACE_HAS_THREADS */
@@ -120,17 +128,13 @@ private:
   void print_schedule ();
   // Display the schedule, task-by-task.
 
-  ACE_UNIMPLEMENTED_FUNC (Scheduler_Generic (const Scheduler_Generic &))
-  ACE_UNIMPLEMENTED_FUNC (Scheduler_Generic &operator= (
-    const Scheduler_Generic &))
+  Scheduler_Generic (const Scheduler_Generic &);
+  Scheduler_Generic &operator= (const Scheduler_Generic &);
 };
 
+TAO_END_VERSIONED_NAMESPACE_DECL
 
-#if defined (__ACE_INLINE__)
-#include "Scheduler_Generic.i"
-#endif /* __ACE_INLINE__ */
-
+#include /**/ "ace/post.h"
 #endif /* SCHEDULER_INTERNAL_H */
-
 
 // EOF

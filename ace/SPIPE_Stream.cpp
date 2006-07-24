@@ -1,21 +1,24 @@
-// SPIPE_Stream.cpp
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/SPIPE_Stream.h"
+#include "ace/OS_Memory.h"
 
-#if defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/SPIPE_Stream.i"
-#endif
+#if !defined (__ACE_INLINE__)
+#include "ace/SPIPE_Stream.inl"
+#endif /* __ACE_INLINE__ */
 
 ACE_RCSID(ace, SPIPE_Stream, "$Id$")
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_ALLOC_HOOK_DEFINE(ACE_SPIPE_Stream)
 
 void
 ACE_SPIPE_Stream::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_SPIPE_Stream::dump");
+#endif /* ACE_HAS_DUMP */
 }
 
 // Simple-minded do nothing constructor.
@@ -34,18 +37,20 @@ ssize_t
 ACE_SPIPE_Stream::send (size_t n, ...) const
 {
   // ACE_TRACE ("ACE_SPIPE_Stream::send");
-  va_list argp;  
-  size_t total_tuples = n / 2;
+  va_list argp;
+  int total_tuples = static_cast<int> (n / 2);
   iovec *iovp;
 #if defined (ACE_HAS_ALLOCA)
   iovp = (iovec *) alloca (total_tuples * sizeof (iovec));
 #else
-  ACE_NEW_RETURN (iovp, iovec[total_tuples], -1);
+  ACE_NEW_RETURN (iovp,
+                  iovec[total_tuples],
+                  -1);
 #endif /* !defined (ACE_HAS_ALLOCA) */
 
   va_start (argp, n);
 
-  for (size_t i = 0; i < total_tuples; i++)
+  for (int i = 0; i < total_tuples; i++)
     {
       iovp[i].iov_base = va_arg (argp, char *);
       iovp[i].iov_len  = va_arg (argp, int);
@@ -69,18 +74,20 @@ ssize_t
 ACE_SPIPE_Stream::recv (size_t n, ...) const
 {
   ACE_TRACE ("ACE_SPIPE_Stream::recv");
-  va_list argp;  
-  size_t total_tuples = n / 2;
+  va_list argp;
+  int total_tuples = static_cast<int> (n / 2);
   iovec *iovp;
 #if defined (ACE_HAS_ALLOCA)
   iovp = (iovec *) alloca (total_tuples * sizeof (iovec));
 #else
-  ACE_NEW_RETURN (iovp, iovec[total_tuples], -1);
+  ACE_NEW_RETURN (iovp,
+                  iovec[total_tuples],
+                  -1);
 #endif /* !defined (ACE_HAS_ALLOCA) */
 
   va_start (argp, n);
 
-  for (size_t i = 0; i < total_tuples; i++)
+  for (int i = 0; i < total_tuples; i++)
     {
       iovp[i].iov_base = va_arg (argp, char *);
       iovp[i].iov_len  = va_arg (argp, int);
@@ -93,3 +100,5 @@ ACE_SPIPE_Stream::recv (size_t n, ...) const
   va_end (argp);
   return result;
 }
+
+ACE_END_VERSIONED_NAMESPACE_DECL

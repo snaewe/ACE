@@ -1,12 +1,19 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (_PEER_ROUTER_H)
+#ifndef _PEER_ROUTER_H
 #define _PEER_ROUTER_H
 
 #include "ace/Acceptor.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/SOCK_Acceptor.h"
+#include "ace/Svc_Handler.h"
 #include "ace/Map_Manager.h"
+#include "ace/RW_Thread_Mutex.h"
 
 // Type of search key for CONSUMER_MAP
 typedef ACE_HANDLE ROUTING_KEY;
@@ -31,7 +38,7 @@ public:
   virtual int handle_input (ACE_HANDLE);
   // Receive input from a peer.
 
-  virtual int put (ACE_Message_Block *, ACE_Time_Value *tv = 0);  
+  virtual int put (ACE_Message_Block *, ACE_Time_Value *tv = 0);
   // Send output to a peer.  Note that this implementation "blocks" if
   // flow control occurs.  This is undesirable for "real"
   // applications.  The best way around this is to make the
@@ -39,7 +46,7 @@ public:
   // $ACE_ROOT/apps/Gateway/Gateway application.
 
 protected:
-  Peer_Router_Context *peer_router_context_;  
+  Peer_Router_Context *peer_router_context_;
   // Pointer to router context.  This maintains the state that is
   // shared by both Tasks in a <Peer_Router> Module.
 };
@@ -48,7 +55,7 @@ class Peer_Router_Context : public ACE_Acceptor<Peer_Handler, ACE_SOCK_ACCEPTOR>
 {
   // = TITLE
   //     Defines state and behavior shared between both Tasks in a
-  //     <Peer_Router> Module.  
+  //     <Peer_Router> Module.
   //
   // = DESCRIPTION
   //     This class also serves as an <ACE_Acceptor>, which creates
@@ -92,11 +99,11 @@ private:
   // Pointer to the <Peer_Router> that we are accepting for.
 
   // = Useful typedefs.
-  typedef ACE_Map_Manager <ROUTING_KEY, Peer_Handler *, ACE_SYNCH_RW_MUTEX> 
+  typedef ACE_Map_Manager <ROUTING_KEY, Peer_Handler *, ACE_SYNCH_RW_MUTEX>
           PEER_MAP;
-  typedef ACE_Map_Iterator<ROUTING_KEY, Peer_Handler *, ACE_SYNCH_RW_MUTEX> 
+  typedef ACE_Map_Iterator<ROUTING_KEY, Peer_Handler *, ACE_SYNCH_RW_MUTEX>
           PEER_ITERATOR;
-  typedef ACE_Map_Entry<ROUTING_KEY, Peer_Handler *> 
+  typedef ACE_Map_Entry<ROUTING_KEY, Peer_Handler *>
           PEER_ENTRY;
 
   PEER_MAP peer_map_;
@@ -129,7 +136,7 @@ protected:
   Peer_Router (Peer_Router_Context *prc);
   // Initialization method.
 
-  virtual int control (ACE_Message_Block *); 
+  virtual int control (ACE_Message_Block *);
   // Handle control messages arriving from adjacent Modules.
 
   Peer_Router_Context *context (void) const;

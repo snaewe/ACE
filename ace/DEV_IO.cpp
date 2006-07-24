@@ -1,20 +1,22 @@
-// DEV_IO.cpp
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/DEV_IO.h"
+#include "ace/Log_Msg.h"
 
-#if defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/DEV_IO.i"
-#endif
+#if !defined (__ACE_INLINE__)
+#include "ace/DEV_IO.inl"
+#endif /* __ACE_INLINE__ */
 
 ACE_RCSID(ace, DEV_IO, "$Id$")
+
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_ALLOC_HOOK_DEFINE(ACE_DEV_IO)
 
 // Return the local endpoint address.
 
-int 
+int
 ACE_DEV_IO::get_local_addr (ACE_DEV_Addr &addr) const
 {
   ACE_TRACE ("ACE_DEV_IO::get_local_addr");
@@ -26,7 +28,7 @@ ACE_DEV_IO::get_local_addr (ACE_DEV_Addr &addr) const
 // Return the address of the remotely connected peer (if there is
 // one).
 
-int 
+int
 ACE_DEV_IO::get_remote_addr (ACE_DEV_Addr &addr) const
 {
   ACE_TRACE ("ACE_DEV_IO::get_remote_addr");
@@ -37,14 +39,16 @@ ACE_DEV_IO::get_remote_addr (ACE_DEV_Addr &addr) const
 void
 ACE_DEV_IO::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_DEV_IO::dump");
 
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
   this->addr_.dump ();
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
-// Simple-minded do nothing constructor. 
+// Simple-minded do nothing constructor.
 
 ACE_DEV_IO::ACE_DEV_IO (void)
 {
@@ -60,18 +64,20 @@ ssize_t
 ACE_DEV_IO::send (size_t n, ...) const
 {
   ACE_TRACE ("ACE_DEV_IO::send");
-  va_list argp;  
-  size_t total_tuples = n / 2;
+  va_list argp;
+  int total_tuples = static_cast<int> (n / 2);
   iovec *iovp;
 #if defined (ACE_HAS_ALLOCA)
   iovp = (iovec *) alloca (total_tuples * sizeof (iovec));
 #else
-  ACE_NEW_RETURN (iovp, iovec[total_tuples], -1);
+  ACE_NEW_RETURN (iovp,
+                  iovec[total_tuples],
+                  -1);
 #endif /* !defined (ACE_HAS_ALLOCA) */
 
   va_start (argp, n);
 
-  for (size_t i = 0; i < total_tuples; i++)
+  for (int i = 0; i < total_tuples; i++)
     {
       iovp[i].iov_base = va_arg (argp, char *);
       iovp[i].iov_len  = va_arg (argp, int);
@@ -95,18 +101,20 @@ ssize_t
 ACE_DEV_IO::recv (size_t n, ...) const
 {
   ACE_TRACE ("ACE_DEV_IO::recv");
-  va_list argp;  
-  size_t total_tuples = n / 2;
+  va_list argp;
+  int total_tuples = static_cast<int> (n / 2);
   iovec *iovp;
 #if defined (ACE_HAS_ALLOCA)
   iovp = (iovec *) alloca (total_tuples * sizeof (iovec));
-#else 
-  ACE_NEW_RETURN (iovp, iovec[total_tuples], -1);
+#else
+  ACE_NEW_RETURN (iovp,
+                  iovec[total_tuples],
+                  -1);
 #endif /* !defined (ACE_HAS_ALLOCA) */
 
   va_start (argp, n);
 
-  for (size_t i = 0; i < total_tuples; i++)
+  for (int i = 0; i < total_tuples; i++)
     {
       iovp[i].iov_base = va_arg (argp, char *);
       iovp[i].iov_len  = va_arg (argp, int);
@@ -120,3 +128,4 @@ ACE_DEV_IO::recv (size_t n, ...) const
   return result;
 }
 
+ACE_END_VERSIONED_NAMESPACE_DECL

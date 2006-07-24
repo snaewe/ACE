@@ -23,8 +23,42 @@
 //
 // ============================================================================
 
-#if !defined (TAO_BE_VISITOR_CONTEXT_H)
+#ifndef TAO_BE_VISITOR_CONTEXT_H
 #define TAO_BE_VISITOR_CONTEXT_H
+
+#include "be_codegen.h"
+
+
+class TAO_OutStream;
+class be_decl;
+class be_typedef;
+class be_attribute;
+class be_interface;
+class be_interface_fwd;
+class be_argument;
+class be_array;
+class be_constant;
+class be_enum;
+class be_enum_val;
+class be_exceptionl;
+class be_field;
+class be_module;
+class be_operation;
+class be_exception;
+class be_predefined_type;
+class be_root;
+class be_sequence;
+class be_string;
+class be_structure;
+class be_typedef;
+class be_union;
+class be_union_branch;
+
+// When interface is defined as macro redefine it as aceinterface
+#if defined (interface)
+# define aceinterface interface
+# undef interface
+#endif /* interface */
 
 class be_visitor_context
 {
@@ -70,6 +104,12 @@ public:
   TAO_CodeGen::CG_STATE state (void);
   // return the code generation state
 
+  void sub_state (TAO_CodeGen::CG_SUB_STATE);
+  // code generation state
+
+  TAO_CodeGen::CG_SUB_STATE sub_state (void);
+  // return the code generation state
+
   void alias (be_typedef *node);
   // set the alias node (if any)
 
@@ -88,19 +128,19 @@ public:
   be_attribute *attribute (void);
   // get the attribute node
 
-  void exception (idl_bool);
+  void exception (bool);
   // is it the special ctor for exceptions?
 
-  idl_bool exception (void);
+  bool exception (void);
   // is it the special ctor for exceptions?
 
-  void comma (idl_bool);
+  void comma (bool);
   // scope supoorts generation of comma after each element
 
-  idl_bool comma (void);
+  bool comma (void);
   // are we supposed to generate a comma?
 
-  be_interface* interface (void) const;
+  be_interface *interface (void) const;
   void interface (be_interface*);
   // In some cases we need to generate the objects of one interface as
   // members of a derived visitor (the TIE classes are a good
@@ -204,8 +244,17 @@ public:
   be_union *be_scope_as_union (void);
   // return the scope as union if possible
 
+  const char *export_macro (void) const;
+  // return the export macro currently in force
+
+  const char *non_null_export_macro (void) const;
+  // if anyop export macro is empty, check stub.
+
 private:
   TAO_CodeGen::CG_STATE state_;
+  // code generation state
+
+  TAO_CodeGen::CG_SUB_STATE sub_state_;
   // code generation state
 
   TAO_OutStream *os_;
@@ -226,15 +275,18 @@ private:
   be_attribute *attr_;
   // attribute node stored here while generating its code
 
-  idl_bool exception_;
+  bool exception_;
   // is it the special ctor for exceptions?
 
-  idl_bool comma_;
+  bool comma_;
   // whether scope should generate a comma after every element
 
   be_interface* interface_;
   // See the method declaration above.
 };
 
+#if defined (interface)
+# define interface aceinterface
+#endif /* interface */
 
 #endif /* BE_VISITOR_CONTEXT_H */

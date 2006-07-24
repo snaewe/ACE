@@ -33,7 +33,9 @@ public class DOVEBrowserApplet extends java.applet.Applet {
     }
 
     demoCore_ = new DemoCore (nameServiceIOR_,  // name service IOR
+			      null,             // name service port
 			      null,             // args
+                              false,            // don't use queueing
 			      this);            // pointer to the applet
     demoCore_.show ();
     demoCore_.run ();

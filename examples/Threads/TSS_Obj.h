@@ -4,7 +4,7 @@
 //
 // = LIBRARY
 //    tests
-// 
+//
 // = FILENAME
 //    TSS_Test.cpp
 //
@@ -14,10 +14,15 @@
 //
 // = AUTHOR
 //    Prashant Jain and Doug Schmidt
-// 
+//
 // ============================================================================
 
-#include "ace/Synch.h"
+#include "ace/Atomic_Op.h"
+#include "ace/Synch_Traits.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 class TSS_Obj
   // = TITLE

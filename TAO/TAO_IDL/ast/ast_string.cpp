@@ -62,94 +62,147 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_string.cc - Implementation of class AST_String
- *
- * AST_String nodes represent IDL string declarations.
- * AST_String is a subclass of AST_ConcreteType.
- * AST_String nodes have a maximum size (an AST_Expression which must
- * evaluate to a positive integer).
- */
+// AST_String nodes represent IDL string declarations.
+// AST_String is a subclass of AST_ConcreteType.
+// AST_String nodes have a maximum size (an AST_Expression which must
+// evaluate to a positive integer).
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_string.h"
+#include "ast_expression.h"
+#include "ast_visitor.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
+#include "utl_identifier.h"
+#include "idl_defines.h"
+#include "global_extern.h"
 
-ACE_RCSID(ast, ast_string, "$Id$")
+ACE_RCSID (ast, 
+           ast_string, 
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_String::AST_String()
-	  : pd_max_size(0), pd_width(1)
+AST_String::AST_String (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_ConcreteType (),
+    pd_max_size (0),
+    pd_width (sizeof (char))
+{
+  // Always the case.
+  this->size_type (AST_Type::VARIABLE);
+}
+
+AST_String::AST_String (AST_Decl::NodeType nt,
+                        UTL_ScopedName *n,
+                        AST_Expression *ms,
+                        long wide)
+  : COMMON_Base (),
+    AST_Decl (nt,
+		          n,
+              true),
+    AST_Type (nt,
+		          n),
+    AST_ConcreteType (nt,
+		                  n),
+    pd_max_size (ms),
+    pd_width (wide)
+{
+  // Always the case.
+  this->size_type (AST_Type::VARIABLE);
+
+  Identifier *id = 0;
+  UTL_ScopedName *new_name = 0;
+  UTL_ScopedName *conc_name = 0;
+
+  ACE_NEW (id,
+           Identifier (this->width () == 1 ? "Char *" : "WChar *"));
+
+  ACE_NEW (conc_name,
+           UTL_ScopedName (id,
+                           0));
+
+  ACE_NEW (id,
+           Identifier ("CORBA"));
+
+  ACE_NEW (new_name,
+           UTL_ScopedName (id,
+                           conc_name));
+
+  this->set_name (new_name);
+
+  unsigned long bound = ms->ev ()->u.ulval;
+
+  static char namebuf[NAMEBUFSIZE];
+  static char boundbuf[NAMEBUFSIZE];
+  ACE_OS::memset (namebuf,
+                  '\0',
+                  NAMEBUFSIZE);
+  ACE_OS::memset (boundbuf,
+                  '\0',
+                  NAMEBUFSIZE);
+
+  if (bound)
+    {
+      ACE_OS::sprintf (boundbuf,
+                       "_%ld",
+                       bound);
+    }
+
+  ACE_OS::sprintf (namebuf,
+                   "CORBA_%sSTRING%s",
+                   (wide == 1 ? "" : "W"),
+                   boundbuf);
+
+  this->flat_name_ = ACE::strnew (namebuf);
+}
+
+AST_String::~AST_String (void)
 {
 }
 
-AST_String::AST_String(AST_Expression *ms)
-	  : AST_Decl(AST_Decl::NT_string,
-		     new UTL_ScopedName(new Identifier("string",1,0,I_FALSE),
-					NULL),
-		     NULL),
-	    pd_max_size(ms),
-            pd_width(sizeof(char))
-{
-}
+// Redefinition of inherited virtual operations.
 
-AST_String::AST_String(AST_Expression *ms, long wide)
-	  : AST_Decl(AST_Decl::NT_string,
-		     new UTL_ScopedName(wide == sizeof(char)
-					? new Identifier("string",1,0,I_FALSE)
-					: new Identifier("wstring_t",
-                                                         1,
-                                                         0,
-                                                         I_FALSE),
-					NULL),
-		     NULL),
-            pd_max_size(ms),
-            pd_width(wide)
-{
-}
-
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_String node to the ostream o
- */
+// Dump this AST_String node to the ostream o.
 void
-AST_String::dump(ostream &o)
+AST_String::dump (ACE_OSTREAM_TYPE &o)
 {
-  o << "string <";
-  pd_max_size->dump(o);
-  o << ">";
+  this->dump_i (o, "string <");
+  this->pd_max_size->dump (o);
+  this->dump_i (o, ">");
 }
 
-/*
- * Data accessors
- */
+int
+AST_String::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_string (this);
+}
+
+void
+AST_String::destroy (void)
+{
+  this->pd_max_size->destroy ();
+  delete this->pd_max_size;
+  this->pd_max_size = 0;
+
+  this->AST_ConcreteType::destroy ();
+}
+
+// Data accessors.
 
 AST_Expression *
-AST_String::max_size()
+AST_String::max_size (void)
 {
-  return pd_max_size;
+  return this->pd_max_size;
 }
 
 long
-AST_String::width()
+AST_String::width (void)
 {
-  return pd_width;
+  return this->pd_width;
 }
 
-// Narrowing
+// Narrowing.
 IMPL_NARROW_METHODS1(AST_String, AST_ConcreteType)
 IMPL_NARROW_FROM_DECL(AST_String)

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,38 +62,38 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_ENUM_VAL_AST_ENUM_VAL_HH
 #define _AST_ENUM_VAL_AST_ENUM_VAL_HH
 
-// Representation of enumerator in enum:
-//
-// An enumerator is a constant of type unsigned long
+#include "ast_constant.h"
 
-/*
-** DEPENDENCIES: ast_constant.hh, utl_scoped_name.hh, utl_strlist.hh,
-**		 ast_decl.hh
-**
-** USE: Included from ast.hh
-*/
+// An enumerator is a constant of type unsigned long.
 
-class	AST_EnumVal : public virtual AST_Constant
+class TAO_IDL_FE_Export AST_EnumVal : public virtual AST_Constant
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_EnumVal();
-  AST_EnumVal(unsigned long v, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_EnumVal() {}
+  // Constructor(s).
+  AST_EnumVal (void);
 
-  // Narrowing
+  AST_EnumVal (unsigned long v,
+               UTL_ScopedName *n);
+
+  // Destructor.
+  virtual ~AST_EnumVal (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_EnumVal, AST_Constant);
   DEF_NARROW_FROM_DECL(AST_EnumVal);
 
-  // AST Dumping
-  virtual void			dump(ostream &);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
 };
 
 #endif           // _AST_ENUM_VAL_AST_ENUM_VAL_HH

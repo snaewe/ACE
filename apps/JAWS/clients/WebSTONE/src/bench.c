@@ -1,3 +1,4 @@
+/* $Id$ */
 /**************************************************************************
  *									  *
  * 		 Copyright (C) 1995 Silicon Graphics, Inc.		  *
@@ -8,6 +9,8 @@
  *  modifications and changes to the code and release it.		  *
  *									  *
  **************************************************************************/
+
+/* FUZZ: disable check_for_math_include */
 
 #include <stdio.h>
 #include <errno.h>

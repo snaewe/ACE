@@ -1,24 +1,21 @@
 // $Id$
 
 #include "tao/default_server.h"
-#include "tao/ORB_Core.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_strings.h"
+#include "ace/OS_NS_string.h"
 
-#if !defined (__ACE_INLINE__)
-# include "tao/default_client.i"
-#endif /* ! __ACE_INLINE__ */
+ACE_RCSID (tao,
+           default_server,
+           "$Id$")
 
-ACE_RCSID(tao, default_server, "$Id$")
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
 
 TAO_Default_Server_Strategy_Factory::TAO_Default_Server_Strategy_Factory (void)
-  : thread_flags_ (0),
-    object_table_size_ (TAO_DEFAULT_SERVER_OBJECT_TABLE_SIZE),
-    object_lookup_strategy_ (TAO_DYNAMIC_HASH),
+  : activate_server_connections_ (0),
+    thread_flags_ (THR_BOUND | THR_DETACHED),
     poa_lock_type_ (TAO_THREAD_LOCK),
-    poa_mgr_lock_type_ (TAO_THREAD_LOCK),
-    event_loop_lock_type_ (TAO_NULL_LOCK),
-    collocation_table_lock_type_ (TAO_THREAD_LOCK),
-    cached_connector_lock_type_ (TAO_THREAD_LOCK),
-    concurrency_strategy_ (0)
+    thread_per_connection_use_timeout_ (-1)
 {
 }
 
@@ -27,195 +24,63 @@ TAO_Default_Server_Strategy_Factory::~TAO_Default_Server_Strategy_Factory (void)
   // Perform appropriate cleanup.
 }
 
-TAO_Default_Server_Strategy_Factory::CONCURRENCY_STRATEGY *
-TAO_Default_Server_Strategy_Factory::concurrency_strategy (void)
+int
+TAO_Default_Server_Strategy_Factory::enable_poa_locking (void)
 {
-  if (this->concurrency_strategy_ == 0)
-    // If no strategy is specified, use the reactive one.
-    return &this->reactive_strategy_;
-  else
-    return this->concurrency_strategy_;
-}
-
-ACE_Lock *
-TAO_Default_Server_Strategy_Factory::create_poa_lock (void)
-{
-  ACE_Lock *the_lock = 0;
-
   switch (this->poa_lock_type_)
     {
+    case TAO_NULL_LOCK:
+      return 0;
     case TAO_THREAD_LOCK:
-#if defined (ACE_HAS_THREADS)
-      ACE_NEW_RETURN (the_lock,
-                      ACE_Lock_Adapter<ACE_Recursive_Thread_Mutex> (),
-                      0);
-      break;
-#endif /* ACE_HAS_THREADS */
     default:
-      ACE_NEW_RETURN (the_lock,
-                      ACE_Lock_Adapter<ACE_Null_Mutex> (),
-                      0);
-      break;
+      return 1;
     }
-
-  return the_lock;// Just to make sure we return something
 }
 
-ACE_Lock *
-TAO_Default_Server_Strategy_Factory::create_poa_mgr_lock (void)
+int
+TAO_Default_Server_Strategy_Factory::activate_server_connections (void)
 {
-  ACE_Lock *the_lock = 0;
-
-  switch (this->poa_mgr_lock_type_)
-    {
-    case TAO_THREAD_LOCK:
-#if defined (ACE_HAS_THREADS)
-      ACE_NEW_RETURN (the_lock,
-                      ACE_Lock_Adapter<ACE_Thread_Mutex> (),
-                      0);
-      break;
-#endif /* ACE_HAS_THREADS */
-    default:
-      ACE_NEW_RETURN (the_lock,
-                      ACE_Lock_Adapter<ACE_Null_Mutex> (),
-                      0);
-      break;
-    }
-
-  // Just to make sure we return something.
-  return the_lock;
+  return this->activate_server_connections_;
 }
 
-ACE_Lock *
-TAO_Default_Server_Strategy_Factory::create_servant_lock (void)
+int
+TAO_Default_Server_Strategy_Factory::thread_per_connection_timeout (ACE_Time_Value &timeout)
 {
-  ACE_Lock *the_lock = 0;
-
-#if defined (ACE_HAS_THREADS)
-  if (this->concurrency_strategy_ != &this->reactive_strategy_ &&
-      this->concurrency_strategy_ != 0)
-      ACE_NEW_RETURN (the_lock,
-                      ACE_Lock_Adapter<ACE_Recursive_Thread_Mutex> (),
-                      0);
-  else
-#endif /* ACE_HAS_THREADS */
-      ACE_NEW_RETURN (the_lock,
-                      ACE_Lock_Adapter<ACE_Null_Mutex> (),
-                      0);
-
-  return the_lock;
+  timeout = this->thread_per_connection_timeout_;
+  return this->thread_per_connection_use_timeout_;
 }
 
-ACE_Lock *
-TAO_Default_Server_Strategy_Factory::create_event_loop_lock (void)
+int
+TAO_Default_Server_Strategy_Factory::server_connection_thread_flags (void)
 {
-  ACE_Lock *the_lock = 0;
-
-  if (this->event_loop_lock_type_ == TAO_NULL_LOCK)
-    ACE_NEW_RETURN (the_lock,
-		    ACE_Lock_Adapter<ACE_SYNCH_NULL_MUTEX> (),
-		    0);
-  else
-    ACE_NEW_RETURN (the_lock,
-		    ACE_Lock_Adapter<ACE_SYNCH_RECURSIVE_MUTEX> (),
-		    0);
-
-  return the_lock;
+  return this->thread_flags_;
 }
 
-ACE_Lock *
-TAO_Default_Server_Strategy_Factory::create_collocation_table_lock (void)
+int
+TAO_Default_Server_Strategy_Factory::server_connection_thread_count (void)
 {
-  ACE_Lock *the_lock = 0;
-
-  if (this->collocation_table_lock_type_ == TAO_NULL_LOCK)
-    ACE_NEW_RETURN (the_lock,
-		    ACE_Lock_Adapter<ACE_SYNCH_NULL_MUTEX> (),
-		    0);
-  else
-    ACE_NEW_RETURN (the_lock,
-		    ACE_Lock_Adapter<ACE_SYNCH_MUTEX> (),
-		    0);
-
-  return the_lock;
-}
-
-ACE_Lock *
-TAO_Default_Server_Strategy_Factory::create_cached_connector_lock (void)
-{
-  ACE_Lock *the_lock = 0;
-
-  if (this->cached_connector_lock_type_ == TAO_NULL_LOCK)
-    ACE_NEW_RETURN (the_lock,
-		    ACE_Lock_Adapter<ACE_SYNCH_NULL_MUTEX> (),
-		    0);
-  else
-    ACE_NEW_RETURN (the_lock,
-		    ACE_Lock_Adapter<ACE_SYNCH_MUTEX> (),
-		    0);
-
-  return the_lock;
-}
-
-TAO_Object_Table_Impl *
-TAO_Default_Server_Strategy_Factory::create_object_table (void)
-{
-  // Create the appropriate-sized object table based on passed
-  // arguments.
-  TAO_Object_Table_Impl *objtable = 0;
-
-  switch (this->object_lookup_strategy_)
-    {
-    case TAO_LINEAR:
-      ACE_NEW_RETURN (objtable,
-                      TAO_Linear_ObjTable (this->object_table_size_),
-                      0);
-      break;
-      // Don't do this one right now until we determine how to deal
-      // with its reliance on a global singleton.
-    case TAO_USER_DEFINED:
-      // it is assumed that the user would have used the hooks to
-      // supply a user-defined instance of the object table
-      //
-      // Note that the usage below doesn't really fit very well now.
-      // We need for the userdef stuff to provide a creation hook--IF
-      // we decide to keep the whole demultiplexing strategy creation
-      // the way it is.  IMHO, the way that userdef stuff should be
-      // done is to create the User_Server_Strategy_Factory and just
-      // link it in.  The default server would only encompass the
-      // strategies that are "shipped", so to speak. --cjc
-      objtable = TAO_ORB_Core_instance()->oa_params()->userdef_lookup_strategy ();
-      break;
-    case TAO_ACTIVE_DEMUX:
-      ACE_NEW_RETURN (objtable,
-                      TAO_Active_Demux_ObjTable (this->object_table_size_),
-                      0);
-      break;
-    case TAO_DYNAMIC_HASH:
-    case TAO_NONE:
-    default:
-      ACE_NEW_RETURN (objtable,
-                      TAO_Dynamic_Hash_ObjTable (this->object_table_size_),
-                      0);
-      break;
-    }
-
-  return objtable;
+  return 1;
 }
 
 // Evil macros b/c I'm lazy!
 #define TAO_BEGINCHECK  if (0)
-#define TAO_CHECKANDSET(sym) else if (ACE_OS::strcmp (flag, #sym) == 0) ACE_SET_BITS (this->thread_flags_, sym)
+#define TAO_CHECKANDSET(sym) \
+  else if (ACE_OS::strcmp (const_cast <const ACE_TCHAR *> ( flag), ACE_TEXT(#sym)) == 0) \
+  ACE_SET_BITS (this->thread_flags_, sym)
 #define TAO_ENDCHECK
 
 void
-TAO_Default_Server_Strategy_Factory::tokenize (char *flag_string)
+TAO_Default_Server_Strategy_Factory::tokenize (ACE_TCHAR* flag_string)
 {
-  char *lasts = 0;
+  ACE_TCHAR* lasts = 0;
 
-  for (char *flag = ACE_OS::strtok_r (flag_string, "|", &lasts);
+  for (ACE_TCHAR* flag = ACE_OS::strtok_r (flag_string,
+                                      ACE_TEXT("|"),
+                                      &lasts);
        flag != 0;
-       flag = ACE_OS::strtok_r (0, "|", &lasts))
+       flag = ACE_OS::strtok_r (0,
+                                ACE_TEXT("|"),
+                                &lasts))
     {
       TAO_BEGINCHECK;
       TAO_CHECKANDSET (THR_DETACHED);
@@ -230,152 +95,299 @@ TAO_Default_Server_Strategy_Factory::tokenize (char *flag_string)
 }
 
 int
-TAO_Default_Server_Strategy_Factory::init (int argc, char *argv[])
+TAO_Default_Server_Strategy_Factory::init (int argc, ACE_TCHAR* argv[])
 {
   return this->parse_args (argc, argv);
 }
 
 int
-TAO_Default_Server_Strategy_Factory::open (void)
+TAO_Default_Server_Strategy_Factory::open (TAO_ORB_Core *)
 {
-  TAO_ORB_Core *orb_core = TAO_ORB_Core_instance ();
-
-  if (reactive_strategy_.open (orb_core->reactor ()) == 0
-      && threaded_strategy_.open (orb_core->thr_mgr (),
-                                  this->thread_flags_) == 0)
-    return 0;
-  else
-    return -1;
+  return 0;
 }
 
 int
-TAO_Default_Server_Strategy_Factory::parse_args (int argc, char *argv[])
+TAO_Default_Server_Strategy_Factory::parse_args (int argc, ACE_TCHAR* argv[])
 {
   ACE_TRACE ("TAO_Default_Server_Strategy_Factory::parse_args");
 
   int curarg;
 
-  for (curarg = 0; curarg < argc && argv[curarg]; curarg++)
-    if (ACE_OS::strcmp (argv[curarg], "-ORBconcurrency") == 0)
+  for (curarg = 0; curarg < argc && argv[curarg]; ++curarg)
+    if (ACE_OS::strcasecmp (argv[curarg],
+                            ACE_TEXT("-ORBConcurrency")) == 0)
       {
-        curarg++;
+        ++curarg;
         if (curarg < argc)
           {
-            char *name = argv[curarg];
+            ACE_TCHAR* name = argv[curarg];
 
-            if (ACE_OS::strcasecmp (name, "reactive") == 0)
-              this->concurrency_strategy_ = &reactive_strategy_;
-            else if (ACE_OS::strcasecmp (name, "thread-per-connection") == 0)
-              this->concurrency_strategy_ = &threaded_strategy_;
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("reactive")) == 0)
+              this->activate_server_connections_ = 0;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("thread-per-connection")) == 0)
+              this->activate_server_connections_ = 1;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBConcurrency"), name);
           }
       }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBtablesize") == 0)
+
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBThreadPerConnectionTimeout")) == 0)
       {
-        curarg++;
-        if (curarg < argc)
-          this->object_table_size_ = ACE_OS::strtoul (argv[curarg], 0, 10);
-      }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBdemuxstrategy") == 0)
-      {
-        curarg++;
+        ++curarg;
         if (curarg < argc)
           {
-            char *name = argv[curarg];
+            ACE_TCHAR* name = argv[curarg];
 
-            if (ACE_OS::strcasecmp (name, "dynamic") == 0)
-              this->object_lookup_strategy_ = TAO_DYNAMIC_HASH;
-            else if (ACE_OS::strcasecmp (name, "linear") == 0)
-              this->object_lookup_strategy_ = TAO_LINEAR;
-            else if (ACE_OS::strcasecmp (name, "active") == 0)
-              this->object_lookup_strategy_ = TAO_ACTIVE_DEMUX;
-            else if (ACE_OS::strcasecmp (name, "user") == 0)
-              this->object_lookup_strategy_ = TAO_USER_DEFINED;
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("infinite")) == 0)
+              {
+                this->thread_per_connection_use_timeout_ = 0;
+              }
+            else
+              {
+                this->thread_per_connection_use_timeout_ = 1;
+                int milliseconds = ACE_OS::atoi (name);
+                this->thread_per_connection_timeout_.set (0,
+                                                          1000 * milliseconds);
+              }
           }
       }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBpoalock") == 0)
+
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBTableSize")) == 0
+             || ACE_OS::strcasecmp (argv[curarg],
+                                    ACE_TEXT("-ORBActiveObjectMapSize")) == 0)
       {
-        curarg++;
+        ++curarg;
+        if (curarg < argc)
+          this->active_object_map_creation_parameters_.active_object_map_size_ =
+            ACE_OS::strtoul (argv[curarg],
+                             0,
+                             10);
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBPOAMapSize")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          this->active_object_map_creation_parameters_.poa_map_size_ =
+            ACE_OS::strtoul (argv[curarg],
+                             0,
+                             10);
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBActiveHintInIds")) == 0)
+      {
+        ++curarg;
         if (curarg < argc)
           {
-            char *name = argv[curarg];
+            ACE_TCHAR* value = argv[curarg];
 
-            if (ACE_OS::strcasecmp (name, "thread") == 0)
+            this->active_object_map_creation_parameters_.use_active_hint_in_ids_ =
+              ACE_OS::atoi (value);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBActiveHintInPOANames")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* value = argv[curarg];
+
+            this->active_object_map_creation_parameters_.use_active_hint_in_poa_names_ =
+              ACE_OS::atoi (value);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBAllowReactivationOfSystemids")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* value = argv[curarg];
+
+            this->active_object_map_creation_parameters_.allow_reactivation_of_system_ids_ =
+              ACE_OS::atoi (value);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBUseridPolicyDemuxStrategy")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* name = argv[curarg];
+
+            // Active demux not supported with user id policy.
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("dynamic")) == 0)
+              this->active_object_map_creation_parameters_.object_lookup_strategy_for_user_id_policy_ =
+                TAO_DYNAMIC_HASH;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("linear")) == 0)
+              this->active_object_map_creation_parameters_.object_lookup_strategy_for_user_id_policy_ =
+                TAO_LINEAR;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBUseridPolicyDemuxStrategy"), name);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBSystemidPolicyDemuxStrategy")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* name = argv[curarg];
+
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("dynamic")) == 0)
+              this->active_object_map_creation_parameters_.object_lookup_strategy_for_system_id_policy_ =
+                TAO_DYNAMIC_HASH;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("linear")) == 0)
+              this->active_object_map_creation_parameters_.object_lookup_strategy_for_system_id_policy_ =
+                TAO_LINEAR;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("active")) == 0)
+              this->active_object_map_creation_parameters_.object_lookup_strategy_for_system_id_policy_ =
+                TAO_ACTIVE_DEMUX;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBSystemidPolicyDemuxStrategy"), name);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBPersistentidPolicyDemuxStrategy")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* name = argv[curarg];
+
+            // Active demux not supported with user id policy.
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("dynamic")) == 0)
+              this->active_object_map_creation_parameters_.poa_lookup_strategy_for_persistent_id_policy_ =
+                TAO_DYNAMIC_HASH;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("linear")) == 0)
+              this->active_object_map_creation_parameters_.poa_lookup_strategy_for_persistent_id_policy_ =
+                TAO_LINEAR;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBPersistentidPolicyDemuxStrategy"), name);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBTransientidPolicyDemuxStrategy")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* name = argv[curarg];
+
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("dynamic")) == 0)
+              this->active_object_map_creation_parameters_.poa_lookup_strategy_for_transient_id_policy_ =
+                TAO_DYNAMIC_HASH;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("linear")) == 0)
+              this->active_object_map_creation_parameters_.poa_lookup_strategy_for_transient_id_policy_ =
+                TAO_LINEAR;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("active")) == 0)
+              this->active_object_map_creation_parameters_.poa_lookup_strategy_for_transient_id_policy_ =
+                TAO_ACTIVE_DEMUX;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBTransientidPolicyDemuxStrategy"), name);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBUniqueidPolicyReverseDemuxStrategy")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* name = argv[curarg];
+
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("dynamic")) == 0)
+              this->active_object_map_creation_parameters_.reverse_object_lookup_strategy_for_unique_id_policy_ =
+                TAO_DYNAMIC_HASH;
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("linear")) == 0)
+              this->active_object_map_creation_parameters_.reverse_object_lookup_strategy_for_unique_id_policy_ =
+                TAO_LINEAR;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBUniqueidPolicyReverseDemuxStrategy"), name);
+          }
+      }
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBPOALock")) == 0)
+      {
+        ++curarg;
+        if (curarg < argc)
+          {
+            ACE_TCHAR* name = argv[curarg];
+
+            if (ACE_OS::strcasecmp (name,
+                                    ACE_TEXT("thread")) == 0)
               this->poa_lock_type_ = TAO_THREAD_LOCK;
-            else if (ACE_OS::strcasecmp (name, "null") == 0)
+            else if (ACE_OS::strcasecmp (name,
+                                         ACE_TEXT("null")) == 0)
               this->poa_lock_type_ = TAO_NULL_LOCK;
+            else
+              this->report_option_value_error (ACE_TEXT("-ORBPOALock"), name);
           }
       }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBpoamgrlock") == 0)
+    else if (ACE_OS::strcasecmp (argv[curarg],
+                                 ACE_TEXT("-ORBThreadFlags")) == 0)
       {
-        curarg++;
-        if (curarg < argc)
-          {
-            char *name = argv[curarg];
-
-            if (ACE_OS::strcasecmp (name, "thread") == 0)
-              this->poa_mgr_lock_type_ = TAO_THREAD_LOCK;
-            else if (ACE_OS::strcasecmp (name, "null") == 0)
-              this->poa_mgr_lock_type_ = TAO_NULL_LOCK;
-          }
-      }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBeventlock") == 0)
-      {
-        curarg++;
-        if (curarg < argc)
-          {
-            char *name = argv[curarg];
-
-            if (ACE_OS::strcasecmp (name, "thread") == 0)
-              this->poa_mgr_lock_type_ = TAO_THREAD_LOCK;
-            else if (ACE_OS::strcasecmp (name, "null") == 0)
-              this->poa_mgr_lock_type_ = TAO_NULL_LOCK;
-          }
-      }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBcoltbllock") == 0)
-      {
-        curarg++;
-        if (curarg < argc)
-          {
-            char *name = argv[curarg];
-
-            if (ACE_OS::strcasecmp (name, "thread") == 0)
-              this->collocation_table_lock_type_ = TAO_THREAD_LOCK;
-            else if (ACE_OS::strcasecmp (name, "null") == 0)
-              this->collocation_table_lock_type_ = TAO_NULL_LOCK;
-          }
-      }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBconnectorlock") == 0)
-      {
-        curarg++;
-        if (curarg < argc)
-          {
-            char *name = argv[curarg];
-
-            if (ACE_OS::strcasecmp (name, "thread") == 0)
-              this->cached_connector_lock_type_ = TAO_THREAD_LOCK;
-            else if (ACE_OS::strcasecmp (name, "null") == 0)
-              this->cached_connector_lock_type_ = TAO_NULL_LOCK;
-          }
-      }
-    else if (ACE_OS::strcmp (argv[curarg], "-ORBthreadflags") == 0)
-      {
-        curarg++;
+        ++curarg;
 
         if (curarg < argc)
           this->tokenize (argv[curarg]);
       }
 
+    else if (ACE_OS::strncmp (argv[curarg], ACE_TEXT("-ORB"), 4) == 0)
+      {
+        // Can we assume there is an argument after the option?
+        // ++curarg;
+        ACE_ERROR ((LM_ERROR,
+                    ACE_TEXT("Server_Strategy_Factory - ")
+                    ACE_TEXT("unknown option <%s>\n"),
+                    argv[curarg]));
+      }
+    else
+      {
+        ACE_DEBUG ((LM_DEBUG,
+                    ACE_TEXT("Server_Strategy_Factory - ")
+                    ACE_TEXT("ignoring option <%s>\n"),
+                    argv[curarg]));
+      }
+
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class TAO_Reactive_Strategy<TAO_Server_Connection_Handler>;
-template class ACE_Reactive_Strategy<TAO_Server_Connection_Handler>;
-template class ACE_Thread_Strategy<TAO_Server_Connection_Handler>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate TAO_Reactive_Strategy<TAO_Server_Connection_Handler>
-#pragma instantiate ACE_Reactive_Strategy<TAO_Server_Connection_Handler>
-#pragma instantiate ACE_Thread_Strategy<TAO_Server_Connection_Handler>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+void
+TAO_Default_Server_Strategy_Factory::report_option_value_error (
+                                 const ACE_TCHAR* option_name,
+                                 const ACE_TCHAR* option_value)
+{
+  ACE_DEBUG((LM_DEBUG,
+             ACE_TEXT ("Server_Strategy_Factory - unknown argument")
+             ACE_TEXT (" <%s> for <%s>\n"),
+             option_value, option_name));
+}
 
+TAO_END_VERSIONED_NAMESPACE_DECL
+
+ACE_STATIC_SVC_DEFINE (TAO_Default_Server_Strategy_Factory,
+                       ACE_TEXT ("Server_Strategy_Factory"),
+                       ACE_SVC_OBJ_T,
+                       &ACE_SVC_NAME (TAO_Default_Server_Strategy_Factory),
+                       ACE_Service_Type::DELETE_THIS | ACE_Service_Type::DELETE_OBJ,
+                       0)
 ACE_FACTORY_DEFINE (TAO, TAO_Default_Server_Strategy_Factory)

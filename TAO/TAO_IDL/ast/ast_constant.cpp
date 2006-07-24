@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,153 +62,257 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_constant.cc - Implementation of class AST_Constant
- *
- * AST_Constant nodes denote IDL constant declarations.
- * AST_Constants have a value (an AST_Expression) and a value type
- * (a value from the enum AST_Expression::ExprType).
- * AST_Constant has two constructors, one for use in creating constants
- * and the other for use in creating enumerators (see the class
- * AST_EnumVal)
- */
+// AST_Constant nodes denote IDL constant declarations.
+// AST_Constants have a value (an AST_Expression) and a value type
+// (a value from the enum AST_Expression::ExprType).
+// AST_Constant has two constructors, one for use in creating constants
+// and the other for use in creating enumerators (see the class
+// AST_EnumVal).
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_constant.h"
+#include "utl_identifier.h"
+#include "ast_visitor.h"
+#include "ast_generator.h"
+#include "nr_extern.h"
 
-ACE_RCSID(ast, ast_constant, "$Id$")
+ACE_RCSID (ast,
+           ast_constant,
+           "$Id$")
 
-/*
- * Static functions
- */
+// Static functions.
 
-/*
- * Convert a value from the enum AST_Expression::ExprType to a char *
- */
-static char *
-exprtype_to_string(AST_Expression::ExprType et)
+// Convert a value from the enum AST_Expression::ExprType to a char *.
+const char *
+AST_Constant::exprtype_to_string (AST_Expression::ExprType et)
 {
-  switch (et) {
-  case AST_Expression::EV_short:
-    return "short";
-  case AST_Expression::EV_ushort:
-    return "unsigned short";
-  case AST_Expression::EV_long:
-    return "long";
-  case AST_Expression::EV_ulong:
-    return "unsigned long";
-  case AST_Expression::EV_float:
-    return "float";
-  case AST_Expression::EV_double:
-    return "double";
-  case AST_Expression::EV_char:
-    return "char";
-  case AST_Expression::EV_octet:
-    return "octet";
-  case AST_Expression::EV_bool:
-    return "boolean";
-  case AST_Expression::EV_string:
-    return "string";
-  case AST_Expression::EV_any:
-    return "any";
-  case AST_Expression::EV_void:
-    return "void";
-  case AST_Expression::EV_none:
-    return "none";
-  case AST_Expression::EV_wstring:
-  case AST_Expression::EV_wchar:
-  case AST_Expression::EV_longdouble:
-  case AST_Expression::EV_ulonglong:
-  case AST_Expression::EV_longlong:
-    return NULL;
-  }
-  return NULL;
+  switch (et)
+    {
+    case AST_Expression::EV_short:
+      return "Short";
+    case AST_Expression::EV_ushort:
+      return "UShort";
+    case AST_Expression::EV_long:
+      return "Long";
+    case AST_Expression::EV_ulong:
+      return "ULong";
+    case AST_Expression::EV_float:
+      return "Float";
+    case AST_Expression::EV_double:
+      return "Double";
+    case AST_Expression::EV_char:
+      return "Char";
+    case AST_Expression::EV_octet:
+      return "Octet";
+    case AST_Expression::EV_bool:
+      return "Boolean";
+    case AST_Expression::EV_string:
+      return "Char*";
+    case AST_Expression::EV_ulonglong:
+      return "ULongLong";
+    case AST_Expression::EV_longlong:
+      return "LongLong";
+    case AST_Expression::EV_wchar:
+      return "Wchar";
+    case AST_Expression::EV_wstring:
+      return "Wchar*";
+    case AST_Expression::EV_longdouble:
+      return "LongDouble";
+    default:
+      break;
+    }
+
+  return 0;
 }
 
-/*
- * Constructor(s) and destructor
- */
+// Constructor(s) and destructor.
 
-/*
- * Default constructor
- */
-AST_Constant::AST_Constant()
-	    : pd_constant_value(NULL), pd_et(AST_Expression::EV_none)
-{
-}
-
-/*
- * Used in constructing AST_EnumVal nodes
- */
-AST_Constant::AST_Constant(AST_Expression::ExprType t,
-			   AST_Decl::NodeType nt,
-			   AST_Expression *v,
-			   UTL_ScopedName *n,
-			   UTL_StrList *p)
-	    : AST_Decl(nt, n, p),
-	      pd_constant_value(idl_global->gen()->create_expr(v, t)),
-	      pd_et(t)
+// Default constructor.
+AST_Constant::AST_Constant (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    pd_constant_value (0),
+    pd_et (AST_Expression::EV_none),
+    ifr_added_ (0)
 {
 }
 
-/*
- * Used when constructing AST_Constant nodes
- */
-AST_Constant::AST_Constant(AST_Expression::ExprType t,
-			   AST_Expression *v,
-			   UTL_ScopedName *n,
-			   UTL_StrList *p)
-	    : AST_Decl(AST_Decl::NT_const, n, p),
-	      pd_constant_value(idl_global->gen()->create_expr(v, t)),
-	      pd_et(t)
+// Used in constructing AST_EnumVal nodes.
+AST_Constant::AST_Constant (AST_Expression::ExprType t,
+                            AST_Decl::NodeType nt,
+                            AST_Expression *v,
+                            UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (nt,
+              n),
+    pd_constant_value (v),
+    pd_et (t),
+    ifr_added_ (0)
 {
 }
 
-/*
- * Private operations
- */
+// Used when constructing AST_Constant nodes.
+AST_Constant::AST_Constant (AST_Expression::ExprType t,
+                            AST_Expression *v,
+                            UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_const,
+              n),
+    pd_constant_value (v),
+    pd_et (t),
+    ifr_added_ (0)
+{
+  // Avoids a truncation warning on MSVC when assigning a decimal
+  // literal to a float constant. Must also check that the input
+  // expression is of type double (indicates that we are being
+  // assigned from a literal). If v is of type float, it may be
+  // a constant-to-constant assignment - in any case the danger
+  // of truncation would not apply.
+  if (t == AST_Expression::EV_float && v->ev ()->et == AST_Expression::EV_double)
+    {
+      AST_Expression::AST_ExprValue *ev =
+        this->pd_constant_value->ev ();
+      ev->et = t;
+      ev->u.fval = (float) ev->u.dval;
+    }
+  // Allows the enum value string name to be used in generating the
+  // rhs of the constant assignment.
+  else if (t == AST_Expression::EV_enum)
+    {
+      this->pd_constant_value->ev ()->et = t;
+    }
+}
 
-/*
- * Public operations
- */
+AST_Constant::~AST_Constant (void)
+{
+}
 
+// Redefinition of inherited virtual operations.
 
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_Constant node to the ostream o
- */
+// Dump this AST_Constant node to the ostream o.
 void
-AST_Constant::dump(ostream &o)
+AST_Constant::dump (ACE_OSTREAM_TYPE &o)
 {
-  o << "const " << exprtype_to_string(pd_et) << " ";
-  local_name()->dump(o);
-  o << " = ";
-  pd_constant_value->dump(o);
+  this->dump_i (o, "const ");
+  this->dump_i (o, this->exprtype_to_string ());
+  this->dump_i (o, " ");
+
+  this->local_name ()->dump (o);
+
+  this->dump_i (o, " = ");
+
+  this->pd_constant_value->dump (o);
 }
 
-/*
- * Data accessors
- */
+int
+AST_Constant::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_constant (this);
+}
+
+void
+AST_Constant::destroy (void)
+{
+  if (this->pd_constant_value != 0)
+    {
+      this->pd_constant_value->destroy ();
+      delete this->pd_constant_value;
+      this->pd_constant_value = 0;
+    }
+    
+  this->AST_Decl::destroy ();
+}
+
+// Data accessors.
 
 AST_Expression *
-AST_Constant::constant_value()
+AST_Constant::constant_value (void)
 {
-  return pd_constant_value;
+  return this->pd_constant_value;
 }
 
 AST_Expression::ExprType
-AST_Constant::et()
+AST_Constant::et (void)
 {
-  return pd_et;
+  return this->pd_et;
 }
 
-/*
- * Narrowing methods
- */
+bool
+AST_Constant::ifr_added (void)
+{
+  return this->ifr_added_;
+}
+
+void
+AST_Constant::ifr_added (bool val)
+{
+  this->ifr_added_ = val;
+}
+
+const char *
+AST_Constant::exprtype_to_string (void)
+{
+  switch (this->pd_et)
+    {
+    case AST_Expression::EV_short:
+      return "CORBA::Short";
+    case AST_Expression::EV_ushort:
+      return "CORBA::UShort";
+    case AST_Expression::EV_long:
+      return "CORBA::Long";
+    case AST_Expression::EV_ulong:
+      return "CORBA::ULong";
+    case AST_Expression::EV_float:
+      return "CORBA::Float";
+    case AST_Expression::EV_double:
+      return "CORBA::Double";
+    case AST_Expression::EV_char:
+      return "CORBA::Char";
+    case AST_Expression::EV_octet:
+      return "CORBA::Octet";
+    case AST_Expression::EV_bool:
+      return "CORBA::Boolean";
+    case AST_Expression::EV_string:
+      return "char *const";
+    case AST_Expression::EV_void:
+      return "void";
+    case AST_Expression::EV_none:
+      return "none";
+    case AST_Expression::EV_longlong:
+      return "CORBA::LongLong";
+    case AST_Expression::EV_ulonglong:
+      return "CORBA::ULongLong";
+    case AST_Expression::EV_wchar:
+      return "CORBA::WChar";
+    case AST_Expression::EV_wstring:
+      return "CORBA::WChar *const";
+    case AST_Expression::EV_enum:
+    case AST_Expression::EV_longdouble:
+    case AST_Expression::EV_any:
+    case AST_Expression::EV_object:
+      return 0;
+    }
+
+  return 0;
+}
+
+UTL_ScopedName *
+AST_Constant::enum_full_name (void)
+{
+  if (this->pd_et == AST_Expression::EV_enum)
+    {
+      UTL_Scope *s = this->defined_in ();
+      AST_Decl *d = s->lookup_by_name (this->pd_constant_value->n (),
+                                       1);
+      return (ScopeAsDecl (d->defined_in ()))->name ();
+    }
+  else
+    {
+      return 0;
+    }
+}
+
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_Constant, AST_Decl)
 IMPL_NARROW_FROM_DECL(AST_Constant)

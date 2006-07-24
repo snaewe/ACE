@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,1540 +62,3126 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/* * ast_expression.cc - Implementation of class AST_Expression
- *
- * AST_Expression nodes denote IDL expressions used in the IDL input.
- */
+// AST_Expression nodes denote IDL expressions used in the IDL input.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_expression.h"
+#include "ast_constant.h"
+#include "ast_visitor.h"
+#include "global_extern.h"
+#include "utl_err.h"
+#include "utl_scope.h"
+#include "utl_string.h"
+#include "nr_extern.h"
 
-#include	<limits.h>
-#include	<float.h>
+// FUZZ: disable check_for_streams_include
+#include "ace/streams.h"
 
-ACE_RCSID(ast, ast_expression, "$Id$")
-
-#undef	MAXCHAR
-#define MAXCHAR	128
+ACE_RCSID (ast,
+           ast_expression,
+           "$Id$")
 
 // Helper function to fill out the details of where this expression
-// is defined
+// is defined.
 void
-AST_Expression::fill_definition_details()
+AST_Expression::fill_definition_details (void)
 {
-  pd_defined_in = idl_global->scopes()->depth() > 0 
-    ? idl_global->scopes()->top()
-    : 0 ;
-  pd_line       = idl_global->lineno();
-  pd_file_name	= idl_global->filename();
+  this->pd_defined_in = idl_global->scopes ().depth () > 0
+                          ? idl_global->scopes().top ()
+                          : 0 ;
+  this->pd_line = idl_global->lineno ();
+  this->pd_file_name = idl_global->filename ();
 }
 
-/*
- * Constructor(s) and destructor
- */
+// Constructor(s) and destructor.
 
-/*
- * An AST_Expression denoting a symbolic name
- */
-AST_Expression::AST_Expression(UTL_ScopedName *nm)
-	      : pd_ec(EC_symbol),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(nm)
+// An AST_Expression denoting a symbolic name.
+AST_Expression::AST_Expression (UTL_ScopedName *nm)
+  : pd_ec (EC_symbol),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (nm),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 }
 
-/*
- * An AST_Expression denoting a type coercion from another AST_Expression
- */
-AST_Expression::AST_Expression(AST_Expression *v, ExprType t)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a type coercion from another AST_Expression.
+AST_Expression::AST_Expression (AST_Expression *v,
+                                ExprType t)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
+  
+  // If we are here because one string constant has
+  // another one as its rhs, we must copy the UTL_String
+  // so both can be destroyed at cleanup.
+  if (EV_string == t)
+    {
+      ACE_NEW (this->pd_ev,
+              AST_ExprValue);
+               
+      ACE_NEW (this->pd_ev->u.strval,
+               UTL_String (v->pd_ev->u.strval));
 
-  pd_ev = v->coerce(t);
-  if (pd_ev == NULL)
-    idl_global->err()->coercion_error(v, t);
+      this->pd_ev->et = EV_string;
+    }
+  else if (EV_wstring == t)
+    {
+      ACE_NEW (this->pd_ev,
+              AST_ExprValue);
+               
+      this->pd_ev->u.wstrval = ACE::strnew (v->pd_ev->u.wstrval);
+      this->pd_ev->et = EV_string;
+    }
+  else
+    {
+      this->pd_ev = v->coerce (t);
+
+      if (this->pd_ev == 0)
+        {
+          idl_global->err ()->coercion_error (v,
+                                              t);
+        }
+        
+      if (0 != v->pd_n)
+        {
+          this->pd_n =
+            dynamic_cast<UTL_ScopedName *> (v->pd_n->copy ());
+        }
+    }
 }
 
-/*
- * An AST_Expression denoting a binary expression combination from
- * two other AST_Expressions
- */
-AST_Expression::AST_Expression(ExprComb c, AST_Expression *ev1,
-			       AST_Expression *ev2)
-	      : pd_ec(c),
-		pd_ev(NULL),
-		pd_v1(ev1),
-		pd_v2(ev2),
-		pd_n(NULL)
+// An AST_Expression denoting a binary expression combination from
+// two other AST_Expressions.
+AST_Expression::AST_Expression (ExprComb c,
+                                AST_Expression *ev1,
+                                AST_Expression *ev2)
+  : pd_ec (c),
+    pd_ev (0),
+    pd_v1 (ev1),
+    pd_v2 (ev2),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 }
 
-/*
- * An AST_Expression denoting a short integer
- */
-AST_Expression::AST_Expression(short sv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a short integer.
+AST_Expression::AST_Expression (short sv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_short;
-  pd_ev->u.sval = sv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_short;
+  this->pd_ev->u.sval = sv;
 }
 
-/*
- * An AST_Expression denoting an unsigned short integer
- */
-AST_Expression::AST_Expression(unsigned short usv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting an unsigned short integer.
+AST_Expression::AST_Expression (unsigned short usv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_ushort;
-  pd_ev->u.usval = usv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_ushort;
+  this->pd_ev->u.usval = usv;
 }
 
-/*
- * An AST_Expression denoting a long integer
- */
-AST_Expression::AST_Expression(long lv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a long integer.
+AST_Expression::AST_Expression (long lv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_long;
-  pd_ev->u.lval = lv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_long;
+  this->pd_ev->u.lval = lv;
 }
 
-/*
- * An AST_Expression denoting a long integer being used as a boolean
- */
-AST_Expression::AST_Expression(long lv, ExprType t)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a boolean.
+AST_Expression::AST_Expression (bool b)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = t;
-  pd_ev->u.lval = lv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_bool;
+  this->pd_ev->u.bval = b;
 }
 
-/*
- * An AST_Expression denoting an unsigned long integer
- */
-AST_Expression::AST_Expression(unsigned long ulv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting an unsigned long integer.
+AST_Expression::AST_Expression (unsigned long ulv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_ulong;
-  pd_ev->u.ulval = ulv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_ulong;
+  this->pd_ev->u.ulval = ulv;
 }
 
-/* 
- * An AST_Expression denoting a 32-bit floating point number
- */
-AST_Expression::AST_Expression(float fv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting an unsigned long integer.
+AST_Expression::AST_Expression (idl_uns_long ulv,
+                                ExprType t)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_float;
-  pd_ev->u.fval = fv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = t;
+#if defined (ACE_LACKS_LONGLONG_T)
+  this->pd_ev->u.ulval = ulv;
+#else
+  this->pd_ev->u.ullval = ulv;
+#endif
 }
 
-/*
- * An AST_Expression denoting a 64-bit floating point number
- */
-AST_Expression::AST_Expression(double dv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a 32-bit floating point number.
+AST_Expression::AST_Expression (float fv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_double;
-  pd_ev->u.dval = dv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_float;
+  this->pd_ev->u.fval = fv;
 }
 
-/*
- * An AST_Expression denoting a character
- */
-AST_Expression::AST_Expression(char cv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a 64-bit floating point number.
+AST_Expression::AST_Expression (double dv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_char;
-  pd_ev->u.cval = cv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_double;
+  this->pd_ev->u.dval = dv;
 }
 
-/*
- * An AST_Expression denoting an octet (unsigned char)
- */
-AST_Expression::AST_Expression(unsigned char ov)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a character.
+AST_Expression::AST_Expression (char cv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_octet;
-  pd_ev->u.oval = ov;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_char;
+  this->pd_ev->u.cval = cv;
 }
 
-/*
- * An AST_Expression denotign a string (char * encapsulated as a String)
- */
-AST_Expression::AST_Expression(String *sv)
-	      : pd_ec(EC_none),
-		pd_ev(NULL),
-		pd_v1(NULL),
-		pd_v2(NULL),
-		pd_n(NULL)
+// An AST_Expression denoting a wide character.
+AST_Expression::AST_Expression (ACE_OutputCDR::from_wchar wcv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
 {
-  fill_definition_details();
+  this->fill_definition_details ();
 
-  pd_ev = new AST_ExprValue;
-  pd_ev->et = EV_string;
-  pd_ev->u.strval = sv;
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_wchar;
+  this->pd_ev->u.wcval = wcv.val_;
 }
 
-/*
- * Static operations
- */
+// An AST_Expression denoting an octet (unsigned char).
+AST_Expression::AST_Expression (unsigned char ov)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
+{
+  this->fill_definition_details ();
 
-/*
- * Perform the coercion from the given AST_ExprValue to the requested
- * ExprType. Return an AST_ExprValue if successful, NULL if failed.
- */
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_octet;
+  this->pd_ev->u.oval = ov;
+}
+
+// An AST_Expression denoting a string (char * encapsulated as a String).
+AST_Expression::AST_Expression (UTL_String *sv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
+{
+  this->fill_definition_details ();
+
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+           
+  UTL_String *new_str = 0;
+  ACE_NEW (new_str,
+           UTL_String (sv));
+
+  this->pd_ev->u.strval = new_str;
+  this->pd_ev->et = EV_string;
+}
+
+// An AST_Expression denoting a wide string.
+AST_Expression::AST_Expression (char *sv)
+  : pd_ec (EC_none),
+    pd_ev (0),
+    pd_v1 (0),
+    pd_v2 (0),
+    pd_n (0),
+    tdef (0)
+{
+  this->fill_definition_details ();
+
+  ACE_NEW (this->pd_ev,
+           AST_ExprValue);
+
+  this->pd_ev->et = EV_wstring;
+  this->pd_ev->u.wstrval = sv;
+}
+
+AST_Expression::~AST_Expression (void)
+{
+}
+
+AST_Expression::AST_ExprValue::AST_ExprValue (void)
+{
+  this->u.ulval = 0UL;
+  this->et = AST_Expression::EV_none;
+}
+
+// Static operations.
+
+// Perform the coercion from the given AST_ExprValue to the requested
+// ExprType. Return an AST_ExprValue if successful, 0 if failed.
 static AST_Expression::AST_ExprValue *
-coerce_value(AST_Expression::AST_ExprValue *ev, AST_Expression::ExprType t)
+coerce_value (AST_Expression::AST_ExprValue *ev,
+              AST_Expression::ExprType t)
 {
-  if (ev == NULL)
-    return NULL;
+  if (ev == 0)
+    {
+      return 0;
+    }
 
-  switch (t) {
-  case AST_Expression::EV_short:
-    switch (ev->et) {
+  switch (t)
+    {
     case AST_Expression::EV_short:
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          return ev;
+        case AST_Expression::EV_ushort:
+          if (ev->u.usval > (unsigned short) ACE_INT16_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.usval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval > (long) ACE_INT16_MAX
+              || ev->u.lval < (long) ACE_INT16_MIN)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.lval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_ulong:
+          if (ev->u.ulval > (unsigned long) ACE_INT16_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.ulval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > (ACE_CDR::LongLong) ACE_INT16_MAX
+              || ev->u.llval < (ACE_CDR::LongLong) ACE_INT16_MIN)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.llval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if ((ev->u.ullval & ACE_INT16_MAX) != ev->u.ullval)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.ullval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.sval = (short) ev->u.bval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval > (float) ACE_INT16_MAX
+              || ev->u.fval < (float) ACE_INT16_MIN)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.fval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval > (double) ACE_INT16_MAX
+              || ev->u.dval < (double) ACE_INT16_MIN)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.dval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_char:
+          ev->u.sval = (short) ev->u.cval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_wchar:
+          if (ev->u.wcval > (ACE_CDR::WChar) ACE_INT16_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.sval = (short) ev->u.wcval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.sval = (short) ev->u.oval;
+          ev->et = AST_Expression::EV_short;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
     case AST_Expression::EV_ushort:
-      if (ev->u.usval > (unsigned short) SHRT_MAX)
-	return NULL;
-      ev->u.sval = (short) ev->u.usval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          if (ev->u.sval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.sval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_ushort:
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval > (long) ACE_UINT16_MAX
+              || ev->u.lval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.lval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_ulong:
+          if (ev->u.ulval > (unsigned long) ACE_UINT16_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.ulval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > (ACE_CDR::LongLong) ACE_UINT16_MAX
+              || ev->u.llval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.llval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if ((ev->u.ullval & ACE_UINT16_MAX) != ev->u.ullval)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.ullval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.usval = (unsigned short) ev->u.bval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval < 0.0
+              || ev->u.fval > (float) ACE_UINT16_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.fval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval < 0.0
+              || ev->u.dval > (double) ACE_UINT16_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.dval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_char:
+          if ((signed char) ev->u.cval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.usval = (unsigned short) ev->u.cval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.usval = (unsigned short) ev->u.wcval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.usval = (unsigned short) ev->u.oval;
+          ev->et = AST_Expression::EV_ushort;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
     case AST_Expression::EV_long:
-      if (ev->u.lval > (long) SHRT_MAX || ev->u.lval < (long) -(SHRT_MAX))
-	return NULL;
-      ev->u.sval = (short) ev->u.lval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          ev->u.lval = (long) ev->u.sval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.lval = (long) ev->u.usval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_long:
+          return ev;
+        case AST_Expression::EV_ulong:
+          if (ev->u.ulval > (unsigned long) ACE_INT32_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.lval = (long) ev->u.ulval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > (ACE_CDR::LongLong) ACE_INT32_MAX
+              || ev->u.llval < (ACE_CDR::LongLong) ACE_INT32_MIN)
+            {
+                    return 0;
+            }
+          ev->u.lval = (long) ev->u.llval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if ((ev->u.ullval & ACE_INT32_MAX) != ev->u.ullval)
+            {
+                    return 0;
+            }
+
+          ev->u.lval = (long) ev->u.ullval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.lval = (long) ev->u.bval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval > (float) LONG_MAX
+              || ev->u.fval < (float) ACE_INT32_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.lval = (long) ev->u.fval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval > (double) LONG_MAX
+              || ev->u.dval < (double) ACE_INT32_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.lval = (long) ev->u.dval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_char:
+          ev->u.lval = (long) ev->u.cval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.lval = (long) ev->u.wcval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.lval = (long) ev->u.oval;
+          ev->et = AST_Expression::EV_long;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
     case AST_Expression::EV_ulong:
-      if (ev->u.ulval > (unsigned long) SHRT_MAX)
-	return NULL;
-      ev->u.sval = (short) ev->u.ulval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          if (ev->u.sval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ulval = (unsigned long) ev->u.sval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.ulval = (unsigned long) ev->u.usval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ulval = (unsigned long) ev->u.lval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_ulong:
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > (ACE_CDR::LongLong) ACE_UINT32_MAX
+              || ev->u.llval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ulval = (unsigned long) ev->u.llval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return NULL;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if ((ev->u.ullval & ACE_UINT32_MAX) != ev->u.ullval)
+            {
+                    return 0;
+            }
+          ev->u.ulval = (unsigned long) ev->u.ullval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.ulval = (unsigned long) ev->u.bval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval < 0.0
+              || ev->u.fval > (float) ACE_UINT32_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.ulval = (unsigned long) ev->u.fval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval < 0.0
+              || ev->u.dval > (double) ACE_UINT32_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.ulval = (unsigned long) ev->u.dval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_char:
+          if ((signed char) ev->u.cval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ulval = (unsigned long) ev->u.cval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.ulval = (unsigned long) ev->u.wcval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.ulval = (unsigned long) ev->u.oval;
+          ev->et = AST_Expression::EV_ulong;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
+    case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.sval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.usval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_long:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.lval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_ulong:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.ulval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_longlong:
+          return ev;
+        case AST_Expression::EV_ulonglong:
+          if (ev->u.ullval > ACE_INT64_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.ullval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_bool:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.bval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval > (float) ACE_INT64_MAX
+              || ev->u.fval < (float) ACE_INT64_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.fval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval > (double) ACE_INT64_MAX
+              || ev->u.dval < (double) ACE_INT64_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.dval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_char:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.cval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.wcval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.llval = (ACE_CDR::LongLong) ev->u.oval;
+          ev->et = AST_Expression::EV_longlong;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          if (ev->u.sval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval =  ev->u.sval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.ullval = ev->u.usval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = ev->u.lval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_ulong:
+          ev->u.ullval = ev->u.ulval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_longlong:
+          if (ev->u.llval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = (ACE_CDR::LongLong) ev->u.llval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_ulonglong:
+          return ev;
+        case AST_Expression::EV_bool:
+          ev->u.ullval = ev->u.bval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_float:
+#if defined (ACE_LACKS_UNSIGNEDLONGLONG_T)
+          if (ev->u.fval < 0.0
+              || ev->u.fval > (float) ACE_INT64_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = static_cast<ACE_UINT32> (ev->u.fval);
+#else
+          if (ev->u.fval < 0.0
+              || ev->u.fval > (float) ACE_UINT64_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = static_cast<ACE_UINT64> (ev->u.fval);
+#endif
+
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_double:
+#if defined (ACE_LACKS_UNSIGNEDLONGLONG_T)
+          if (ev->u.dval < 0.0
+              || ev->u.dval > (double) ACE_INT64_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = static_cast<ACE_UINT32> (ev->u.dval);
+#else
+          if (ev->u.dval < 0.0
+              || ev->u.dval > (double) ACE_UINT64_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = static_cast<ACE_UINT64> (ev->u.dval);
+#endif
+
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_char:
+          if ((signed char) ev->u.cval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.ullval = ev->u.cval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.ullval = ev->u.wcval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.ullval = ev->u.oval;
+          ev->et = AST_Expression::EV_ulonglong;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
     case AST_Expression::EV_bool:
-      ev->u.sval = (short) ev->u.bval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          ev->u.bval = (ev->u.sval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.bval = (ev->u.usval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_long:
+          ev->u.bval = (ev->u.lval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_ulong:
+          ev->u.bval = (ev->u.ulval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          ev->u.bval = (ev->u.llval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+       case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          ev->u.bval = (ev->u.ullval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          return ev;
+        case AST_Expression::EV_float:
+          ev->u.bval = (ev->u.fval == 0.0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_double:
+          ev->u.bval = (ev->u.dval == 0.0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_char:
+          ev->u.bval = (ev->u.cval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.bval = (ev->u.wcval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.bval = (ev->u.oval == 0) ? false : true;
+          ev->et = AST_Expression::EV_bool;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+         return 0;
+        }
     case AST_Expression::EV_float:
-      if (ev->u.fval > (float) SHRT_MAX || ev->u.fval < (float) -(SHRT_MAX))
-	return NULL;
-      ev->u.sval = (short) ev->u.fval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          ev->u.fval = (float) ev->u.sval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.fval = (float) ev->u.usval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_long:
+          ev->u.fval = (float) ev->u.lval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_ulong:
+          ev->u.fval = (float) ev->u.ulval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > FLT_MAX
+              || ev->u.llval < -(ACE_FLT_MAX))
+            {
+              return 0;
+            }
+          ev->u.fval = (float) ev->u.llval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          ev->u.fval = (float) ((ACE_CDR::LongLong) ev->u.ullval);
+          ev->et = AST_Expression::EV_float;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.fval = (float) ((ev->u.bval == true) ? 1.0 : 0.0);
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_float:
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval > ACE_FLT_MAX
+              || ev->u.dval < -(ACE_FLT_MAX))
+            {
+                    return 0;
+            }
+
+          ev->u.fval = (float) ev->u.dval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_char:
+          ev->u.fval = (float) ev->u.cval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.fval = (float) ev->u.wcval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.fval = (float) ev->u.oval;
+          ev->et = AST_Expression::EV_float;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
     case AST_Expression::EV_double:
-      if (ev->u.dval > (double) SHRT_MAX || ev->u.dval < (double) -(SHRT_MAX))
-	return NULL;
-      ev->u.sval = (short) ev->u.dval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          ev->u.dval = (double) ev->u.sval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.dval = (double) ev->u.usval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_long:
+          ev->u.dval = (double) ev->u.lval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_ulong:
+          ev->u.dval = (double) ev->u.ulval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          ev->u.dval = (double) ev->u.llval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          // Some compilers don't implement unsigned 64-bit to double
+          // conversions, so we are stuck with the signed 64-bit max value.
+          if (ev->u.ullval > ACE_INT64_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.dval = (double) ((ACE_CDR::LongLong) ev->u.ullval);
+          ev->et = AST_Expression::EV_double;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return NULL;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.dval = (ev->u.bval == true) ? 1.0 : 0.0;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_float:
+          ev->u.dval = (double) ev->u.fval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_double:
+          return ev;
+        case AST_Expression::EV_char:
+          ev->u.dval = (double) ev->u.cval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_wchar:
+          ev->u.dval = (double) ev->u.wcval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.dval = (double) ev->u.oval;
+          ev->et = AST_Expression::EV_double;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
     case AST_Expression::EV_char:
-      ev->u.sval = (short) ev->u.cval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          if (ev->u.sval > (short) ACE_CHAR_MAX
+              || ev->u.sval < (short) ACE_CHAR_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.sval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_ushort:
+          if (ev->u.usval > (unsigned short) ACE_CHAR_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.usval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval > (long) ACE_CHAR_MAX
+              || ev->u.lval < (long) ACE_CHAR_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.lval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_ulong:
+          if (ev->u.ulval > (unsigned long) ACE_CHAR_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.ulval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > (ACE_CDR::LongLong) ACE_CHAR_MAX
+              || ev->u.llval < (ACE_CDR::LongLong) ACE_CHAR_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.llval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+       case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (( ev->u.ullval & ACE_CHAR_MAX) != ev->u.ullval)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.ullval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.cval = (char) ev->u.bval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval > (float) ACE_CHAR_MAX
+              || ev->u.fval < (float) ACE_CHAR_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.fval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval > (double) ACE_CHAR_MAX
+              || ev->u.dval < (double) ACE_CHAR_MIN)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.dval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_char:
+          return ev;
+        case AST_Expression::EV_wchar:
+          if (ev->u.wcval > (ACE_CDR::WChar) ACE_CHAR_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.cval = (char) ev->u.wcval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_octet:
+          if (ev->u.oval > (unsigned char) ACE_CHAR_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.cval = (char) ev->u.oval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
+    case AST_Expression::EV_wchar:
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          if (ev->u.sval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.sval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_ushort:
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.usval;
+          ev->et = AST_Expression::EV_char;
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval < 0
+              || ev->u.lval > ACE_WCHAR_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.lval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_ulong:
+          if (ev->u.ulval > ACE_WCHAR_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.ulval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval > (ACE_CDR::LongLong) ACE_WCHAR_MAX
+              || ev->u.llval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.llval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if ((ev->u.ullval & ACE_WCHAR_MAX) != ev->u.ullval )
+            {
+                    return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.ullval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.bval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval > (float) ACE_WCHAR_MAX
+              || ev->u.fval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.fval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval > (double) ACE_WCHAR_MAX
+              || ev->u.dval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.dval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_char:
+          if ((signed char) ev->u.cval < 0)
+            {
+              return 0;
+            }
+
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.cval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_wchar:
+          return ev;
+        case AST_Expression::EV_octet:
+          ev->u.wcval = (ACE_CDR::WChar) ev->u.oval;
+          ev->et = AST_Expression::EV_wchar;
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
     case AST_Expression::EV_octet:
-      ev->u.sval = (short) ev->u.oval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
+      switch (ev->et)
+        {
+        case AST_Expression::EV_short:
+          if (ev->u.sval < 0
+              || ev->u.sval > (short) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.sval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_ushort:
+          if (ev->u.usval > (unsigned short) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.usval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_long:
+          if (ev->u.lval < 0
+              || ev->u.lval > (long) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.lval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_ulong:
+          if (ev->u.ulval > (unsigned long) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.ulval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if (ev->u.llval < 0
+              || ev->u.llval > (ACE_CDR::LongLong) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.llval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+          if ((ev->u.ullval & ACE_OCTET_MAX) != ev->u.ullval)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.ullval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+          return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case AST_Expression::EV_bool:
+          ev->u.oval = (unsigned char) ((ev->u.bval == false) ? 1 : 0);
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_float:
+          if (ev->u.fval < 0.0
+              || ev->u.fval > (float) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.fval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_double:
+          if (ev->u.dval < 0.0
+              || ev->u.dval > (double) ACE_OCTET_MAX)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.dval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_char:
+          if ((signed char) ev->u.cval < 0)
+            {
+                    return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.cval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_wchar:
+          if (ev->u.wcval > (ACE_CDR::WChar) ACE_OCTET_MAX)
+            {
+              return 0;
+            }
+
+          ev->u.oval = (unsigned char) ev->u.wcval;
+          ev->et = AST_Expression::EV_octet;
+          return ev;
+        case AST_Expression::EV_octet:
+          return ev;
+        case AST_Expression::EV_longdouble:
+        case AST_Expression::EV_wstring:
+        case AST_Expression::EV_string:
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_void:
+        case AST_Expression::EV_none:
+        case AST_Expression::EV_any:
+        case AST_Expression::EV_object:
+          return 0;
+        }
+    case AST_Expression::EV_enum:
+      switch (ev->et)
+        {
+        case AST_Expression::EV_enum:
+        case AST_Expression::EV_ulong:
+          return ev;
+        default:
+          return 0;
+        }
+    case AST_Expression::EV_void:
+      switch (ev->et)
+        {
+        case AST_Expression::EV_void:
+          return ev;
+        default:
+          return 0;
+        }
+    case AST_Expression::EV_none:
+      return 0;
+    case AST_Expression::EV_string:
+      switch (ev->et)
+        {
+        case AST_Expression::EV_string:
+          return ev;
+        default:
+          return 0;
+        }
+    case AST_Expression::EV_longdouble:
+    case AST_Expression::EV_wstring:
+    case AST_Expression::EV_any:
+    case AST_Expression::EV_object:
+      return 0;
+    }
+
+  return 0;
+}
+
+// Integer literals may not be assigned to floating point constants,
+// and vice versa.
+static bool
+incompatible_types (AST_Expression::ExprType t1,
+                    AST_Expression::ExprType t2)
+{
+  switch (t1)
+  {
+    case AST_Expression::EV_short:
+    case AST_Expression::EV_ushort:
+    case AST_Expression::EV_long:
+    case AST_Expression::EV_ulong:
     case AST_Expression::EV_longlong:
     case AST_Expression::EV_ulonglong:
+    case AST_Expression::EV_octet:
+    case AST_Expression::EV_bool:
+      switch (t2)
+      {
+        case AST_Expression::EV_short:
+        case AST_Expression::EV_ushort:
+        case AST_Expression::EV_long:
+        case AST_Expression::EV_ulong:
+        case AST_Expression::EV_longlong:
+        case AST_Expression::EV_ulonglong:
+        case AST_Expression::EV_octet:
+        case AST_Expression::EV_bool:
+          return 0;
+        default:
+          return 1;
+      }
+    case AST_Expression::EV_float:
+    case AST_Expression::EV_double:
     case AST_Expression::EV_longdouble:
+      switch (t2)
+      {
+        case AST_Expression::EV_float:
+        case AST_Expression::EV_double:
+        case AST_Expression::EV_longdouble:
+          return 0;
+        default:
+          return 1;
+      }
+    case AST_Expression::EV_char:
     case AST_Expression::EV_wchar:
     case AST_Expression::EV_string:
     case AST_Expression::EV_wstring:
+    case AST_Expression::EV_enum:
     case AST_Expression::EV_any:
+    case AST_Expression::EV_object:
     case AST_Expression::EV_void:
     case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_ushort:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      if (ev->u.sval < 0)
-	return NULL;
-      ev->u.usval = (unsigned short) ev->u.sval;
-      ev->et = AST_Expression::EV_ushort;
-      return ev;
-    case AST_Expression::EV_ushort:
-      return ev;
-    case AST_Expression::EV_long:
-      if (ev->u.lval > (long) (SHRT_MAX << 1) || ev->u.lval < 0)
-	return NULL;
-      ev->u.usval = (unsigned short) ev->u.lval;
-      ev->et = AST_Expression::EV_ushort;
-      return ev;
-    case AST_Expression::EV_ulong:
-      if (ev->u.ulval > (unsigned long) (SHRT_MAX << 1))
-	return NULL;
-      ev->u.usval = (unsigned short) ev->u.ulval;
-      ev->et = AST_Expression::EV_ushort;
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.usval = (unsigned short) ev->u.bval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
-    case AST_Expression::EV_float:
-      if (ev->u.fval < 0.0 || ev->u.fval > (float) (SHRT_MAX << 1))
-	return NULL;
-      ev->u.usval = (unsigned short) ev->u.fval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
-    case AST_Expression::EV_double:
-      if (ev->u.dval < 0.0 || ev->u.dval > (double) (SHRT_MAX << 1))
-	return NULL;
-      ev->u.usval = (unsigned short) ev->u.dval;
-      ev->et = AST_Expression::EV_short;
-      return ev;
-    case AST_Expression::EV_char:
-      if ((signed char) ev->u.cval < 0)
-	return NULL;
-      ev->u.usval = (unsigned short) ev->u.cval;
-      ev->et = AST_Expression::EV_ushort;
-      return ev;
-    case AST_Expression::EV_octet:
-      ev->u.usval = (unsigned short) ev->u.oval;
-      ev->et = AST_Expression::EV_ushort;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_long:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      ev->u.lval = (long) ev->u.sval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_ushort:
-      ev->u.lval = (long) ev->u.usval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_long:
-      return ev;
-    case AST_Expression::EV_ulong:
-      if (ev->u.ulval > (unsigned long) LONG_MAX)
-	return NULL;
-      ev->u.lval = (long) ev->u.ulval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.lval = (long) ev->u.bval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_float:
-      if (ev->u.fval > (float) LONG_MAX || ev->u.fval < (float) -(LONG_MAX))
-	return NULL;
-      ev->u.lval = (long) ev->u.fval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_double:
-      if (ev->u.dval > (double) LONG_MAX || ev->u.dval < (double) -(LONG_MAX))
-	return NULL;
-      ev->u.lval = (long) ev->u.dval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_char:
-      ev->u.lval = (long) ev->u.cval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_octet:
-      ev->u.lval = (long) ev->u.oval;
-      ev->et = AST_Expression::EV_long;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_ulong:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      if (ev->u.sval < 0)
-	return NULL;
-      ev->u.ulval = (unsigned long) ev->u.sval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_ushort:
-      ev->u.ulval = (unsigned long) ev->u.usval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_long:
-      if (ev->u.lval < 0)
-	return NULL;
-      ev->u.ulval = (unsigned long) ev->u.lval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_ulong:
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.ulval = (unsigned long) ev->u.bval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_float:
-      if (ev->u.fval < 0.0 || ev->u.fval > (float) LONG_MAX)
-	return NULL;
-      ev->u.ulval = (unsigned long) ev->u.fval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_double:
-      if (ev->u.dval < 0.0 || ev->u.dval > (double) LONG_MAX)
-	return NULL;
-      ev->u.ulval = (unsigned long) ev->u.dval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_char:
-      if ((signed char) ev->u.cval < 0)
-	return NULL;
-      ev->u.ulval = (unsigned long) ev->u.cval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_octet:
-      ev->u.ulval = (unsigned long) ev->u.oval;
-      ev->et = AST_Expression::EV_ulong;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_bool:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      ev->u.bval = (ev->u.sval == 0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_ushort:
-      ev->u.bval = (ev->u.usval == 0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_long:
-      ev->u.bval = (ev->u.lval == 0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_ulong:
-      ev->u.bval = (ev->u.ulval == 0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_bool:
-      return ev;
-    case AST_Expression::EV_float:
-      ev->u.bval = (ev->u.fval == 0.0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_double:
-      ev->u.bval = (ev->u.dval == 0.0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_char:
-      ev->u.bval = (ev->u.cval == 0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_octet:
-      ev->u.bval = (ev->u.oval == 0) ? I_FALSE : I_TRUE;
-      ev->et = AST_Expression::EV_bool;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_float:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      ev->u.fval = (float) ev->u.sval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_ushort:
-      ev->u.fval = (float) ev->u.usval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_long:
-      ev->u.fval = (float) ev->u.lval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_ulong:
-      ev->u.fval = (float) ev->u.ulval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.fval = (float) ((ev->u.bval == I_TRUE) ? 1.0 : 0.0);
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_float:
-      return ev;
-    case AST_Expression::EV_double:
-      if (ev->u.dval > FLT_MAX || ev->u.dval < -FLT_MAX)
-	return NULL;
-      ev->u.fval = (float) ev->u.dval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_char:
-      ev->u.fval = (float) ev->u.cval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_octet:
-      ev->u.fval = (float) ev->u.oval;
-      ev->et = AST_Expression::EV_float;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_double:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      ev->u.dval = (double) ev->u.sval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_ushort:
-      ev->u.dval = (double) ev->u.usval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_long:
-      ev->u.dval = (double) ev->u.lval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_ulong:
-      ev->u.dval = (double) ev->u.ulval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.dval = (ev->u.bval == I_TRUE) ? 1.0 : 0.0;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_float:
-      ev->u.dval = (double) ev->u.fval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_double:
-      return ev;
-    case AST_Expression::EV_char:
-      ev->u.dval = (double) ev->u.cval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_octet:
-      ev->u.dval = (double) ev->u.oval;
-      ev->et = AST_Expression::EV_double;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_char:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      if (ev->u.sval > (short) MAXCHAR || ev->u.sval < (short) -(MAXCHAR))
-	return NULL;
-      ev->u.cval = (char) ev->u.sval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_ushort:
-      if (ev->u.usval > (unsigned short) MAXCHAR)
-	return NULL;
-      ev->u.cval = (char) ev->u.usval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_long:
-      if (ev->u.lval > (long) MAXCHAR || ev->u.lval < (long) -(MAXCHAR))
-	return NULL;
-      ev->u.cval = (char) ev->u.lval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_ulong:
-      if (ev->u.ulval > (unsigned long) MAXCHAR)
-	return NULL;
-      ev->u.cval = (char) ev->u.ulval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.cval = (char) ev->u.bval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_float:
-      if (ev->u.fval > (float) MAXCHAR || ev->u.fval < (float) -(MAXCHAR))
-	return NULL;
-      ev->u.cval = (char) ev->u.fval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_double:
-      if (ev->u.dval > (double) MAXCHAR || ev->u.dval < (double) -(MAXCHAR))
-	return NULL;
-      ev->u.cval = (char) ev->u.dval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_char:
-      return ev;
-    case AST_Expression::EV_octet:
-      if (ev->u.oval > (unsigned char) MAXCHAR)
-	return NULL;
-      ev->u.cval = (char) ev->u.oval;
-      ev->et = AST_Expression::EV_char;
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_octet:
-    switch (ev->et) {
-    case AST_Expression::EV_short:
-      if (ev->u.sval < 0 || ev->u.sval > (short) (MAXCHAR << 1))
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.sval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_ushort:
-      if (ev->u.usval > (unsigned short) (MAXCHAR << 1))
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.usval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_long:
-      if (ev->u.lval < 0 || ev->u.lval > (long) (MAXCHAR << 1))
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.lval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_ulong:
-      if (ev->u.ulval > (unsigned long) (MAXCHAR << 1))
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.ulval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_bool:
-      ev->u.oval = (ev->u.bval == I_FALSE) ? 1 : 0;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_float:
-      if (ev->u.fval < 0.0 || ev->u.fval > (float) (MAXCHAR << 1))
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.fval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_double:
-      if (ev->u.dval < 0.0 || ev->u.dval > (double) (MAXCHAR << 1))
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.dval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_char:
-      if ((signed char) ev->u.cval < 0)
-	return NULL;
-      ev->u.oval = (unsigned char) ev->u.cval;
-      ev->et = AST_Expression::EV_octet;
-      return ev;
-    case AST_Expression::EV_octet:
-      return ev;
-    case AST_Expression::EV_longlong:
-    case AST_Expression::EV_ulonglong:
-    case AST_Expression::EV_longdouble:
-    case AST_Expression::EV_wchar:
-    case AST_Expression::EV_wstring:
-    case AST_Expression::EV_string:
-    case AST_Expression::EV_any:
-    case AST_Expression::EV_void:
-    case AST_Expression::EV_none:
-      return NULL;
-    }
-  case AST_Expression::EV_any:
-    switch (ev->et) {
-    case AST_Expression::EV_any:
-      return ev;
     default:
-      return NULL;
-    }
-  case AST_Expression::EV_void:
-    switch (ev->et) {
-    case AST_Expression::EV_void:
-      return ev;
-    default:
-      return NULL;
-    }
-  case AST_Expression::EV_none:
-    return NULL;
-  case AST_Expression::EV_string:
-    switch (ev->et) {
-    case AST_Expression::EV_string:
-      return ev;
-    default:
-      return NULL;
-    }
-  case AST_Expression::EV_longlong:
-  case AST_Expression::EV_ulonglong:
-  case AST_Expression::EV_longdouble:
-  case AST_Expression::EV_wchar:
-  case AST_Expression::EV_wstring:
-    return NULL;
+      return 0;
   }
-  return NULL;
 }
 
-/*
- * Evaluate the expression wrt the evaluation kind requested. Supported
- * evaluation kinds are
- * - EK_const:		The expression must evaluate to a constant
- * - EK_positive_int:	The expression must further evaluate to a
- *			positive integer
- */
+// Evaluate the expression wrt the evaluation kind requested. Supported
+// evaluation kinds are
+// - EK_const:          The expression must evaluate to a constant
+// - EK_positive_int:   The expression must further evaluate to a
+// positive integer
+
+// @@(JP) This just maps one enum to another. It's a temporary fix,
+// but AST_Expression::EvalKind should go eventually.
 static AST_Expression::AST_ExprValue *
-eval_kind(AST_Expression::AST_ExprValue *ev, AST_Expression::EvalKind ek)
+eval_kind (AST_Expression::AST_ExprValue *ev, AST_Expression::EvalKind ek)
 {
-  if (ek == AST_Expression::EK_const)
-    return ev;
-  if (ek == AST_Expression::EK_positive_int)
-    return coerce_value(ev, AST_Expression::EV_ulong);
+  // Make a copy to simplify the memory management logic.
+  AST_Expression::AST_ExprValue *newval = 0;
+  ACE_NEW_RETURN (newval,
+                  AST_Expression::AST_ExprValue,
+                  0);
+                  
+  if (ev != 0)
+    {
+      *newval = *ev;
+    }
+    
+  AST_Expression::AST_ExprValue *retval = 0;
 
-  return NULL;
+  switch (ek)
+  {
+    case AST_Expression::EK_const:
+      retval = newval;
+      break;
+    case AST_Expression::EK_positive_int:
+      retval = coerce_value (newval, AST_Expression::EV_ulong);
+      break;
+    case AST_Expression::EK_short:
+      retval = coerce_value (newval, AST_Expression::EV_short);
+      break;
+    case AST_Expression::EK_ushort:
+      retval = coerce_value (newval, AST_Expression::EV_ushort);
+      break;
+    case AST_Expression::EK_long:
+      retval = coerce_value (newval, AST_Expression::EV_long);
+      break;
+    case AST_Expression::EK_ulong:
+      retval = coerce_value (newval, AST_Expression::EV_ulong);
+      break;
+#if ! defined (ACE_LACKS_LONGLONG_T)
+    case AST_Expression::EK_longlong:
+      retval = coerce_value (newval, AST_Expression::EV_longlong);
+      break;
+    case AST_Expression::EK_ulonglong:
+      retval = coerce_value (newval, AST_Expression::EV_ulonglong);
+      break;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case AST_Expression::EK_octet:
+      retval = coerce_value (newval, AST_Expression::EV_octet);
+      break;
+    case AST_Expression::EK_bool:
+      retval = coerce_value (newval, AST_Expression::EV_bool);
+      break;
+    default:
+      break;
+  }
+  
+  // Sometimes the call above to coerce_value() will return an
+  // evaluated newval, other times 0. But a heap-allocated 
+  // ExprValue is not always passed to coerce_value(), so we
+  // have to manage it here, where we know it is always a 'new'.
+  if (retval != newval)
+    {
+      delete newval;
+      newval = 0;
+    }
+    
+  return retval;
 }
 
-/*
- * Private operations
- */
+// Private operations.
 
-/*
- * Apply binary operators to an AST_Expression after evaluating
- * its sub-expressions.
- * Operations supported:
- *
- * '+', '-', '*', '/'
- */
+// @@@ (JP) CORBA 2.6 and earlier say that in a constant expression,
+// each subexpression must fall within the range of the assigned type.
+// However, this may be hard for the compiler in some cases (must
+// evaluate all grouping possibilities). So there is an outstanding
+// issue, #1139, and the best guess is that it will ultimately be
+// decided that only the final value must fall within the range of
+// the assigned type. So there are no checks here, only in coerce().
+
+// Apply binary operators to an AST_Expression after evaluating
+// its sub-expressions.
+// Operations supported: '+', '-', '*', '/'
 AST_Expression::AST_ExprValue *
-AST_Expression::eval_bin_op(AST_Expression::EvalKind ek)
+AST_Expression::eval_bin_op (AST_Expression::EvalKind ek)
 {
-  AST_ExprValue	*retval = NULL;
+  AST_ExprValue *retval = 0;
 
-  if (ek != EK_const && ek != EK_positive_int)
-    return NULL;
-  if (pd_v1 == NULL || pd_v2 == NULL)
-    return NULL;
-  pd_v1->set_ev(pd_v1->eval_internal(ek));
-  if (pd_v1->ev() == NULL)
-    return NULL;
-  pd_v1->set_ev(pd_v1->coerce(EV_double));
-  if (pd_v1->ev() == NULL)
-    return NULL;
-  pd_v2->set_ev(pd_v2->eval_internal(ek));
-  if (pd_v2->ev() == NULL)
-    return NULL;
-  pd_v2->set_ev(pd_v2->coerce(EV_double));
-  if (pd_v2->ev() == NULL)
-    return NULL;
+  if (this->pd_v1 == 0 || this->pd_v2 == 0)
+    {
+      return 0;
+    }
 
-  retval = new AST_ExprValue;
-  retval->et = EV_double;
+  this->pd_v1->set_ev (this->pd_v1->eval_internal (ek));
+  this->pd_v2->set_ev (this->pd_v2->eval_internal (ek));
 
-  switch (pd_ec) {
-  case EC_mod:
-    if (pd_v2->ev()->u.lval == 0)
-      return NULL;
-    retval->u.lval = pd_v1->ev()->u.lval % pd_v2->ev()->u.lval;
-    break;
+  if (this->pd_v1->ev () == 0 || this->pd_v2->ev () == 0)
+    {
+      return 0;
+    }
+
+  ACE_NEW_RETURN (retval,
+                  AST_ExprValue,
+                  0);
+
+#if !defined (ACE_LACKS_LONGLONG_T)
+  if (ek == EK_ulonglong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_ulonglong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_ulonglong));
+      retval->et = EV_ulonglong;
+
+      switch (this->pd_ec)
+  {
   case EC_add:
-    retval->u.dval = pd_v1->ev()->u.dval + pd_v2->ev()->u.dval;
+    retval->u.ullval =
+      this->pd_v1->ev ()->u.ullval + this->pd_v2->ev ()->u.ullval;
     break;
   case EC_minus:
-    retval->u.dval = pd_v1->ev()->u.dval - pd_v2->ev()->u.dval;
+    retval->u.ullval =
+      this->pd_v1->ev ()->u.ullval - this->pd_v2->ev ()->u.ullval;
     break;
   case EC_mul:
-    retval->u.dval = pd_v1->ev()->u.dval * pd_v2->ev()->u.dval;
+    retval->u.ullval =
+      this->pd_v1->ev ()->u.ullval * this->pd_v2->ev ()->u.ullval;
     break;
   case EC_div:
-    if (pd_v2->ev()->u.dval == 0.0)
-      return NULL;
-    retval->u.dval = pd_v1->ev()->u.dval / pd_v2->ev()->u.dval;
+    if (this->pd_v2->ev ()->u.ullval == 0)
+      {
+        return 0;
+      }
+
+    retval->u.ullval =
+      this->pd_v1->ev ()->u.ullval / this->pd_v2->ev  ()->u.ullval;
     break;
   default:
-    return NULL;
+    return 0;
   }
+    }
+  else if (ek == EK_longlong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_longlong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_longlong));
+      retval->et = EV_longlong;
+
+      switch (this->pd_ec)
+  {
+  case EC_add:
+    retval->u.llval =
+      this->pd_v1->ev ()->u.llval + this->pd_v2->ev ()->u.llval;
+    break;
+  case EC_minus:
+    retval->u.llval =
+      this->pd_v1->ev ()->u.llval - this->pd_v2->ev ()->u.llval;
+    break;
+  case EC_mul:
+    retval->u.llval =
+      this->pd_v1->ev ()->u.llval * this->pd_v2->ev ()->u.llval;
+    break;
+  case EC_div:
+    if (this->pd_v2->ev ()->u.llval == 0)
+      {
+        return 0;
+      }
+
+    retval->u.llval =
+      this->pd_v1->ev ()->u.llval / this->pd_v2->ev  ()->u.llval;
+    break;
+  default:
+    return 0;
+  }
+    }
+  else
+#endif
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_double));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_double));
+      retval->et = EV_double;
+
+      switch (this->pd_ec)
+  {
+  case EC_add:
+    retval->u.dval =
+      this->pd_v1->ev ()->u.dval + this->pd_v2->ev ()->u.dval;
+    break;
+  case EC_minus:
+    retval->u.dval =
+      this->pd_v1->ev ()->u.dval - this->pd_v2->ev ()->u.dval;
+    break;
+  case EC_mul:
+    retval->u.dval =
+      this->pd_v1->ev ()->u.dval * this->pd_v2->ev ()->u.dval;
+    break;
+  case EC_div:
+    if (this->pd_v2->ev ()->u.dval == 0.0)
+      {
+        return 0;
+      }
+
+    retval->u.dval =
+      this->pd_v1->ev ()->u.dval / this->pd_v2->ev  ()->u.dval;
+    break;
+  default:
+    return 0;
+  }
+    }
+
+  return retval;
+}
+// Apply binary operators to an AST_Expression after evaluating
+// its sub-expressions.
+// Operations supported: '%'
+AST_Expression::AST_ExprValue *
+AST_Expression::eval_mod_op (AST_Expression::EvalKind ek)
+{
+  AST_ExprValue *retval = 0;
+
+  if (this->pd_v1 == 0 || this->pd_v2 == 0)
+    {
+      return 0;
+    }
+
+  this->pd_v1->set_ev (this->pd_v1->eval_internal (ek));
+  this->pd_v2->set_ev (this->pd_v2->eval_internal (ek));
+
+  if (this->pd_v1->ev () == 0 || this->pd_v2->ev () == 0)
+    {
+      return 0;
+    }
+
+  ACE_NEW_RETURN (retval,
+                  AST_ExprValue,
+                  0);
+
+#if !defined (ACE_LACKS_LONGLONG_T)
+  if (ek == EK_ulonglong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_ulonglong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_ulonglong));
+      retval->et = EV_ulonglong;
+
+      if (this->pd_v2->ev ()->u.ullval == 0)
+  {
+    return 0;
+  }
+
+      retval->u.ullval =
+  this->pd_v1->ev ()->u.ullval % this->pd_v2->ev ()->u.ullval;
+    }
+  else if (ek == EK_longlong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_longlong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_longlong));
+      retval->et = EV_longlong;
+
+      if (this->pd_v2->ev ()->u.llval == 0)
+  {
+    return 0;
+  }
+
+      retval->u.llval =
+  this->pd_v1->ev ()->u.llval % this->pd_v2->ev ()->u.llval;
+    }
+  else
+#endif
+  if (ek == EK_ulong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_ulong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_ulong));
+      retval->et = EV_ulong;
+
+      if (this->pd_v2->ev ()->u.ulval == 0)
+  {
+    return 0;
+  }
+
+      retval->u.ulval =
+  this->pd_v1->ev ()->u.ulval % this->pd_v2->ev ()->u.ulval;
+    }
+  else if (ek == EK_long)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_long));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_long));
+      retval->et = EV_long;
+
+      if (this->pd_v2->ev ()->u.lval == 0)
+  {
+    return 0;
+  }
+
+      retval->u.lval =
+  this->pd_v1->ev ()->u.lval % this->pd_v2->ev ()->u.lval;
+    }
+  else
+    {
+      return 0;
+    }
+
   return retval;
 }
 
-/*
- * Apply bitwise operations to an AST_Expression after evaluating
- * its sub-expressions.
- * Operations supported:
- *
- * '%', '|', '&', '^', '<<', '>>'
- */
+// Apply bitwise operations to an AST_Expression after evaluating
+// its sub-expressions.
+// Operations supported: '%', '|', '&', '^', '<<', '>>'
 AST_Expression::AST_ExprValue *
-AST_Expression::eval_bit_op(AST_Expression::EvalKind ek)
+AST_Expression::eval_bit_op (AST_Expression::EvalKind ek)
 {
-  AST_Expression::AST_ExprValue	*retval=NULL;
+  AST_Expression::AST_ExprValue *retval = 0;
 
-  if (ek != EK_const && ek != EK_positive_int)
-    return NULL;
-  if (pd_v1 == NULL || pd_v2 == NULL)
-    return NULL;
-  pd_v1->set_ev(pd_v1->eval_internal(ek));
-  if (pd_v1->ev() == NULL)
-    return NULL;
-  pd_v1->set_ev(pd_v1->coerce(EV_long));
-  if (pd_v1->ev() == NULL)
-    return NULL;
-  pd_v2->set_ev(pd_v2->eval_internal(ek));
-  if (pd_v2->ev() == NULL)
-    return NULL;
-  pd_v2->set_ev(pd_v2->coerce(EV_long));
-  if (pd_v2->ev() == NULL)
-    return NULL;
+  if (this->pd_v1 == 0 || this->pd_v2 == 0)
+    {
+      return 0;
+    }
 
-  retval = new AST_ExprValue;
-  retval->et = EV_long;
+  this->pd_v1->set_ev (this->pd_v1->eval_internal (ek));
+  this->pd_v2->set_ev (this->pd_v2->eval_internal (ek));
 
-  switch (pd_ec) {
-  case EC_or:
-    retval->u.lval = pd_v1->ev()->u.lval | pd_v2->ev()->u.lval;
-    break;
-  case EC_xor:
-    retval->u.lval = pd_v1->ev()->u.lval ^ pd_v2->ev()->u.lval;
-    break;
-  case EC_and:
-    retval->u.lval = pd_v1->ev()->u.lval & pd_v2->ev()->u.lval;
-    break;
-  case EC_left:
-    retval->u.lval = pd_v1->ev()->u.lval << pd_v2->ev()->u.lval;
-    break;
-  case EC_right:
-    retval->u.lval = pd_v1->ev()->u.lval >> pd_v2->ev()->u.lval;
-    break;
-  default:
-    return NULL;
+  if (this->pd_v1->ev () == 0 || this->pd_v2->ev () == 0 )
+    {
+      return 0;
+    }
+
+  ACE_NEW_RETURN (retval,
+                  AST_ExprValue,
+                  0);
+
+#if !defined (ACE_LACKS_LONGLONG_T)
+  if (ek == EK_ulonglong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_ulonglong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_ulonglong));
+      retval->et = EV_ulonglong;
+
+      switch (this->pd_ec)
+  {
+        case EC_or:
+          retval->u.ullval =
+            this->pd_v1->ev ()->u.ullval | this->pd_v2->ev ()->u.ullval;
+          break;
+        case EC_xor:
+          retval->u.ullval =
+            this->pd_v1->ev ()->u.ullval ^ this->pd_v2->ev ()->u.ullval;
+          break;
+        case EC_and:
+          retval->u.ullval =
+            this->pd_v1->ev ()->u.ullval & this->pd_v2->ev ()->u.ullval;
+          break;
+        case EC_left:
+          retval->u.ullval =
+            this->pd_v1->ev ()->u.ullval << this->pd_v2->ev ()->u.ullval;
+          break;
+        case EC_right:
+          retval->u.ullval =
+            this->pd_v1->ev ()->u.ullval >> this->pd_v2->ev ()->u.ullval;
+          break;
+        default:
+          return 0;
   }
+    }
+  else if (ek == EK_longlong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_longlong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_longlong));
+      retval->et = EV_longlong;
+
+      switch (this->pd_ec)
+        {
+          case EC_or:
+            retval->u.llval =
+              this->pd_v1->ev ()->u.llval | this->pd_v2->ev ()->u.llval;
+            break;
+          case EC_xor:
+            retval->u.llval =
+              this->pd_v1->ev ()->u.llval ^ this->pd_v2->ev ()->u.llval;
+            break;
+          case EC_and:
+            retval->u.llval =
+              this->pd_v1->ev ()->u.llval & this->pd_v2->ev ()->u.llval;
+            break;
+          case EC_left:
+            retval->u.llval =
+              this->pd_v1->ev ()->u.llval << this->pd_v2->ev ()->u.llval;
+            break;
+          case EC_right:
+            retval->u.llval =
+              this->pd_v1->ev ()->u.llval >> this->pd_v2->ev ()->u.llval;
+            break;
+          default:
+            return 0;
+        }
+    }
+  else
+#endif
+  if (ek == EK_ulong)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_ulong));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_ulong));
+      retval->et = EV_ulong;
+
+      switch (this->pd_ec)
+  {
+        case EC_or:
+          retval->u.ulval =
+            this->pd_v1->ev ()->u.ulval | this->pd_v2->ev ()->u.ulval;
+          break;
+        case EC_xor:
+          retval->u.ulval =
+            this->pd_v1->ev ()->u.ulval ^ this->pd_v2->ev ()->u.ulval;
+          break;
+        case EC_and:
+          retval->u.ulval =
+            this->pd_v1->ev ()->u.ulval & this->pd_v2->ev ()->u.ulval;
+          break;
+        case EC_left:
+          retval->u.ulval =
+            this->pd_v1->ev ()->u.ulval << this->pd_v2->ev ()->u.ulval;
+          break;
+        case EC_right:
+          retval->u.ulval =
+            this->pd_v1->ev ()->u.ulval >> this->pd_v2->ev ()->u.ulval;
+          break;
+        default:
+          return 0;
+  }
+    }
+  else if (ek == EK_long)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_long));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_long));
+      retval->et = EV_long;
+
+      switch (this->pd_ec)
+  {
+        case EC_or:
+          retval->u.lval =
+            this->pd_v1->ev ()->u.lval | this->pd_v2->ev ()->u.lval;
+          break;
+        case EC_xor:
+          retval->u.lval =
+            this->pd_v1->ev ()->u.lval ^ this->pd_v2->ev ()->u.lval;
+          break;
+        case EC_and:
+          retval->u.lval =
+            this->pd_v1->ev ()->u.lval & this->pd_v2->ev ()->u.lval;
+          break;
+        case EC_left:
+          retval->u.lval =
+            this->pd_v1->ev ()->u.lval << this->pd_v2->ev ()->u.lval;
+          break;
+        case EC_right:
+          retval->u.lval =
+            this->pd_v1->ev ()->u.lval >> this->pd_v2->ev ()->u.lval;
+          break;
+        default:
+          return 0;
+  }
+    }
+  else if (ek == EK_bool)
+    {
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_bool));
+      this->pd_v2->set_ev (this->pd_v2->coerce (EV_bool));
+      retval->et = EV_bool;
+
+      switch (this->pd_ec)
+      {
+        case EC_or:
+          retval->u.bval =
+            this->pd_v1->ev ()->u.bval | this->pd_v2->ev ()->u.bval;
+          break;
+        case EC_xor:
+          retval->u.bval =
+            this->pd_v1->ev ()->u.bval ^ this->pd_v2->ev ()->u.bval;
+          break;
+        case EC_and:
+          retval->u.bval =
+            this->pd_v1->ev ()->u.bval & this->pd_v2->ev ()->u.bval;
+          break;
+        case EC_left:
+          retval->u.bval =
+            this->pd_v1->ev ()->u.ulval << this->pd_v2->ev ()->u.ulval;
+          break;
+        case EC_right:
+          retval->u.bval =
+            this->pd_v1->ev ()->u.ulval >> this->pd_v2->ev ()->u.ulval;
+          break;
+        default:
+          return 0;
+      }
+    }
+  else
+    {
+      return 0;
+    }
+
   return retval;
 }
 
-/*
- * Apply unary operators to an AST_Expression after evaluating its
- * sub-expression.
- * Operations supported:
- *
- * '-', '+', '~'
- */
+// Apply unary operators to an AST_Expression after evaluating its
+// sub-expression.
+// Operations supported: '-', '+', '~'
 AST_Expression::AST_ExprValue *
-AST_Expression::eval_un_op(AST_Expression::EvalKind ek)
+AST_Expression::eval_un_op (AST_Expression::EvalKind ek)
 {
-  AST_ExprValue	*retval = NULL;
+  AST_ExprValue *retval = 0;
 
-  if (pd_ev != NULL)
-    return pd_ev;
+  if (this->pd_ev != 0)
+    {
+      return this->pd_ev;
+    }
 
-  if (ek != EK_const && ek != EK_positive_int)
-    return NULL;
-  if (pd_v1 == NULL)
-    return NULL;
-  pd_v1->set_ev(pd_v1->eval_internal(ek));
-  if (pd_v1->ev() == NULL)
-    return NULL;
-  pd_v1->set_ev(pd_v1->coerce(EV_double));
-  if (pd_v1->ev() == NULL)
-    return NULL;
+  if (this->pd_v1 == 0)
+    {
+      return 0;
+    }
 
-  retval = new AST_ExprValue;
+  this->pd_v1->set_ev (this->pd_v1->eval_internal (ek));
+
+  if (this->pd_v1->ev () == 0)
+    {
+      return 0;
+    }
+
+  ACE_NEW_RETURN (retval,
+                  AST_ExprValue,
+                  0);
+
   retval->et = EV_double;
 
-  switch (pd_ec) {
-  case EC_u_plus:
-    retval->u.lval = pd_v1->ev()->u.lval;
-    break;
-  case EC_u_minus:
-    retval->u.lval = -(pd_v1->ev()->u.lval);
-    break;
-  case EC_bit_neg:
-    pd_v1->set_ev(pd_v1->coerce(EV_long));
-    if (pd_v1->ev() == NULL)
-      return NULL;
-    retval->u.lval = ~pd_v1->ev()->u.lval;
-    break;
-  default:
-    return NULL;
+  switch (this->pd_ec)
+    {
+    case EC_u_plus:
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_double));
+
+      if (this->pd_v1->ev () == 0)
+        {
+          return 0;
+        }
+
+      retval->u.dval = this->pd_v1->ev ()->u.dval;
+      break;
+    case EC_u_minus:
+      this->pd_v1->set_ev (this->pd_v1->coerce (EV_double));
+
+      if (this->pd_v1->ev () == 0)
+        {
+          return 0;
+        }
+
+      retval->u.dval = -(this->pd_v1->ev ()->u.dval);
+      break;
+    case EC_bit_neg:
+      if (this->pd_v1->ev () == 0)
+        {
+          return 0;
+        }
+
+      switch (this->pd_v1->ev ()->et)
+      {
+        case EV_short:
+          retval->et = EV_short;
+          retval->u.sval = ~this->pd_v1->ev ()->u.sval;
+          break;
+        case EV_ushort:
+          retval->et = EV_ushort;
+          retval->u.usval = ~this->pd_v1->ev ()->u.usval;
+          break;
+        case EV_long:
+          retval->et = EV_long;
+          retval->u.lval = ~this->pd_v1->ev ()->u.lval;
+          break;
+        case EV_ulong:
+          retval->et = EV_ulong;
+          retval->u.ulval = ~this->pd_v1->ev ()->u.ulval;
+          break;
+#if ! defined (ACE_LACKS_LONGLONG_T)
+        case EV_longlong:
+          retval->et = EV_longlong;
+          retval->u.llval = ~this->pd_v1->ev ()->u.llval;
+          break;
+        case EV_ulonglong:
+          retval->et = EV_ulonglong;
+          retval->u.ullval = ~this->pd_v1->ev ()->u.ullval;
+          break;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+        case EV_octet:
+          retval->et = EV_octet;
+          retval->u.oval = ~this->pd_v1->ev ()->u.oval;
+          break;
+        default:
+          return 0;
+      }
+
+      break;
+    default:
+      return 0;
   }
+
   return retval;
 }
 
-/*
- * Evaluate a symbolic AST_Expression by looking up the named
- * symbol.
- */
+// Evaluate a symbolic AST_Expression by looking up the named
+// symbol.
 AST_Expression::AST_ExprValue *
-AST_Expression::eval_symbol(AST_Expression::EvalKind ek)
+AST_Expression::eval_symbol (AST_Expression::EvalKind ek)
 {
-  UTL_Scope		*s = 0;
-  AST_Decl		*d = 0;
-  AST_Constant		*c = 0;
+  UTL_Scope     *s = 0;
+  AST_Decl *d = 0;
+  AST_Constant *c = 0;
 
-  /*
-   * Is there a symbol stored?
-   */
-  if (pd_n == NULL) {
-    idl_global->err()->eval_error(this);
-    return NULL;
-  }
-  /*
-   * Get current scope for lookup
-   */
-  if (idl_global->scopes()->depth() > 0)
-     s = idl_global->scopes()->top_non_null();
-  if (s == NULL) {
-    idl_global->err()->lookup_error(pd_n);
-    return NULL;
-  }
-  /*
-   * Do lookup
-   */
-  d = s->lookup_by_name(pd_n, I_TRUE);
-  if (d == NULL) {
-    idl_global->err()->lookup_error(pd_n);
-    return NULL;
-  }
-  /*
-   * Is it a constant?
-   */
-  if (d->node_type() != AST_Decl::NT_const &&
-      d->node_type() != AST_Decl::NT_enum_val) {
-    idl_global->err()->constant_expected(pd_n, d);
-    return NULL;
-  }
-  /*
-   * OK, now evaluate the constant we just got, to produce its value
-   */
-  c = AST_Constant::narrow_from_decl(d);
-  if (c == NULL) return NULL;
-  return c->constant_value()->eval_internal(ek);
+  // Is there a symbol stored?
+  if (this->pd_n == 0)
+    {
+      idl_global->err ()->eval_error  (this);
+      return 0;
+    }
+
+  // Get current scope for lookup.
+  if (idl_global->scopes ().depth () > 0)
+    {
+      s = idl_global->scopes ().top_non_null ();
+    }
+
+  if (s == 0)
+    {
+      idl_global->err ()->lookup_error (this->pd_n);
+      return 0;
+    }
+
+  // Do lookup.
+  d = s->lookup_by_name (this->pd_n,
+                         true);
+
+  if (d == 0)
+    {
+      idl_global->err ()->lookup_error (this->pd_n);
+      return 0;
+    }
+
+  // Is it a constant?
+  if (d->node_type () != AST_Decl::NT_const
+      && d->node_type () != AST_Decl::NT_enum_val)
+    {
+      idl_global->err ()->constant_expected (this->pd_n,
+                                             d);
+      return 0;
+    }
+
+  // OK, now evaluate the constant we just got, to produce its value.
+  c = AST_Constant::narrow_from_decl (d);
+
+  if (c == 0)
+    {
+      return 0;
+    }
+
+  return c->constant_value ()->eval_internal (ek);
 }
 
-/*
- * Coerce "this" to the ExprType required. Returns a copy of the
- * original ExprValue with the coercion applied, if successful, or
- * NULL if failed.
- */
-AST_Expression::AST_ExprValue *
-AST_Expression::coerce(AST_Expression::ExprType t)
+bool
+AST_Expression::type_mismatch (AST_Expression::ExprType t)
 {
-  AST_ExprValue *copy;
+  if (this->pd_ev != 0)
+    {
+      return incompatible_types (this->pd_ev->et, t);
+    }
 
-  /*
-   * Is it already of the right type?
-   */
-  if (pd_ev != NULL && pd_ev->et == t)
-    return pd_ev;
-  /*
-   * OK, must coerce
-   *
-   * First, evaluate it, then try to coerce result type
-   * If already evaluated, return the result
-   */
-  pd_ev = eval_internal(EK_const);
-  if (pd_ev == NULL)
-    return NULL;
+  bool v1_mismatch = 0;
+  bool v2_mismatch = 0;
 
-  /*
-   * Create a copy to contain coercion result
-   */
-  copy = new AST_ExprValue;
+  if (this->pd_v1 != 0)
+    {
+      v1_mismatch = this->pd_v1->type_mismatch (t);
+    }
 
-  copy->et = pd_ev->et;
-  switch (pd_ev->et) {
-  case EV_longlong:
-  case EV_ulonglong:
-  case EV_longdouble:
-  case EV_wchar:
-  case EV_wstring:
-  case EV_void:
-  case EV_none:
-  case EV_any:
-    return NULL;
-  case EV_short:
-    copy->u.sval = pd_ev->u.sval;
-    break;
-  case EV_ushort:
-    copy->u.usval = pd_ev->u.usval;
-    break;
-  case EV_long:
-    copy->u.lval = pd_ev->u.lval;
-    break;
-  case EV_ulong:
-    copy->u.ulval = pd_ev->u.ulval;
-    break;
-  case EV_bool:
-    copy->u.bval = pd_ev->u.bval;
-    break;
-  case EV_float:
-    copy->u.fval = pd_ev->u.fval;
-    break;
-  case EV_double:
-    copy->u.dval = pd_ev->u.dval;
-    break;
-  case EV_char:
-    copy->u.cval = pd_ev->u.cval;
-    break;
-  case EV_octet:
-    copy->u.oval = pd_ev->u.oval;
-    break;
-  case EV_string:
-    copy->u.strval = pd_ev->u.strval;
-    break;
+  if (this->pd_v2 != 0)
+    {
+      v2_mismatch = this->pd_v2->type_mismatch (t);
+    }
+
+  return v1_mismatch | v2_mismatch;
+}
+
+// Coerce "this" to the ExprType required. Returns a copy of the
+// original ExprValue with the coercion applied, if successful, or
+// 0 if failed.
+AST_Expression::AST_ExprValue *
+AST_Expression::check_and_coerce (AST_Expression::ExprType t,
+                                  AST_Decl *d)
+{
+  if (d != 0)
+    {
+      AST_Decl *enum_val =
+        idl_global->scopes ().top_non_null ()->lookup_by_name (this->pd_n,
+                                                               1);
+
+      if (enum_val != 0)
+        {
+          AST_Decl *enum_decl = ScopeAsDecl (enum_val->defined_in ());
+
+          if (d->node_type () == AST_Decl::NT_typedef)
+            {
+              AST_Typedef *td = AST_Typedef::narrow_from_decl (d);
+              d = td->primitive_base_type ();
+            }
+
+          if (d != enum_decl)
+            {
+              idl_global->err ()->incompatible_type_error (this);
+              return 0;
+            }
+        }
+    }
+
+  if (this->type_mismatch (t))
+    {
+      idl_global->err ()->incompatible_type_error (this);
+      return 0;
+    }
+
+  if (d != 0 && d->node_type () == AST_Decl::NT_typedef)
+    {
+      this->tdef = d;
+    }
+
+  return this->coerce (t);
+}
+
+// Coerce "this" to the ExprType required. Returns a copy of the
+// original ExprValue with the coercion applied, if successful, or
+// 0 if failed.
+AST_Expression::AST_ExprValue *
+AST_Expression::coerce (AST_Expression::ExprType t)
+{
+  AST_ExprValue *tmp = 0;
+
+  // First, evaluate it, then try to coerce result type.
+  // If already evaluated, return the result.
+  switch (t)
+  {
+    case EV_short:
+      tmp = this->eval_internal (EK_short);
+      break;
+    case EV_ushort:
+      tmp = this->eval_internal (EK_ushort);
+      break;
+    case EV_long:
+      tmp = this->eval_internal (EK_long);
+      break;
+    case EV_ulong:
+      tmp = this->eval_internal (EK_ulong);
+      break;
+#if ! defined (ACE_LACKS_LONGLONG_T)
+    case EV_longlong:
+      tmp = this->eval_internal (EK_longlong);
+      break;
+    case EV_ulonglong:
+      tmp = this->eval_internal (EK_ulonglong);
+      break;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_octet:
+      tmp = this->eval_internal (EK_octet);
+      break;
+    case EV_bool:
+      tmp = this->eval_internal (EK_bool);
+      break;
+    default:
+      tmp = this->eval_internal (EK_const);
+      break;
   }
 
-  return coerce_value(copy, t);
-}
+  if (tmp == 0)
+    {
+      return 0;
+    }
+  else
+    {
+      delete this->pd_ev;
+      this->pd_ev = tmp;
+    }
 
-/*
- * Eval used internally
- */
-AST_Expression::AST_ExprValue *
-AST_Expression::eval_internal(AST_Expression::EvalKind ek)
-{
-  /*
-   * Already evaluated?
-   */
-  if (pd_ev != NULL)
-    return eval_kind(pd_ev, ek);
-  /*
-   * OK, must evaluate operator
-   */
-  switch (pd_ec) {
-  case EC_add:
-  case EC_minus:
-  case EC_mul:
-  case EC_div:
-  case EC_mod:
-    pd_ev = eval_bin_op(ek);
-    return eval_kind(pd_ev, ek);
-  case EC_or:
-  case EC_xor:
-  case EC_and:
-  case EC_left:
-  case EC_right:
-    pd_ev = eval_bit_op(ek);
-    return eval_kind(pd_ev, ek);
-  case EC_u_plus:
-  case EC_u_minus:
-  case EC_bit_neg:
-    pd_ev = eval_un_op(ek);
-    return eval_kind(pd_ev, ek);
-  case EC_symbol:
-    pd_ev = eval_symbol(ek);
-    return eval_kind(pd_ev, ek);
-  case EC_none:
-    return NULL;
+  // Create a copy to contain coercion result.
+  AST_ExprValue *copy = 0;
+  ACE_NEW_RETURN (copy,
+                  AST_ExprValue,
+                  0);
+
+  copy->et = this->pd_ev->et;
+
+  switch (this->pd_ev->et)
+  {
+    case EV_longdouble:
+    case EV_void:
+    case EV_none:
+      delete copy;
+      return 0;
+    case EV_enum:
+      copy->u.ulval = this->pd_ev->u.ulval;
+      break;
+    case EV_short:
+      copy->u.sval = this->pd_ev->u.sval;
+      break;
+    case EV_ushort:
+      copy->u.usval = this->pd_ev->u.usval;
+      break;
+    case EV_long:
+      copy->u.lval = this->pd_ev->u.lval;
+      break;
+    case EV_ulong:
+      copy->u.ulval = this->pd_ev->u.ulval;
+      break;
+    case EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      copy->u.llval = this->pd_ev->u.llval;
+      break;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      delete copy;
+      return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      copy->u.ullval = this->pd_ev->u.ullval;
+      break;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      delete copy;
+      return 0;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_bool:
+      copy->u.bval = this->pd_ev->u.bval;
+      break;
+    case EV_float:
+      copy->u.fval = this->pd_ev->u.fval;
+      break;
+    case EV_double:
+      copy->u.dval = this->pd_ev->u.dval;
+      break;
+    case EV_char:
+      copy->u.cval = this->pd_ev->u.cval;
+      break;
+    case EV_wchar:
+      copy->u.wcval = this->pd_ev->u.wcval;
+      break;
+    case EV_octet:
+      copy->u.oval = this->pd_ev->u.oval;
+      break;
+    case EV_string:
+      copy->u.strval = this->pd_ev->u.strval;
+      break;
+    case EV_wstring:
+      copy->u.wstrval = this->pd_ev->u.wstrval;
+      break;
+    default:
+      break;
   }
-  return NULL;
+
+  if (this->pd_ev->et == t)
+    {
+      return copy;
+    }
+  else
+    {
+      return coerce_value (copy,
+                           t);
+    }
 }
 
-/*
- * Public operations
- */
-
-/*
- * Evaluate an AST_Expression, producing an AST_ExprValue or NULL
- */
+// Eval used internally.
 AST_Expression::AST_ExprValue *
-AST_Expression::eval(AST_Expression::EvalKind ek)
+AST_Expression::eval_internal (AST_Expression::EvalKind ek)
 {
-  AST_Expression::AST_ExprValue *v = NULL;
+  // Already evaluated?
+  if (this->pd_ev != 0)
+    {
+      return eval_kind (this->pd_ev,
+                        ek);
+    }
 
-  /*
-   * Call internal evaluator which does not coerce value to
-   * EvalKind-expected format
-   */
-  v = eval_internal(ek);
-  /*
-   * Then coerce according to EvalKind-expected format
-   */
-  return eval_kind(v, ek);
+  if (ek == EK_bool || ek == EK_octet)
+    {
+      // Operators may be used only with integer or floating point types.
+      idl_global->err ()->illegal_infix ();
+      return 0;
+    }
+
+  //  OK, must evaluate operator.
+  switch (this->pd_ec)
+    {
+    case EC_add:
+    case EC_minus:
+    case EC_mul:
+    case EC_div:
+      this->pd_ev = this->eval_bin_op (ek);
+      return eval_kind (this->pd_ev,
+                        ek);
+    case EC_mod:
+      this->pd_ev = this->eval_mod_op (ek);
+      return eval_kind (this->pd_ev,
+                        ek);
+    case EC_or:
+    case EC_xor:
+    case EC_and:
+    case EC_left:
+    case EC_right:
+      this->pd_ev = this->eval_bit_op (ek);
+      return eval_kind (this->pd_ev,
+                        ek);
+    case EC_u_plus:
+    case EC_u_minus:
+    case EC_bit_neg:
+      this->pd_ev = this->eval_un_op (ek);
+      return eval_kind (this->pd_ev,
+                        ek);
+    case EC_symbol:
+      this->pd_ev = this->eval_symbol (ek);
+      return eval_kind (this->pd_ev,
+                        ek);
+    case EC_none:
+      return 0;
+    }
+
+  return 0;
 }
 
-/*
- * Evaluate "this", assigning the value to the pd_ev field.
- */
+// Public operations.
+
+// Evaluate "this", assigning the value to the pd_ev field.
 void
-AST_Expression::evaluate(EvalKind ek)
+AST_Expression::evaluate (EvalKind ek)
 {
-  pd_ev = eval_internal(ek);
-  pd_ev = eval_kind(pd_ev, ek);
+  AST_ExprValue *tmp = eval_kind (this->pd_ev, ek);
+  delete this->pd_ev;
+  this->pd_ev = tmp;
 }
 
-/*
- * Expression equality comparison operator
- */
-long
-AST_Expression::operator==(AST_Expression *vc)
+// Expression equality comparison operator.
+bool
+AST_Expression::operator== (AST_Expression *vc)
 {
-  if (pd_ec != vc->ec())
-    return I_FALSE;
-  evaluate(EK_const);
-  vc->evaluate(EK_const);
-  if (pd_ev == NULL || vc->ev() == NULL)
-    return I_FALSE;
-  if (pd_ev->et != vc->ev()->et)
-    return I_FALSE;
-  switch (pd_ev->et) {
-  case EV_short:
-    return (pd_ev->u.sval == vc->ev()->u.sval) ? I_TRUE : I_FALSE;
-  case EV_ushort:
-    return (pd_ev->u.usval == vc->ev()->u.usval) ? I_TRUE : I_FALSE;
-  case EV_long:
-    return (pd_ev->u.lval == vc->ev()->u.lval) ? I_TRUE : I_FALSE;
-  case EV_ulong:
-    return (pd_ev->u.ulval == vc->ev()->u.ulval) ? I_TRUE : I_FALSE;
-  case EV_float:
-    return (pd_ev->u.fval == vc->ev()->u.fval) ? I_TRUE : I_FALSE;
-  case EV_double:
-    return (pd_ev->u.dval == vc->ev()->u.dval) ? I_TRUE : I_FALSE;
-  case EV_char:
-    return (pd_ev->u.cval == vc->ev()->u.cval) ? I_TRUE : I_FALSE;
-  case EV_octet:
-    return (pd_ev->u.oval == vc->ev()->u.oval) ? I_TRUE : I_FALSE;
-  case EV_bool:
-    return (pd_ev->u.lval == vc->ev()->u.lval) ? I_TRUE : I_FALSE;
-  case EV_string:
-    if (pd_ev->u.strval == NULL) {
-      if (vc->ev()->u.strval == NULL)
-	return I_TRUE;
+  if (this->pd_ec != vc->ec ())
+    {
+      return false;
+    }
+
+  this->evaluate (EK_const);
+  vc->evaluate (EK_const);
+
+  if (pd_ev == 0 || vc->ev() == 0)
+    {
+      return false;
+    }
+
+  if (this->pd_ev->et != vc->ev ()->et)
+    {
+      return false;
+    }
+
+  switch (pd_ev->et)
+    {
+    case EV_short:
+      return this->pd_ev->u.sval == vc->ev ()->u.sval ? true : false;
+    case EV_ushort:
+      return this->pd_ev->u.usval == vc->ev ()->u.usval ? true : false;
+    case EV_long:
+      return this->pd_ev->u.lval == vc->ev ()->u.lval ? true : false;
+    case EV_ulong:
+      return this->pd_ev->u.ulval == vc->ev()->u.ulval ? true : false;
+    case EV_float:
+      return this->pd_ev->u.fval == vc->ev ()->u.fval ? true : false;
+    case EV_double:
+      return this->pd_ev->u.dval == vc->ev ()->u.dval ? true : false;
+    case EV_char:
+      return this->pd_ev->u.cval == vc->ev ()->u.cval ? true : false;
+    case EV_wchar:
+      return this->pd_ev->u.wcval == vc->ev ()->u.wcval ? true : false;
+    case EV_octet:
+      return this->pd_ev->u.oval == vc->ev ()->u.oval ? true : false;
+    case EV_bool:
+      return this->pd_ev->u.lval == vc->ev ()->u.lval ? true : false;
+    case EV_string:
+      if (this->pd_ev->u.strval == 0)
+        {
+          if (vc->ev ()->u.strval == 0)
+            {
+                    return true;
+            }
+          else
+            {
+                    return false;
+            }
+        }
+      else if (vc->ev ()->u.strval == 0)
+        {
+          return false;
+        }
       else
-	return I_FALSE;
-    } else if (vc->ev()->u.strval == NULL)
-      return I_FALSE;
-    else
-      return (pd_ev->u.strval == vc->ev()->u.strval) ? I_TRUE : I_FALSE;
-  case EV_longlong:
-  case EV_ulonglong:
-  case EV_longdouble:
-  case EV_wchar:
-  case EV_wstring:
-  case EV_any:
-  case EV_void:
-  case EV_none:
-    return I_FALSE;
-  }
-  return I_FALSE;
+        {
+          return this->pd_ev->u.strval == vc->ev ()->u.strval
+                   ? true
+                   : false;
+        }
+
+    case EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      return pd_ev->u.llval == vc->ev ()->u.llval ? true : false;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      return false;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      return pd_ev->u.ullval == vc->ev()->u.ullval ? true : false;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      return false;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_longdouble:
+    case EV_wstring:
+    case EV_enum:
+    case EV_void:
+    case EV_none:
+    case EV_any:
+    case EV_object:
+      return false;
+    }
+
+  return false;
 }
 
 long
-AST_Expression::compare(AST_Expression *vc)
+AST_Expression::compare (AST_Expression *vc)
 {
-  if (pd_ec != vc->ec())
-    return I_FALSE;
-  evaluate(EK_const);
-  vc->evaluate(EK_const);
-  if (pd_ev == NULL || vc->ev() == NULL)
-    return I_FALSE;
-  if (pd_ev->et != vc->ev()->et)
-    return I_FALSE;
-  switch (pd_ev->et) {
-  case EV_short:
-    return (pd_ev->u.sval == vc->ev()->u.sval) ? I_TRUE : I_FALSE;
- case EV_ushort:
-    return (pd_ev->u.usval == vc->ev()->u.usval) ? I_TRUE : I_FALSE;
-  case EV_long:
-    return (pd_ev->u.lval == vc->ev()->u.lval) ? I_TRUE : I_FALSE;
-  case EV_ulong:
-    return (pd_ev->u.ulval == vc->ev()->u.ulval) ? I_TRUE : I_FALSE;
-  case EV_float:
-    return (pd_ev->u.fval == vc->ev()->u.fval) ? I_TRUE : I_FALSE;
-  case EV_double:
-    return (pd_ev->u.dval == vc->ev()->u.dval) ? I_TRUE : I_FALSE;
-  case EV_char:
-    return (pd_ev->u.cval == vc->ev()->u.cval) ? I_TRUE : I_FALSE;
-  case EV_octet:
-    return (pd_ev->u.oval == vc->ev()->u.oval) ? I_TRUE : I_FALSE;
-  case EV_bool:
-    return (pd_ev->u.lval == vc->ev()->u.lval) ? I_TRUE : I_FALSE;
-  case EV_string:
-    if (pd_ev->u.strval == NULL) {
-      if (vc->ev()->u.strval == NULL)
-	return I_TRUE;
+  if (this->pd_ec != vc->ec ())
+    {
+      return false;
+    }
+
+  this->evaluate (EK_const);
+  vc->evaluate (EK_const);
+
+  if (this->pd_ev == 0 || vc->ev () == 0)
+    {
+      return false;
+    }
+
+  if (this->pd_ev->et != vc->ev ()->et)
+    {
+      return false;
+    }
+
+  switch (this->pd_ev->et)
+    {
+    case EV_short:
+      return this->pd_ev->u.sval == vc->ev ()->u.sval ? true : false;
+    case EV_ushort:
+      return this->pd_ev->u.usval == vc->ev ()->u.usval ? true : false;
+    case EV_long:
+      return this->pd_ev->u.lval == vc->ev ()->u.lval ? true : false;
+    case EV_ulong:
+      return this->pd_ev->u.ulval == vc->ev ()->u.ulval ? true : false;
+    case EV_float:
+      return this->pd_ev->u.fval == vc->ev ()->u.fval ? true : false;
+    case EV_double:
+      return this->pd_ev->u.dval == vc->ev ()->u.dval ? true : false;
+    case EV_char:
+      return this->pd_ev->u.cval == vc->ev ()->u.cval ? true : false;
+    case EV_wchar:
+      return this->pd_ev->u.wcval == vc->ev ()->u.wcval ? true : false;
+    case EV_octet:
+      return this->pd_ev->u.oval == vc->ev ()->u.oval ? true : false;
+    case EV_bool:
+      return this->pd_ev->u.lval == vc->ev ()->u.lval ? true : false;
+    case EV_string:
+      if (this->pd_ev->u.strval == 0)
+        {
+          if (vc->ev ()->u.strval == 0)
+            {
+                    return true;
+            }
+          else
+            {
+                    return false;
+            }
+        }
+      else if (vc->ev ()->u.strval == 0)
+        {
+          return false;
+        }
       else
-	return I_FALSE;
-    } else if (vc->ev()->u.strval == NULL)
-      return I_FALSE;
-    else
-      return (pd_ev->u.strval == vc->ev()->u.strval) ? I_TRUE : I_FALSE;
-  case EV_longlong:
-  case EV_ulonglong:
-  case EV_longdouble:
-  case EV_wchar:
-  case EV_wstring:
-  case EV_any:
-  case EV_void:
-  case EV_none:
-    return I_FALSE;
-  }
-  return I_FALSE;
+        {
+          return this->pd_ev->u.strval == vc->ev ()->u.strval ? true : false;
+        }
+
+    case EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      return this->pd_ev->u.llval == vc->ev ()->u.llval ? true : false;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      return false;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_ulonglong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+      return this->pd_ev->u.ullval == vc->ev ()->u.ullval ? true : false;
+#else /* ! defined (ACE_LACKS_LONGLONG_T) */
+      return false;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+    case EV_longdouble:
+    case EV_wstring:
+    case EV_enum:
+    case EV_void:
+    case EV_none:
+    case EV_any:
+    case EV_object:
+      return false;
+    }
+
+  return false;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
+AST_Decl *
+AST_Expression::get_tdef (void) const
+{
+  return this->tdef;
+}
 
-/*
- * Helper functions for expression dumpers
- */
+// Helper functions for expression dumpers.
 
-/*
- * Dump this binary AST_Expression node to the ostream o
- */
+// Dump this binary AST_Expression node to the ostream o.
 static void
-dump_binary_expr(ostream &o, char *s, AST_Expression *n1, AST_Expression *n2)
+dump_binary_expr (ACE_OSTREAM_TYPE &o,
+                  const char *s,
+                  AST_Expression *n1,
+                  AST_Expression *n2)
 {
-  if (n1 != NULL) n1->dump(o);
+  if (n1 != 0)
+    {
+      n1->dump (o);
+    }
+
   o << " " << s << " ";
-  if (n2 != NULL) n2->dump(o);
+
+  if (n2 != 0)
+    {
+      n2->dump (o);
+    }
 }
 
-/*
- * Dump this unary AST_Expression node to the ostream o
- */
+// Dump this unary AST_Expression node to the ostream o.
 static void
-dump_unary_expr(ostream &o, char *s, AST_Expression *e)
+dump_unary_expr (ACE_OSTREAM_TYPE &o,
+                 const char *s,
+                 AST_Expression *e)
 {
   o << s;
-  e->dump(o);
+  e->dump (o);
 }
 
-/*
- * Dump the supplied AST_ExprValue to the ostream o
- */
+// Dump the supplied AST_ExprValue to the ostream o.
 static void
-dump_expr_val(ostream &o, AST_Expression::AST_ExprValue *ev)
+dump_expr_val (ACE_OSTREAM_TYPE &o,
+               AST_Expression::AST_ExprValue *ev)
 {
-  switch (ev->et) {
-  case AST_Expression::EV_short:
-    o << ev->u.sval;
+  switch (ev->et)
+    {
+    case AST_Expression::EV_short:
+      o << ev->u.sval;
+      break;
+    case AST_Expression::EV_ushort:
+      o << ev->u.usval;
+      break;
+    case AST_Expression::EV_long:
+      o << ev->u.lval;
+      break;
+    case AST_Expression::EV_ulong:
+      o << ev->u.ulval;
+      break;
+    case AST_Expression::EV_float:
+      o << ev->u.fval;
+      break;
+    case AST_Expression::EV_double:
+      o << ev->u.dval;
+      break;
+    case AST_Expression::EV_char:
+      o << ev->u.cval;
+      break;
+    case AST_Expression::EV_wchar:
+      o << ev->u.wcval;
+      break;
+    case AST_Expression::EV_octet:
+      o << ev->u.oval;
+      break;
+    case AST_Expression::EV_bool:
+      o << (ev->u.bval == true ? "TRUE" : "FALSE");
+      break;
+    case AST_Expression::EV_string:
+      if (ev->u.strval != 0)
+        ev->u.strval->dump(o);
+    case AST_Expression::EV_longlong:
+#if ! defined (ACE_LACKS_LONGLONG_T)
+//      o << ev->u.llval;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
     break;
-  case AST_Expression::EV_ushort:
-    o << ev->u.usval;
-    break;
-  case AST_Expression::EV_long:
-    o << ev->u.lval;
-    break;
-  case AST_Expression::EV_ulong:
-    o << ev->u.ulval;
-    break;
-  case AST_Expression::EV_float:
-    o << ev->u.fval;
-    break;
-  case AST_Expression::EV_double:
-    o << ev->u.dval;
-    break;
-  case AST_Expression::EV_char:
-    o << ev->u.cval;
-    break;
-  case AST_Expression::EV_octet:
-    o << ev->u.oval;
-    break;
-  case AST_Expression::EV_bool:
-    o << (ev->u.bval == I_TRUE) ? "TRUE" : "FALSE";
-    break;
-  case AST_Expression::EV_string:
-    if (ev->u.strval != NULL)
-      ev->u.strval->dump(o);
-  case AST_Expression::EV_longlong:
   case AST_Expression::EV_ulonglong:
-  case AST_Expression::EV_longdouble:
-  case AST_Expression::EV_wchar:
-  case AST_Expression::EV_wstring:
-  case AST_Expression::EV_any:
-  case AST_Expression::EV_none:
-  case AST_Expression::EV_void:
-    break;
-  }
+#if ! defined (ACE_LACKS_LONGLONG_T)
+//      o << ev->u.ullval;
+#endif /* ! defined (ACE_LACKS_LONGLONG_T) */
+      break;
+    case AST_Expression::EV_longdouble:
+    case AST_Expression::EV_wstring:
+    case AST_Expression::EV_enum:
+    case AST_Expression::EV_none:
+    case AST_Expression::EV_void:
+    case AST_Expression::EV_any:
+    case AST_Expression::EV_object:
+      break;
+    }
 }
 
-/*
- * Dump an AST_Expression node to the ostream o
- */
+// Dump an AST_Expression node to the ostream o.
 void
-AST_Expression::dump(ostream &o)
+AST_Expression::dump (ACE_OSTREAM_TYPE &o)
 {
-  /*
-   * See if it was a constant or was evaluated already
-   */
-  if (pd_ev != NULL) {
-    dump_expr_val(o, pd_ev);
-    return;
-  }
-  /*
-   * OK, must print out an expression
-   */
-  switch (pd_ec) {
-    /*
-     * Binary expressions:
-     */
-  case EC_add:
-    dump_binary_expr(o, "+", pd_v1, pd_v2);
-    break;
-  case EC_minus:
-    dump_binary_expr(o, "-", pd_v1, pd_v2);
-    break;
-  case EC_mul:
-    dump_binary_expr(o, "*", pd_v1, pd_v2);
-    break;
-  case EC_div:
-    dump_binary_expr(o, "/", pd_v1, pd_v2);
-    break;
-  case EC_mod:
-    dump_binary_expr(o, "%", pd_v1, pd_v2);
-    break;
-  case EC_or:
-    dump_binary_expr(o, "|", pd_v1, pd_v2);
-    break;
-  case EC_xor:
-    dump_binary_expr(o, "^", pd_v1, pd_v2);
-    break;
-  case EC_and:
-    dump_binary_expr(o, "&", pd_v1, pd_v2);
-    break;
-  case EC_left:
-    dump_binary_expr(o, "<<", pd_v1, pd_v2);
-    break;
-  case EC_right:
-    dump_binary_expr(o, ">>", pd_v1, pd_v2);
-    break;
-    /*
-     * Unary expressions:
-     */
-  case EC_u_plus:
-    dump_unary_expr(o, "+", pd_v1);
-    break;
-  case EC_u_minus:
-    dump_unary_expr(o, "-", pd_v1);
-    break;
-  case EC_bit_neg:
-    dump_unary_expr(o, "~", pd_v1);
-    break;
-    /*
-     * Unevaluated symbol
-     */
-  case EC_symbol:
-    pd_n->dump(o);
-    break;
-  case EC_none:
-    break;
-  default:
-    o << GTDEVEL("unsupported dump mode for expression with ec == ") 
-      << (int) pd_ec ;
-    break;
-  }
+  // See if it was a constant or was evaluated already.
+  if (this->pd_ev != 0)
+    {
+      dump_expr_val (o,
+                     this->pd_ev);
+      return;
+    }
+
+  // OK, must print out an expression.
+  switch (this->pd_ec)
+    {
+    // Binary expressions:
+    case EC_add:
+      dump_binary_expr (o,
+                        "+",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_minus:
+      dump_binary_expr (o,
+                        "-",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_mul:
+      dump_binary_expr (o,
+                        "*",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_div:
+      dump_binary_expr (o,
+                        "/",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_mod:
+      dump_binary_expr (o,
+                        "%",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_or:
+      dump_binary_expr (o,
+                        "|",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_xor:
+      dump_binary_expr (o,
+                        "^",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_and:
+      dump_binary_expr (o,
+                        "&",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_left:
+      dump_binary_expr (o,
+                        "<<",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    case EC_right:
+      dump_binary_expr (o,
+                        ">>",
+                        this->pd_v1,
+                        this->pd_v2);
+      break;
+    // Unary expressions.
+    case EC_u_plus:
+      dump_unary_expr (o,
+                       "+",
+                       this->pd_v1);
+      break;
+    case EC_u_minus:
+      dump_unary_expr (o,
+                       "-",
+                       this->pd_v1);
+      break;
+    case EC_bit_neg:
+      dump_unary_expr (o,
+                       "~",
+                       this->pd_v1);
+      break;
+    // Unevaluated symbol.
+    case EC_symbol:
+      this->pd_n->dump (o);
+      break;
+    case EC_none:
+      break;
+    default:
+      o << ACE_TEXT ("unsupported dump mode for expression with ec == ")
+        << (int) this->pd_ec ;
+      break;
+    }
 }
 
-/*
- * Data accessors
- */
+int
+AST_Expression::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_expression (this);
+}
+
+void
+AST_Expression::destroy (void)
+{
+  if (0 != this->pd_ev && EV_string == this->pd_ev->et)
+    {
+      this->pd_ev->u.strval->destroy ();
+      delete this->pd_ev->u.strval;
+      this->pd_ev->u.strval = 0;
+    }
+
+  delete this->pd_ev;
+  this->pd_ev = 0;
+
+  if (this->pd_v1 != 0)
+    {
+      this->pd_v1->destroy ();
+    }
+
+  if (this->pd_v2 != 0)
+    {
+      this->pd_v2->destroy ();
+    }
+
+  delete this->pd_v1;
+  this->pd_v1 = 0;
+
+  delete this->pd_v2;
+  this->pd_v2 = 0;
+  
+  if (this->pd_n != 0)
+    {
+      this->pd_n->destroy ();
+    }
+    
+  delete this->pd_n;
+  this->pd_n = 0;
+}
+
+// Data accessors.
 
 UTL_Scope *
-AST_Expression::defined_in()
+AST_Expression::defined_in (void)
 {
-  return pd_defined_in;
+  return this->pd_defined_in;
 }
 
 void
-AST_Expression::set_defined_in(UTL_Scope *d)
+AST_Expression::set_defined_in (UTL_Scope *d)
 {
-  pd_defined_in = d;
+  this->pd_defined_in = d;
 }
 
 long
-AST_Expression::line()
+AST_Expression::line (void)
 {
-  return pd_line;
+  return this->pd_line;
 }
 
 void
-AST_Expression::set_line(long l)
+AST_Expression::set_line (long l)
 {
-  pd_line = l;
+  this->pd_line = l;
 }
 
-String *
-AST_Expression::file_name()
+UTL_String *
+AST_Expression::file_name (void)
 {
-  return pd_file_name;
+  return this->pd_file_name;
 }
 
 void
-AST_Expression::set_file_name(String *f)
+AST_Expression::set_file_name (UTL_String *f)
 {
-  pd_file_name = f;
+  this->pd_file_name = f;
 }
 
 AST_Expression::ExprComb
-AST_Expression::ec()
+AST_Expression::ec (void)
 {
-  return pd_ec;
+  return this->pd_ec;
+}
+
+AST_Expression::AST_ExprValue   *
+AST_Expression::ev (void)
+{
+  return this->pd_ev;
 }
 
 void
-AST_Expression::set_ec(AST_Expression::ExprComb new_ec)
+AST_Expression::set_ev (AST_Expression::AST_ExprValue *new_ev)
 {
-  pd_ec = new_ec;
-}
-
-AST_Expression::AST_ExprValue	*
-AST_Expression::ev()
-{
-  return pd_ev;
-}
-
-void
-AST_Expression::set_ev(AST_Expression::AST_ExprValue *new_ev)
-{
-  pd_ev = new_ev;
+  delete this->pd_ev;
+  this->pd_ev = new_ev;
 }
 
 AST_Expression *
-AST_Expression::v1()
+AST_Expression::v1 (void)
 {
-  return pd_v1;
+  return this->pd_v1;
 }
 
 void
-AST_Expression::set_v1(AST_Expression *e)
+AST_Expression::set_v1 (AST_Expression *e)
 {
-
-  pd_v1 = e;
+  this->pd_v1 = e;
 }
 
 AST_Expression *
-AST_Expression::v2()
+AST_Expression::v2 (void)
 {
-  return pd_v2;
+  return this->pd_v2;
 }
 
 void
-AST_Expression::set_v2(AST_Expression *e)
+AST_Expression::set_v2 (AST_Expression *e)
 {
-  pd_v2 = e;
+  this->pd_v2 = e;
 }
 
 UTL_ScopedName *
-AST_Expression::n()
+AST_Expression::n (void)
 {
-  return pd_n;
+  return this->pd_n;
 }
 
 void
-AST_Expression::set_n(UTL_ScopedName *new_n)
+AST_Expression::set_n (UTL_ScopedName *new_n)
 {
-  pd_n = new_n;
+  this->pd_n = new_n;
 }

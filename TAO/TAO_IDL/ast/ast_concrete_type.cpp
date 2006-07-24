@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,47 +62,45 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_concrete_type.cc - Implementation of class AST_ConcreteType
- *
- * AST_ConcreteType nodes denote all non-interface types of IDL.
- * They are AST_Type nodes.
- */
+// AST_ConcreteType nodes denote all non-interface types of IDL.
+// They are AST_Type nodes.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_concrete_type.h"
 
-ACE_RCSID(ast, ast_concrete_type, "$Id$")
+ACE_RCSID (ast, 
+           ast_concrete_type, 
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_ConcreteType::AST_ConcreteType()
+// Constructor(s) and destructor.
+AST_ConcreteType::AST_ConcreteType (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type ()
 {
 }
 
-AST_ConcreteType::AST_ConcreteType(AST_Decl::NodeType nt, UTL_ScopedName *n,
-				     UTL_StrList *p)
-		 : AST_Decl(nt, n, p)
+AST_ConcreteType::AST_ConcreteType (AST_Decl::NodeType nt,
+                                    UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (nt,
+              n),
+    AST_Type (nt,
+              n)
 {
 }
 
-/*
- * Private operations
- */
+AST_ConcreteType::~AST_ConcreteType (void)
+{
+}
 
-/*
- * Public operations
- */
+void
+AST_ConcreteType::destroy (void)
+{
+  this->AST_Type::destroy ();
+}
 
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Narrowing methods
- */
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_ConcreteType, AST_Type)
 IMPL_NARROW_FROM_DECL(AST_ConcreteType)

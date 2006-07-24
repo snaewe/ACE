@@ -18,14 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_typedef.h"
-
-ACE_RCSID(be_visitor_typedef, typedef_ci, "$Id$")
-
+ACE_RCSID (be_visitor_typedef,
+           typedef_ci,
+           "$Id$")
 
 // ******************************************************
 // Typedef visitor for client inline
@@ -43,10 +38,6 @@ be_visitor_typedef_ci::~be_visitor_typedef_ci (void)
 int
 be_visitor_typedef_ci::visit_typedef (be_typedef *node)
 {
-  TAO_OutStream *os; // output stream
-
-  os = this->ctx_->stream ();
-
   // In general, we may have a chain of typedefs. i.e.,
   // typedef sequence<long> X;
   // typedef X Y;
@@ -81,22 +72,24 @@ be_visitor_typedef_ci::visit_typedef (be_typedef *node)
       // grab the most primitive base type in the chain to avoid recusrsively
       // going thru this visit method
       bt = node->primitive_base_type ();
+
       if (!bt)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ch::"
                              "visit_typedef - "
-                             "bad primitive base type\n"
-                             ),  -1);
+                             "bad primitive base type\n"),
+                            -1);
         }
+
       // accept on this base type
       if (bt->accept (this) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ch::"
                              "visit_typedef - "
-                             "failed to accept visitor\n"
-                             ),  -1);
+                             "failed to accept visitor\n"),
+                            -1);
         }
 
       this->ctx_->alias (0);
@@ -109,26 +102,29 @@ be_visitor_typedef_ci::visit_typedef (be_typedef *node)
 
       // grab the immediate base type node
       bt = be_type::narrow_from_decl (node->base_type ());
+
       if (!bt)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ch::"
                              "visit_typedef - "
-                             "bad base type\n"
-                             ),  -1);
+                             "bad base type\n"),
+                            -1);
         }
+
       // accept on this base type
       if (bt->accept (this) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ch::"
                              "visit_typedef - "
-                             "failed to accept visitor\n"
-                             ),  -1);
+                             "failed to accept visitor\n"),
+                            -1);
         }
 
       this->ctx_->tdef (0);
     }
+
   return 0;
 }
 
@@ -137,16 +133,29 @@ be_visitor_typedef_ci::visit_array (be_array *node)
 {
   TAO_OutStream *os = this->ctx_->stream (); // output stream
   be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
-  if (this->ctx_->alias ()) // typedef of a typedef
-    bt = this->ctx_->alias ();
+  // This doesn't catch 'typedef of a typedef' if the node is
+  // imported, so we check for that below before generating
+  // any code.
+  if (this->ctx_->alias ())
+    {
+      // Typedef of a typedef.
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
-  if (bt->node_type () == AST_Decl::NT_array) // direct typedef of a base node
-                                              // type
+  // Is our base type an array node? If so, generate code for that array node.
+  // In the first layer of typedef for an array, cli_hdr_gen() causes us to
+  // skip all the code reached from the first branch. Then the ELSE branch is
+  // skipped and we fail to generate any typedefs for that node. Adding the
+  // check for cli_hdr_gen() to the IF statement keeps it in. Subsequent
+  // layers of typedef, if any, assign the context alias to bt, so we go
+  // straight to the ELSE branch.
+  if (bt->node_type () == AST_Decl::NT_array && bt->cli_inline_gen () == 0)
     {
       // let the base class visitor handle this case
       if (this->be_visitor_typedef::visit_array (node) == -1)
@@ -154,65 +163,80 @@ be_visitor_typedef_ci::visit_array (be_array *node)
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ci::"
                              "visit_array - "
-                             "base class visitor failed \n"
-                             ),  -1);
+                             "base class visitor failed \n"),
+                            -1);
         }
     }
   else
     {
+      if ((bt->imported () && tdef->imported ()) || bt->cli_inline_gen())
+        {
+          // Code below is generated in another file.
+          return 0;
+        }
+
       // generate the inline code for alloc, dup, copy, and free methods
 
       // alloc method
-      os->indent ();
-      *os << "ACE_INLINE " << tdef->name () << "_slice *" << be_nl;
+      *os << be_nl
+          << "ACE_INLINE " << be_nl
+          << tdef->name () << "_slice *" << be_nl;
       *os << tdef->name () << "_alloc (void)" << be_nl;
       *os << "{" << be_idt_nl;
       *os << "return " << bt->name () << "_alloc ();" << be_uidt_nl;
-      *os << "}\n\n";
+      *os << "}" << be_nl << be_nl;
 
       // dup method
-      os->indent ();
-      *os << "ACE_INLINE " << tdef->name () << "_slice *" << be_nl;
-      *os << tdef->name () << "_dup (const " << tdef->name ()
-          << "_slice *_tao_src)" << be_nl;
+      *os << "ACE_INLINE " << be_nl
+          << tdef->name () << "_slice *" << be_nl;
+      *os << tdef->name () << "_dup (" << be_idt << be_idt_nl
+          << "const " << tdef->name ()
+          << "_slice *_tao_src" << be_uidt_nl
+          << ")" << be_uidt_nl;
       *os << "{" << be_idt_nl;
       *os << "return " << bt->name () << "_dup (_tao_src);" << be_uidt_nl;
-      *os << "}\n\n";
+      *os << "}" << be_nl << be_nl;
 
       // copy method
-      os->indent ();
-      *os << "ACE_INLINE void" << be_nl;
-      *os << tdef->name () << "_copy (" << tdef->name ()
-          << "_slice *_tao_dest, const " << tdef->name ()
-          << "_slice *_tao_src)" << be_nl;
+      *os << "ACE_INLINE" << be_nl
+          << "void" << be_nl;
+      *os << tdef->name () << "_copy (" << be_idt << be_idt_nl
+          << tdef->name ()
+          << "_slice *_tao_dest," << be_nl
+          << "const " << tdef->name () << "_slice *_tao_src" << be_uidt_nl
+          << ")" << be_uidt_nl;
       *os << "{" << be_idt_nl;
       *os << bt->name () << "_copy (_tao_dest, _tao_src);" << be_uidt_nl;
-      *os << "}\n\n";
+      *os << "}" << be_nl << be_nl;
 
       // free method
-      os->indent ();
-      *os << "ACE_INLINE void" << be_nl;
-      *os << tdef->name () << "_free (" << tdef->name ()
-          << "_slice *_tao_src)" << be_nl;
+      *os << "ACE_INLINE" << be_nl
+          << "void" << be_nl;
+      *os << tdef->name () << "_free (" << be_idt << be_idt_nl
+          << tdef->name () << "_slice *_tao_src" << be_uidt_nl
+          << ")" << be_uidt_nl;
       *os << "{" << be_idt_nl;
       *os << bt->name () << "_free (_tao_src);" << be_uidt_nl;
-      *os << "}\n\n";
+      *os << "}" << be_nl << be_nl;
     }
+
+  bt->cli_inline_gen (true);
   return 0;
 }
 
 int
 be_visitor_typedef_ci::visit_sequence (be_sequence *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (bt->node_type () == AST_Decl::NT_sequence) // direct typedef of a base node
                                               // type
@@ -223,25 +247,27 @@ be_visitor_typedef_ci::visit_sequence (be_sequence *node)
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ci::"
                              "visit_sequence - "
-                             "base class visitor failed \n"
-                             ),  -1);
+                             "base class visitor failed \n"),
+                            -1);
         }
     }
+
   return 0;
 }
 
 int
 be_visitor_typedef_ci::visit_structure (be_structure *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (bt->node_type () == AST_Decl::NT_struct) // direct typedef of a base node
                                               // type
@@ -252,25 +278,27 @@ be_visitor_typedef_ci::visit_structure (be_structure *node)
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ci::"
                              "visit_structure - "
-                             "base class visitor failed \n"
-                             ),  -1);
+                             "base class visitor failed \n"),
+                            -1);
         }
     }
+
   return 0;
 }
 
 int
 be_visitor_typedef_ci::visit_union (be_union *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (bt->node_type () == AST_Decl::NT_union) // direct typedef of a base node
                                               // type
@@ -281,9 +309,10 @@ be_visitor_typedef_ci::visit_union (be_union *node)
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_typedef_ci::"
                              "visit_union - "
-                             "base class visitor failed \n"
-                             ),  -1);
+                             "base class visitor failed \n"),
+                            -1);
         }
     }
+
   return 0;
 }

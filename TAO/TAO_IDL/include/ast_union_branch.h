@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,48 +62,63 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_UNION_BRANCH_AST_UNION_BRAN_HH
 #define _AST_UNION_BRANCH_AST_UNION_BRAN_HH
 
-// Representation of union branch declaration:
-//
-// A branch of a union is a field with a label
+#include "ast_field.h"
+#include "utl_scoped_name.h"
 
-/*
-** DEPEndencies: ast_field.hh, ast_union_label.hh, ast_type.hh,
-**		 utl_scoped_name.hh, utl_strlist.h, ast_decl.h
-**
-** USE: Included from ast.hh
-*/
+class UTL_LabelList;
+class AST_Type;
+class AST_UnionLabel;
+class AST_Union;
 
-class	AST_UnionBranch : public virtual AST_Field
+// Representation of union branch declaration.
+// A branch of a union is a field with a label.
+
+class TAO_IDL_FE_Export AST_UnionBranch : public virtual AST_Field
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_UnionBranch();
-  AST_UnionBranch(AST_UnionLabel *label,
-		  AST_Type *ft,
-		  UTL_ScopedName *n,
-		  UTL_StrList *p);
-  virtual ~AST_UnionBranch() {}
+  // Constructor(s) and destructor.
+  AST_UnionBranch (void);
 
-  // Data Accessors
-  AST_UnionLabel *label();
+  AST_UnionBranch (UTL_LabelList *ll,
+                   AST_Type *ft,
+                   UTL_ScopedName *n);
 
-  // Narrowing
-  DEF_NARROW_METHODS1(AST_UnionBranch, AST_Field);
-  DEF_NARROW_FROM_DECL(AST_UnionBranch);
+  virtual ~AST_UnionBranch (void);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // Data Accessors.
+  AST_UnionLabel *label (unsigned long index = 0);
+
+  unsigned long label_list_length (void);
+  
+  // Called if our labels are enum values - adds them the
+  // enclosing scope's name_referenced list.
+  void add_labels (AST_Union *u);
+
+  // Narrowing.
+  DEF_NARROW_METHODS1 (AST_UnionBranch, AST_Field);
+  DEF_NARROW_FROM_DECL (AST_UnionBranch);
+
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  AST_UnionLabel		*pd_label;	// Label of this branch
+  // Data.
+
+  UTL_LabelList *pd_ll;
+  // list of labels.
 };
 
 #endif           // _AST_UNION_BRANCH_AST_UNION_BRAN_HH

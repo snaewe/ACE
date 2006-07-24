@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,56 +62,92 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_ARRAY_AST_ARRAY_HH
 #define _AST_ARRAY_AST_ARRAY_HH
 
+#include "ast_concrete_type.h"
+
+class UTL_ExprList;
+class AST_Expression;
+class AST_Type;
+class ast_visitor;
+
 // Representation of array declaration:
-//
-// An array is a combination of a list of dimensions and a base type
+// An array is a combination of a list of dimensions and a base type.
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, utl_exprlist.hh, ast_type.hh,
-**		 ast_decl.hh
-**
-** USE: Included from ast.hh
-*/
-
-class	AST_Array : public virtual AST_ConcreteType {
+class TAO_IDL_FE_Export AST_Array : public virtual AST_ConcreteType
+{
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_Array();
-  AST_Array(UTL_ScopedName *n, unsigned long ndims, UTL_ExprList *dims);
-  virtual ~AST_Array() {}
+  // Constructor(s).
+  AST_Array (void);
 
-  // Data Accessors
-  unsigned long n_dims();
-  AST_Expression **dims();
-  void		   set_dims(AST_Expression **, unsigned long);
-  AST_Type	  *base_type();
-  void		   set_base_type(AST_Type *nbt);
+  AST_Array (UTL_ScopedName *n,
+             unsigned long ndims,
+             UTL_ExprList *dims,
+             bool local,
+             bool abstract);
 
-  // Narrowing
+  // Destructor.
+  virtual ~AST_Array (void);
+
+  // Data Accessors.
+
+  unsigned long n_dims (void);
+
+  AST_Expression **dims (void);
+  void set_dims (AST_Expression **,
+                 unsigned long);
+
+  AST_Type *base_type (void) const;
+  void set_base_type (AST_Type *nbt);
+
+  // Recursively called on valuetype to check for legal use as
+  // a primary key. Overridden for valuetype, struct, sequence,
+  // union, array, typedef, and interface.
+  virtual bool legal_for_primary_key (void) const;
+  
+  // Cleanup.
+  virtual void destroy (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Array, AST_ConcreteType);
   DEF_NARROW_FROM_DECL(AST_Array);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+protected:
+  virtual int compute_size_type (void);
+  // Compute the size type if it is unknown.
 
 private:
-  // Data
-  unsigned long			pd_n_dims;	// How many dimensions?
-  AST_Expression		**pd_dims;	// Their expressions
-  AST_Type			*pd_base_type;	// Base type of array
+  // Data.
 
-  // Operations
+  unsigned long pd_n_dims;
+  // How many dimensions?
 
-  // Compute how many dimensions
-  AST_Expression	       **compute_dims(UTL_ExprList *dims,
-					     unsigned long ndims);
+  AST_Expression **pd_dims;
+  // Their expressions.
+
+  AST_Type *pd_base_type;
+  // Base type of array.
+  
+  bool owns_base_type_;
+  // If our base type is anonymous array or sequence, we're
+  // responsible for destroying it.
+
+private:
+
+  // Compute how many dimensions.
+  AST_Expression **compute_dims (UTL_ExprList *dims,
+                                 unsigned long ndims);
 };
 
 #endif           // _AST_ARRAY_AST_ARRAY_HH

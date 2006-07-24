@@ -21,7 +21,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_UNION_BRANCH_PUBLIC_RESET_CS_H_)
+#ifndef _BE_VISITOR_UNION_BRANCH_PUBLIC_RESET_CS_H_
 #define _BE_VISITOR_UNION_BRANCH_PUBLIC_RESET_CS_H_
 
 class be_visitor_union_branch_public_reset_cs : public be_visitor_decl
@@ -56,6 +56,15 @@ public:
   // visit interface type
 
   virtual int visit_interface_fwd (be_interface_fwd *node);
+  // visit interface forward type
+
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit valuebox type
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit interface type
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
   // visit interface forward type
 
   virtual int visit_predefined_type (be_predefined_type *node);

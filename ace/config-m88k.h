@@ -4,11 +4,12 @@
 // The following configuration file is designed to work for Motorola
 // 88k SVR4 platforms using pthreads from Florida State (ACE_HAS_FSU_PTHREADS).
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
 
 #if ! defined (__ACE_INLINE__)
-#define __ACE_INLINE__
+# define __ACE_INLINE__
 #endif /* ! __ACE_INLINE__ */
 
 #if defined (__GNUG__)
@@ -51,24 +52,24 @@ struct ip_mreq
 };
 
 #if !defined (ACE_HAS_FSU_PTHREADS)
-#define ACE_HAS_FSU_PTHREADS
+# define ACE_HAS_FSU_PTHREADS
 #endif
 #if !defined (ACE_HAS_PTHREADS_DRAFT6)
-#define ACE_HAS_PTHREADS_DRAFT6
+# define ACE_HAS_PTHREADS_DRAFT6
 #endif
 
 // Added for compilation on the m88k
 #if defined (m88k)
-#define ACE_LACKS_T_ERRNO
-#define ACE_LACKS_MADVISE
-#define ACE_HAS_GNU_CSTRING_H
+# define ACE_LACKS_T_ERRNO
+# define ACE_LACKS_MADVISE
+# define ACE_HAS_GNU_CSTRING_H
 #endif  /* m88k */
 
 // Platform supports System V IPC (most versions of UNIX, but not Win32)
 #define ACE_HAS_SYSV_IPC
 
 // Sun has the wrong prototype for sendmsg.
-#define ACE_HAS_BROKEN_SENDMSG
+#define ACE_HAS_NONCONST_SENDMSG
 
 // The SunOS 5.x version of rand_r is inconsistent with the header files...
 #define ACE_HAS_BROKEN_RANDR
@@ -83,15 +84,15 @@ struct ip_mreq
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-#define ACE_HAS_SYSCALL_H
+#define ACE_HAS_SYS_SYSCALL_H
 
 #if !defined (ACE_HAS_FSU_PTHREADS)
 // Platform supports reentrant functions (i.e., all the POSIX *_r functions).
 #define ACE_HAS_REENTRANT_FUNCTIONS
 #endif  /* ACE_HAS_FSU_PTHREADS */
 
-// Platform has terminal ioctl flags like TCGETS and TCSETS.
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS 
 
 // Compiler/platform correctly calls init()/fini() for shared libraries.
 #define ACE_HAS_AUTOMATIC_INIT_FINI
@@ -104,29 +105,28 @@ struct ip_mreq
 
 #if !defined (m88k)
 // Compiler/platform supports SunOS high resolution timers.
-#define ACE_HAS_HI_RES_TIMER
+# define ACE_HAS_HI_RES_TIMER
 #endif  /* m88k */
 
 // Platform supports IP multicast
 #define ACE_HAS_IP_MULTICAST
 
 // Compiler/platform supports alloca()
-#define ACE_HAS_ALLOCA
+// Although ACE does have alloca() on this compiler/platform combination, it is
+// disabled by default since it can be dangerous.  Uncomment the following line
+// if you ACE to use it.
+//#define ACE_HAS_ALLOCA
 
 #if !defined (m88k)
 // Compiler/platform has <alloca.h>
 #define ACE_HAS_ALLOCA_H
 #endif  /* m88k */
 
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
-
 // Platform contains <poll.h>.
 #define ACE_HAS_POLL
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Platform supports the /proc file system.
 #define ACE_HAS_PROC_FS
@@ -144,7 +144,7 @@ struct ip_mreq
 #define ACE_HAS_UCONTEXT_T
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler supports the ssize_t typedef.
 #define ACE_HAS_SSIZE_T
@@ -218,12 +218,8 @@ struct ip_mreq
 // Use the poll() event demultiplexor rather than select().
 //#define ACE_USE_POLL
 
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
 // Defines the page size of the system.
 #define ACE_PAGE_SIZE 4096
 
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

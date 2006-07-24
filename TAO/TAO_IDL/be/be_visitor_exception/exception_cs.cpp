@@ -18,18 +18,16 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_visitor_typecode/typecode_defn.h"
 
-#include "be_visitor_exception.h"
-
-ACE_RCSID(be_visitor_exception, exception_cs, "$Id$")
-
+ACE_RCSID (be_visitor_exception,
+           exception_cs,
+           "$Id$")
 
 // ***************************************************************************
-// for client stubs
+// For client stubs.
 // ***************************************************************************
+
 be_visitor_exception_cs::be_visitor_exception_cs (be_visitor_context *ctx)
   : be_visitor_exception (ctx)
 {
@@ -39,172 +37,325 @@ be_visitor_exception_cs::~be_visitor_exception_cs (void)
 {
 }
 
-// visit the Exception_Cs node and its scope
+// Visit the Exception_Cs node and its scope.
 int be_visitor_exception_cs::visit_exception (be_exception *node)
 {
-  TAO_OutStream *os; // output stream
-
-  if (!node->cli_stub_gen () && !node->imported ())
+  if (node->cli_stub_gen () || node->imported ())
     {
-      os = this->ctx_->stream ();
-
-      // default constructor
-      os->indent ();
-      *os << "// default constructor" << be_nl;
-      *os << node->name () << "::" << node->local_name () << " (void)" << be_nl;
-      *os << "  : CORBA_UserException ("
-          << node->tc_name () << ")\n";
-      *os << "{" << be_nl;
-      *os << "}\n\n";
-
-      // destructor
-      os->indent ();
-      *os << "// destructor - all members are of self managing types" << be_nl;
-      *os << node->name () << "::~" << node->local_name () << " (void)" << be_nl;
-      *os << "{" << be_nl;
-      *os << "}\n\n";
-
-      // copy constructor
-      os->indent ();
-      *os << "// copy constructor" << be_nl;
-      *os << node->name () << "::" << node->local_name () << " (const " <<
-        node->name () << " &_tao_excp)" << be_nl;
-      *os << "  : CORBA_UserException (" <<
-        "_tao_excp._type ())" << be_nl;
-      *os << "{\n";
-      os->incr_indent ();
-      // assign each individual member
-      be_visitor_context ctx (*this->ctx_);
-      ctx.state (TAO_CodeGen::TAO_EXCEPTION_CTOR_ASSIGN_CS);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
-        {
-          delete visitor;
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_exception_cs::"
-                             "visit_exception -"
-                             "codegen for scope failed\n"), -1);
-        }
-      delete visitor;
-      os->decr_indent ();
-      *os << "}\n\n";
-
-      // assignment operator
-      os->indent ();
-      *os << "// assignment operator" << be_nl;
-      *os << node->name () << "&" << be_nl;
-      *os << node->name () << "::operator= (const "
-	  << node->name () << " &_tao_excp)" << be_nl
-	  << "{\n" << be_idt_nl
-	  << "this->CORBA_UserException::operator= "
-	  << "(_tao_excp);\n";
-      // assign each individual member
-      ctx = *this->ctx_;
-      ctx.state (TAO_CodeGen::TAO_EXCEPTION_CTOR_ASSIGN_CS);
-      visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
-        {
-          delete visitor;
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_exception_cs::"
-                             "visit_exception -"
-                             "codegen for scope failed\n"), -1);
-        }
-      delete visitor;
-      os->indent ();
-      *os << "return *this;" << be_uidt_nl
-	  << "}\n\n";
-
-      // narrow method
-      os->indent ();
-      *os << "// narrow" << be_nl;
-      *os << node->name () << "_ptr " << be_nl;
-      *os << node->name () << "::_narrow (CORBA::Exception *exc)" << be_nl;
-      *os << "{\n";
-      os->incr_indent ();
-      *os << "if (!ACE_OS::strcmp (\"" << node->repoID () <<
-        "\", exc->_id ())) // same type" << be_nl;
-      *os << "  return ACE_dynamic_cast (" << node->name () << "_ptr, exc);" <<
-        be_nl;
-      *os << "else" << be_nl;
-      *os << "  return 0;\n";
-      os->decr_indent ();
-      *os << "}\n\n";
-
-      *os << be_nl
-	  << "void " << node->name () << "::_raise ()" << be_nl
-	  << "{" << be_idt_nl
-	  << "TAO_RAISE(*this);" << be_uidt_nl
-	  << "}\n\n";
-
-      // generate the _alloc method
-      os->indent ();
-      *os << "// TAO extension - the _alloc method" << be_nl;
-      *os << "CORBA::Exception *" << node->name ()
-          << "::_alloc (void)" << be_nl;
-      *os << "{" << be_idt_nl;
-      *os << "return new " << node->name () << ";" << be_uidt_nl;
-      *os << "}\n\n";
-
-      // constructor taking all members. It exists only if there are any
-      // members
-      if (node->member_count () > 0)
-        {
-          // generate the signature
-          ctx = *this->ctx_;
-          ctx.state (TAO_CodeGen::TAO_EXCEPTION_CTOR_CS);
-          visitor = tao_cg->make_visitor (&ctx);
-
-          if (!visitor || (node->accept (visitor) == -1))
-            {
-              ACE_ERROR_RETURN ((LM_ERROR,
-                                 "(%N:%l) be_visitor_exception::"
-                                 "visit_exception - "
-                                 "codegen for ctor failed\n"), -1);
-            }
-          delete visitor;
-
-          *os << "  : CORBA_UserException "
-              << " (CORBA::TypeCode::_duplicate (" << node->tc_name ()
-              << "))" << be_nl;
-          *os << "{\n";
-          os->incr_indent ();
-          // assign each individual member. We need yet another state
-          ctx = *this->ctx_;
-          ctx.state (TAO_CodeGen::TAO_EXCEPTION_CTOR_ASSIGN_CS);
-          ctx.exception (1); // indicate that the special ctor is being
-                             // generated
-          visitor = tao_cg->make_visitor (&ctx);
-          if (!visitor || (node->accept (visitor) == -1))
-            {
-              delete visitor;
-              ACE_ERROR_RETURN ((LM_ERROR,
-                                 "(%N:%l) be_visitor_exception_cs::"
-                                 "visit_exception -"
-                                 "codegen for scope failed\n"), -1);
-            }
-          delete visitor;
-          os->decr_indent ();
-          *os << "}\n\n";
-        }
-
-      // by using a visitor to declare and define the TypeCode, we have the
-      // added advantage to conditionally not generate any code. This will be
-      // based on the command line options. This is still TO-DO
-      ctx = *this->ctx_;
-      ctx.state (TAO_CodeGen::TAO_TYPECODE_DEFN);
-      visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_exception_cs::"
-                             "visit_exception - "
-                             "TypeCode definition failed\n"
-                             ), -1);
-        }
-
-      node->cli_stub_gen (I_TRUE);
+      return 0;
     }
 
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  os->indent ();
+
+  // Generate stub code  required of any anonymous types of members.
+  if (this->visit_scope (node) == -1)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_exception::"
+                         "visit_exception -"
+                         "code for stub failed\n"),
+                        -1);
+    }
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from " << be_nl
+      << "// " << __FILE__ << ":" << __LINE__ << be_nl << be_nl;
+
+  // Default constructor.
+  *os << node->name () << "::" << node->local_name ()
+      << " (void)" << be_idt_nl;
+  *os << ": ::CORBA::UserException (" << be_idt << be_idt << be_idt_nl
+      << "\"" << node->repoID () << "\"," << be_nl
+      << "\"" << node->local_name () << "\"" << be_uidt_nl
+      << ")" << be_uidt << be_uidt << be_uidt_nl;
+  *os << "{" << be_nl;
+  *os << "}" << be_nl << be_nl;
+
+  // Destructor.
+  *os << node->name () << "::~" << node->local_name ()
+      << " (void)" << be_nl;
+  *os << "{" << be_nl;
+  *os << "}" << be_nl << be_nl;
+
+  // Copy constructor.
+  *os << node->name () << "::" << node->local_name () << " (const ::"
+      << node->name () << " &_tao_excp)" << be_idt_nl;
+  *os << ": ::CORBA::UserException (" << be_idt << be_idt << be_idt_nl
+      << "_tao_excp._rep_id ()," << be_nl
+      << "_tao_excp._name ()" << be_uidt_nl
+      << ")" << be_uidt << be_uidt << be_uidt_nl;
+  *os << "{";
+
+  be_visitor_context ctx (*this->ctx_);
+
+  if (node->nmembers () > 0)
+    {
+      *os << be_idt;
+
+      // Assign each individual member.
+      be_visitor_exception_ctor_assign visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_exception_cs::"
+                             "visit_exception -"
+                             "codegen for scope failed\n"),
+                            -1);
+        }
+    }
+
+  *os << be_uidt_nl
+      << "}" << be_nl << be_nl;
+
+  // Assignment operator.
+  *os << node->name () << "&" << be_nl;
+  *os << node->name () << "::operator= (const ::"
+      << node->name () << " &_tao_excp)" << be_nl
+      << "{" << be_idt_nl
+      << "this->::CORBA::UserException::operator= "
+      << "(_tao_excp);";
+
+  // Assign each individual member.
+  ctx = *this->ctx_;
+  be_visitor_exception_ctor_assign ca_visitor (&ctx);
+
+  if (node->accept (&ca_visitor) == -1)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_exception_cs::"
+                         "visit_exception -"
+                         "codegen for scope failed\n"),
+                        -1);
+    }
+
+  *os << be_nl
+      << "return *this;" << be_uidt_nl
+      << "}" << be_nl << be_nl;
+
+  if (be_global->any_support ())
+    {
+      *os << "void "
+          << node->name ()
+          << "::_tao_any_destructor (void *_tao_void_pointer)" << be_nl
+          << "{" << be_idt_nl
+          << node->local_name () << " *_tao_tmp_pointer =" << be_idt_nl
+          << "static_cast<"
+          << node->local_name () << " *> (_tao_void_pointer);" << be_uidt_nl
+          << "delete _tao_tmp_pointer;" << be_uidt_nl
+          << "}" << be_nl << be_nl;
+    }
+
+  // Non-const downcast method.
+  *os << node->name () << " *" << be_nl;
+  *os << node->name () << "::_downcast ( ::CORBA::Exception *_tao_excp)" << be_nl;
+  *os << "{" << be_idt_nl;
+  *os << "return dynamic_cast<" << node->local_name ()
+      << " *> (_tao_excp);" << be_uidt_nl;
+  *os << "}" << be_nl << be_nl;
+
+  // Const downcast method.
+  *os << "const " << node->name () << " *" << be_nl;
+  *os << node->name () << "::_downcast ( ::CORBA::Exception const *_tao_excp)"
+      << be_nl;
+  *os << "{" << be_idt_nl;
+  *os << "return dynamic_cast<const " << node->local_name ()
+      << " *> (_tao_excp);" << be_uidt_nl;
+  *os << "}" << be_nl << be_nl;
+
+  // Generate the _alloc method.
+  *os << "::CORBA::Exception *" << node->name ()
+      << "::_alloc (void)" << be_nl;
+  *os << "{" << be_idt_nl;
+  *os << "::CORBA::Exception *retval = 0;" << be_nl
+      << "ACE_NEW_RETURN (retval, ::" << node->name ()
+      << ", 0);" << be_nl
+      << "return retval;" << be_uidt_nl;
+  *os << "}" << be_nl << be_nl;
+
+  *os << "::CORBA::Exception *" << be_nl
+      << node->name () << "::_tao_duplicate (void) const" << be_nl
+      << "{" << be_idt_nl
+      << "::CORBA::Exception *result = 0;" << be_nl
+      << "ACE_NEW_RETURN (" << be_idt << be_idt_nl
+      << "result," << be_nl
+      << "::" << node->name () << " (*this)," << be_nl
+      << "0" << be_uidt_nl
+      << ");" << be_uidt_nl
+      << "return result;" << be_uidt_nl
+      << "}" << be_nl << be_nl;
+
+  *os << "void " << node->name () << "::_raise (void) const" << be_nl
+      << "{" << be_idt_nl
+      << "TAO_RAISE (*this);" << be_uidt_nl
+      << "}" << be_nl << be_nl;
+
+  *os << "void " << node->name ()
+      << "::_tao_encode (" << be_idt << be_idt_nl;
+
+  if (!node->is_local ())
+    {
+      *os << "TAO_OutputCDR &cdr" << env_decl << be_uidt_nl
+          << ") const" << be_uidt_nl
+          << "{" << be_idt_nl
+          << "if (cdr << *this)" << be_idt_nl
+          << "{" << be_idt_nl
+          << "return;" << be_uidt_nl
+          << "}" << be_uidt_nl << be_nl;
+
+      if (be_global->use_raw_throw ())
+        {
+          *os << "throw ::CORBA::MARSHAL ();" << be_uidt_nl;
+        }
+      else
+        {
+          *os << "ACE_THROW ( ::CORBA::MARSHAL ());" << be_uidt_nl;
+        }
+
+      *os << "}" << be_nl << be_nl;
+    }
+  else
+    {
+      *os << "TAO_OutputCDR &" << env_decl << be_uidt_nl
+          << ") const" << be_uidt_nl
+          << "{" << be_idt_nl;
+
+      if (be_global->use_raw_throw ())
+        {
+          *os << "throw ::CORBA::MARSHAL ();" << be_uidt_nl;
+        }
+      else
+        {
+          *os << "ACE_THROW ( ::CORBA::MARSHAL ());" << be_uidt_nl;
+        }
+
+      *os << "}" << be_nl << be_nl;
+    }
+
+  *os << "void " << node->name ()
+      << "::_tao_decode (" << be_idt << be_idt_nl;
+
+  if (!node->is_local ())
+    {
+      *os << "TAO_InputCDR &cdr" << env_decl << be_uidt_nl
+          << ")" << be_uidt_nl
+          << "{" << be_idt_nl
+          << "if (cdr >> *this)" << be_idt_nl
+          << "{" << be_idt_nl
+          << "return;" << be_uidt_nl
+          << "}" << be_uidt_nl << be_nl;
+
+      if (be_global->use_raw_throw ())
+        {
+          *os << "throw ::CORBA::MARSHAL ();" << be_uidt_nl;
+        }
+      else
+        {
+          *os << "ACE_THROW ( ::CORBA::MARSHAL ());" << be_uidt_nl;
+        }
+
+      *os << "}" << be_nl << be_nl;
+    }
+  else
+    {
+      *os << "TAO_InputCDR &" << env_decl << be_uidt_nl
+          << ")" << be_uidt_nl
+          << "{" << be_idt_nl;
+
+      if (be_global->use_raw_throw ())
+        {
+          *os << "throw ::CORBA::MARSHAL ();" << be_uidt_nl;
+        }
+      else
+        {
+          *os << "ACE_THROW ( ::CORBA::MARSHAL ());" << be_uidt_nl;
+        }
+
+      *os << "}" << be_nl << be_nl;
+    }
+
+  // Constructor taking all members. It exists only if there are any
+  // members.
+  if (node->member_count () > 0)
+    {
+      // Generate the signature.
+      ctx = *this->ctx_;
+      ctx.state (TAO_CodeGen::TAO_EXCEPTION_CTOR_CS);
+      be_visitor_exception_ctor ec_visitor (&ctx);
+
+      if (node->accept (&ec_visitor) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_exception::"
+                             "visit_exception - "
+                             "codegen for ctor failed\n"),
+                            -1);
+        }
+
+      *os << be_idt_nl
+          << ": ::CORBA::UserException ("
+          << be_idt << be_idt << be_idt_nl
+          << "\"" << node->repoID () << "\"," << be_nl
+          << "\"" << node->local_name () << "\"" << be_uidt_nl
+          << ")" << be_uidt << be_uidt << be_uidt_nl;
+      *os << "{" << be_idt;
+
+      // Assign each individual member. We need yet another state.
+      ctx = *this->ctx_;
+
+      // Indicate that the special ctor is being generated.
+      ctx.exception (1);
+
+      be_visitor_exception_ctor_assign eca_visitor (&ctx);
+
+      if (node->accept (&eca_visitor) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_exception_cs::"
+                             "visit_exception -"
+                             "codegen for scope failed\n"),
+                            -1);
+        }
+
+      *os << be_uidt_nl << "}" << be_nl << be_nl;
+    }
+
+  // Switch streams to the *A.cpp file if we are using this option.
+  if (be_global->gen_anyop_files ())
+    {
+      os = tao_cg->anyop_source ();
+      *os << be_nl << be_nl;
+    }
+
+  if (be_global->tc_support ())
+    {
+      *os << "// TAO extension - the virtual _type method." << be_nl;
+      *os << "::CORBA::TypeCode_ptr " << node->name ()
+          << "::_tao_type (void) const" << be_nl;
+      *os << "{" << be_idt_nl;
+      *os << "return ::" << node->tc_name () << ";" << be_uidt_nl;
+      *os << "}";
+    }
+
+  // Make sure we are generating to *C.cpp regardless of the above.
+  os = tao_cg->client_stubs ();
+
+  if (be_global->tc_support ())
+    {
+      ctx = *this->ctx_;
+      TAO::be_visitor_struct_typecode tc_visitor (&ctx);
+
+      if (tc_visitor.visit_exception (node) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                              "(%N:%l) be_visitor_exception_cs::"
+                              "visit_exception - "
+                              "TypeCode definition failed\n"),
+                            -1);
+        }
+    }
+
+  node->cli_stub_gen (true);
   return 0;
 }

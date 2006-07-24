@@ -14,7 +14,7 @@
 //    only used by Priority_Reactor_Test.cpp.
 //
 // = AUTHOR
-//    Carlos O'Ryan
+//    Carlos O'Ryan <coryan@cs.wustl.edu>
 //
 // ============================================================================
 
@@ -22,6 +22,11 @@
 #define ACE_TESTS_PRIORITY_REACTOR_TEST_H
 
 #include "ace/Service_Config.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/SOCK_Stream.h"
 #include "ace/Svc_Handler.h"
 

@@ -20,161 +20,68 @@
 // ============================================================================
 
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_exception.h"
+#include "be_visitor.h"
 
-ACE_RCSID(be, be_exception, "$Id$")
+#include "global_extern.h"
 
-/*
- * BE_Exception
- */
+ACE_RCSID (be,
+           be_exception,
+           "$Id$")
+
 be_exception::be_exception (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_ConcreteType (),
+    UTL_Scope (),
+    AST_Structure (),
+    be_scope (),
+    be_decl (),
+    be_type ()
 {
-  this->size_type (be_decl::VARIABLE); // always the case
+  // Always the case.
+  this->size_type (AST_Type::VARIABLE);
 }
 
-be_exception::be_exception (UTL_ScopedName *n, UTL_StrList *p)
-  : AST_Decl (AST_Decl::NT_except, n, p),
-    AST_Structure (AST_Decl::NT_except, n, p),
+be_exception::be_exception (UTL_ScopedName *n,
+                            bool local,
+                            bool abstract)
+  : COMMON_Base (local,
+                 abstract),
+    AST_Decl (AST_Decl::NT_except,
+              n),
+    AST_Type (AST_Decl::NT_except,
+              n),
+    AST_ConcreteType (AST_Decl::NT_except,
+                      n),
     UTL_Scope (AST_Decl::NT_except),
-    member_count_ (-1)
+    AST_Structure (AST_Decl::NT_except,
+                   n,
+                   local,
+                   abstract),
+    be_scope (AST_Decl::NT_except),
+    be_decl (AST_Decl::NT_except,
+             n),
+    be_type (AST_Decl::NT_except,
+             n)
 {
-  this->size_type (be_decl::VARIABLE); // always the case
-}
+  // Always the case.
+  this->size_type (AST_Type::VARIABLE);
 
-// compute total number of members
-int
-be_exception::compute_member_count (void)
-{
-  UTL_ScopeActiveIterator *si;  // iterator
-
-  this->member_count_ = 0;
-
-  // if there are elements in this scope
-  if (this->nmembers () > 0)
+  if (!this->imported ())
     {
-      // instantiate a scope iterator.
-      si = new UTL_ScopeActiveIterator (this, UTL_Scope::IK_decls);
-
-      while (!(si->is_done ()))
-        {
-          // get the next AST decl node
-          this->member_count_++;
-          si->next ();
-        } // end of while
-      delete si; // free the iterator object
+      idl_global->exception_seen_ = true;
     }
-  return 0;
 }
 
-// return the member count
-int
-be_exception::member_count (void)
+void
+be_exception::destroy (void)
 {
-  if (this->member_count_ == -1)
-    this->compute_member_count ();
-
-  return this->member_count_;
-}
-
-// generate typecode.
-// Typecode for exceptions comprises the enumerated value followed by the
-// encapsulation of the parameters
-
-int
-be_exception::gen_typecode (void)
-{
-  TAO_OutStream *cs; // output stream
-  TAO_NL  nl;        // end line
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
-
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
-
-  *cs << "CORBA::tk_except, // typecode kind" << nl;
-  *cs << this->tc_size () << ", // encapsulation length\n";
-  // now emit the encapsulation
-  return this->gen_encapsulation ();
-}
-
-// generate encapsulation
-// An encapsulation for ourselves will be necessary when we are part of some
-// other IDL type and a typecode for that other type is being generated. This
-// will comprise our typecode kind. IDL types with parameters will additionally
-// have the encapsulation length and the entire typecode description
-int
-be_exception::gen_encapsulation (void)
-{
-  TAO_OutStream *cs; // output stream
-  TAO_NL  nl;        // end line
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
-  long i, arrlen;
-  long *arr;  // an array holding string names converted to array of longs
-
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
-
-  // XXXASG - byte order must be based on what m/c we are generating code -
-  // TODO
-  *cs << "TAO_ENCAP_BYTE_ORDER, // byte order" << nl;
-  // generate repoID
-  *cs << (ACE_OS::strlen (this->repoID ())+1) << ", ";
-  (void)this->tc_name2long (this->repoID (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
-    {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
-    }
-  *cs << " // repository ID = " << this->repoID () << nl;
-  // generate name
-  *cs << (ACE_OS::strlen (this->local_name ()->get_string ())+1) << ", ";
-  (void)this->tc_name2long(this->local_name ()->get_string (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
-    {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
-    }
-  *cs << " // name = " << this->local_name () << nl;
-  // generate the member count
-  *cs << this->member_count () << ", // member count\n";
-  cs->incr_indent (0);
-  // hand over to the scope to generate the typecode for elements
-  if (be_scope::gen_encapsulation () == -1)
-    {
-      ACE_ERROR ((LM_ERROR, "be_exception: cannot generate typecode for members\n"));
-      return -1;
-    }
-  cs->decr_indent (0);
-  return 0;
-}
-
-// compute typecode size
-long
-be_exception::tc_size (void)
-{
-  // 4 bytes for enumeration, 4 bytes for storing encap length val, followed by the
-  // actual encapsulation length
-  return 4 + 4 + this->tc_encap_len ();
-}
-
-// compute encapsulation length
-long
-be_exception::tc_encap_len (void)
-{
-  if (this->encap_len_ == -1) // not computed yet
-    {
-      this->encap_len_ = 4;  // holds the byte order flag
-
-      this->encap_len_ += this->repoID_encap_len (); // repoID
-
-      // do the same thing for the local name
-      this->encap_len_ += this->name_encap_len ();
-
-      this->encap_len_ += 4; // to hold the member count
-
-      // compute encap length for members
-      this->encap_len_ += be_scope::tc_encap_len ();
-    }
-  return this->encap_len_;
+  // Call the destroy methods of our base classes.
+  this->be_scope::destroy ();
+  this->be_type::destroy ();
+  this->AST_Exception::destroy ();
 }
 
 int

@@ -17,10 +17,12 @@
 //
 // ============================================================================
 
-#if !defined (HELPER_H)
+#ifndef HELPER_H
 #define HELPER_H
 
 #include "param_testC.h"
+#include "tao/DynamicInterface/Request.h"
+#include "ace/Singleton.h"
 
 class Generator
 {
@@ -33,18 +35,17 @@ public:
 
   CORBA::Short gen_short (void);
   CORBA::Long gen_long (void);
-#if 0
-  CORBA::Char gen_char (void);
-  CORBA::Octet gen_octet (void);
-  CORBA::Float gen_float (void);
-  CORBA::Double gen_double (void);
-#endif
-  CORBA::String gen_string (void);
-  CORBA::String gen_string (int maxlength);
+  char* gen_string (void);
+  char* gen_string (int maxlength);
+  CORBA::WChar* gen_wstring (void);
+  CORBA::WChar* gen_wstring (int maxlength);
   const Param_Test::Fixed_Struct gen_fixed_struct (void);
-private:
+  const Param_Test::Step gen_step (void);
+ private:
   Param_Test::Fixed_Struct fixed_struct_;
+  Param_Test::Step step_;
 };
 
-typedef ACE_Singleton<Generator, ACE_SYNCH_RECURSIVE_MUTEX> GENERATOR;
+typedef ACE_Singleton<Generator, TAO_SYNCH_RECURSIVE_MUTEX> GENERATOR;
+
 #endif /* HELPER_H */

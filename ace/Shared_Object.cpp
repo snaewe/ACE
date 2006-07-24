@@ -1,42 +1,47 @@
-// Shared_Object.cpp
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/Shared_Object.h"
+#include "ace/Global_Macros.h"
+#include "ace/config-all.h"
+
 /* Provide the abstract base class used to access dynamic linking
    facilities */
 
 #if !defined (__ACE_INLINE__)
-#include "ace/Shared_Object.i"
+#include "ace/Shared_Object.inl"
 #endif /* __ACE_INLINE__ */
 
-ACE_RCSID(ace, Shared_Object, "$Id$")
+ACE_RCSID (ace,
+           Shared_Object,
+           "$Id$")
+
+  ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // Initializes object when dynamic linking occurs.
 
-int 
-ACE_Shared_Object::init (int, ASYS_TCHAR *[])
+int
+ACE_Shared_Object::init (int, ACE_TCHAR *[])
 {
   ACE_TRACE ("ACE_Shared_Object::init");
-  return -1;
+  return 0;
 }
 
 // Terminates object when dynamic unlinking occurs.
 
-int 
+int
 ACE_Shared_Object::fini (void)
 {
   ACE_TRACE ("ACE_Shared_Object::fini");
-  return -1;
+  return 0;
 }
 
 // Returns information on active object.
 
-int 
-ACE_Shared_Object::info (ASYS_TCHAR **, size_t) const
+int
+ACE_Shared_Object::info (ACE_TCHAR **, size_t) const
 {
   ACE_TRACE ("ACE_Shared_Object::info");
-  return -1;
+  return 0;
 }
 
 // Need to give a default implementation.
@@ -45,3 +50,5 @@ ACE_Shared_Object::~ACE_Shared_Object (void)
 {
   ACE_TRACE ("ACE_Shared_Object::~ACE_Shared_Object");
 }
+
+ACE_END_VERSIONED_NAMESPACE_DECL

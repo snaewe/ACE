@@ -4,11 +4,12 @@
 // The following configuration file is designed to work for SunOS 5.4
 // platforms using the SunC++ 4.0.x compiler.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
 
 #if ! defined (__ACE_INLINE__)
-#define __ACE_INLINE__
+# define __ACE_INLINE__
 #endif /* ! __ACE_INLINE__ */
 
 #define ACE_HAS_TEMPLATE_SPECIALIZATION
@@ -25,7 +26,7 @@
 #define ACE_HAS_SYSV_IPC
 
 // Sun has the wrong prototype for sendmsg.
-#define ACE_HAS_BROKEN_SENDMSG
+#define ACE_HAS_NONCONST_SENDMSG
 
 // The SunOS 5.x version of rand_r is inconsistent with the header files...
 #define ACE_HAS_BROKEN_RANDR
@@ -40,10 +41,10 @@
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-#define ACE_HAS_SYSCALL_H
+#define ACE_HAS_SYS_SYSCALL_H
 
-// Platform has terminal ioctl flags like TCGETS and TCSETS.
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS
 
 // Compiler/platform correctly calls init()/fini() for shared libraries.
 #define ACE_HAS_AUTOMATIC_INIT_FINI
@@ -61,20 +62,19 @@
 #define ACE_HAS_IP_MULTICAST
 
 // Compiler/platform supports alloca()
-#define ACE_HAS_ALLOCA
+// Although ACE does have alloca() on this compiler/platform combination, it is
+// disabled by default since it can be dangerous.  Uncomment the following line
+// if you ACE to use it.
+//#define ACE_HAS_ALLOCA
 
 // Compiler/platform has <alloca.h>
 #define ACE_HAS_ALLOCA_H
-
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
 
 // Platform contains <poll.h>.
 #define ACE_HAS_POLL
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Platform supports the /proc file system.
 #define ACE_HAS_PROC_FS
@@ -90,7 +90,7 @@
 #define ACE_HAS_UCONTEXT_T
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler supports the ssize_t typedef.
 #define ACE_HAS_SSIZE_T
@@ -174,21 +174,18 @@
 
 #define ACE_NEEDS_DEV_IO_CONVERSION
 
-// 10 millisecond fudge factor to account for Solaris timers...
-#if !defined (ACE_TIMER_SKEW)
-#define ACE_TIMER_SKEW 1000 * 10
-#endif /* ACE_TIMER_SKEW */
-
-// Turns off the tracing feature.
-// #define ACE_NTRACE 0
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
 // Defines the page size of the system.
 #define ACE_PAGE_SIZE 4096
 #define ACE_HAS_IDTYPE_T
 
 #define ACE_HAS_GPERF
+#define ACE_HAS_DIRENT
 
+#  if defined (ACE_HAS_EXCEPTIONS)
+     // If exceptions are enabled and we are using Sun/CC then
+     // <operator new> throws an exception instead of returning 0.
+#    define ACE_NEW_THROWS_EXCEPTIONS
+#  endif /* ACE_HAS_EXCEPTIONS */
+
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

@@ -8,8 +8,14 @@
 // ACE_Reactor for devices that perform I/O via signals (such as SVR4
 // message queues).
 
+#include "ace/ACE.h"
 #include "ace/Service_Config.h"
+#include "ace/Reactor.h"
 #include "ace/Task.h"
+#include "ace/Reactor_Notification_Strategy.h"
+#include "ace/Signal.h"
+#include "ace/OS_NS_fcntl.h"
+#include "ace/OS_NS_unistd.h"
 
 ACE_RCSID(Misc, test_demuxing, "$Id$")
 
@@ -28,8 +34,8 @@ public:
   virtual ACE_HANDLE get_handle (void) const;
   virtual int handle_input (ACE_HANDLE);
   virtual int shutdown (ACE_HANDLE, ACE_Reactor_Mask);
-  virtual int handle_signal (ACE_HANDLE signum, siginfo_t * = 0, 
-			     ucontext_t * = 0);
+  virtual int handle_signal (int signum, siginfo_t * = 0,
+                             ucontext_t * = 0);
 
 private:
   ACE_HANDLE handle_;
@@ -49,9 +55,14 @@ Sig_Handler::Sig_Handler (void)
 
   // Register signal handler object.  Note that NULL_MASK is used to
   // keep the ACE_Reactor from calling us back on the "/dev/null"
-  // descriptor.
-  if (ACE_Reactor::instance ()->register_handler 
-      (this, ACE_Event_Handler::NULL_MASK) == -1)
+  // descriptor.  NULL_MASK just reserves a "slot" in the Reactor's
+  // internal demuxing table, but doesn't cause it to dispatch the
+  // event handler directly.  Instead, we use the signal handler to do
+  // this.
+  ACE_Reactor_Mask mask = ACE_Event_Handler::NULL_MASK;
+  if (ACE_Reactor::instance ()->register_handler
+      (this,
+       mask) == -1)
     ACE_ERROR ((LM_ERROR,
                 "%p\n%a",
                 "register_handler",
@@ -62,10 +73,10 @@ Sig_Handler::Sig_Handler (void)
 
   sig_set.sig_add (SIGINT);
   sig_set.sig_add (SIGQUIT);
-  sig_set.sig_add (SIGALRM);  
+  sig_set.sig_add (SIGALRM);
 
   // Register the signal handler object to catch the signals.
-  if (ACE_Reactor::instance ()->register_handler 
+  if (ACE_Reactor::instance ()->register_handler
       (sig_set, this) == -1)
     ACE_ERROR ((LM_ERROR,
                 "%p\n%a",
@@ -86,7 +97,7 @@ Sig_Handler::get_handle (void) const
 // just print a greeting to let you know that everything is working
 // properly!
 
-int 
+int
 Sig_Handler::handle_input (ACE_HANDLE)
 {
   ACE_DEBUG ((LM_DEBUG,
@@ -97,7 +108,7 @@ Sig_Handler::handle_input (ACE_HANDLE)
 // In a real application, this method would do any cleanup activities
 // required when shutting down the I/O device.
 
-int 
+int
 Sig_Handler::shutdown (ACE_HANDLE, ACE_Reactor_Mask)
 {
   ACE_DEBUG ((LM_DEBUG,
@@ -107,47 +118,42 @@ Sig_Handler::shutdown (ACE_HANDLE, ACE_Reactor_Mask)
 
 // This method handles all the signals that are being caught by this
 // object.  In our simple example, we are simply catching SIGALRM,
-// SIGINT, and SIGQUIT.  Anything else is logged and ignored.
-//
-// There are several advantages to using this approach.  First, the
-// behavior triggered by the signal is handled in the main event loop,
-// rather than in the signal handler.  Second, the ACE_Reactor's
-// signal handling mechanism eliminates the need to use global signal
-// handler functions and data.
+// SIGINT, and SIGQUIT.  Anything else is logged and ignored.  Note
+// that the ACE_Reactor's signal handling mechanism eliminates the
+// need to use global signal handler functions and data.
 
 int
 Sig_Handler::handle_signal (int signum, siginfo_t *, ucontext_t *)
 {
-  ACE_DEBUG ((LM_DEBUG,
-              "(%t) received signal %S\n",
-              signum));
-
   switch (signum)
     {
+#if !defined (ACE_WIN32)
     case SIGALRM:
       // Rearm the alarm.
       ACE_OS::alarm (4);
       break;
+#endif /* !ACE_WIN32 */
     case SIGINT:
       // Tell the ACE_Reactor to enable the ready bit for
       // this->handle_.  The ACE_Reactor will subsequently call the
       // <Sig_Handler::handle_input> method from within its event
-      // loop.
-      return ACE_Reactor::instance ()->ready_ops 
-	(this->handle_,
+      // loop, i.e., the behavior triggered by the signal is handled
+      // in the main event loop, rather than in the signal handler.
+      return ACE_Reactor::instance ()->ready_ops
+        (this->handle_,
          ACE_Event_Handler::READ_MASK,
          ACE_Reactor::ADD_MASK);
+#if defined (ACE_WIN32)
+    case SIGTERM:
+#else
     case SIGQUIT:
-      ACE_DEBUG ((LM_DEBUG,
-                  "(%t) %S: shutting down signal tester\n",
-                  signum));
-      ACE_Reactor::end_event_loop();
+#endif /* ACE_WIN32 */
+      ACE_Reactor::end_event_loop ();
       break;
-    default: 
-      ACE_DEBUG ((LM_DEBUG, 
-		  "(%t) %S: not handled, returning to program\n",
-                  signum));
+    default:
+      ACE_ERROR_RETURN ((LM_ERROR, "invalid signal"), -1);
       break;
+      /* NOTREACHED */
     }
   return 0;
 }
@@ -159,24 +165,27 @@ class STDIN_Handler : public ACE_Event_Handler
   //   STDIO, and timeouts using the same mechanisms.
 public:
   STDIN_Handler (void);
+  ~STDIN_Handler (void);
   virtual int handle_input (ACE_HANDLE);
-  virtual int handle_timeout (const ACE_Time_Value &, 
-			      const void *arg);
+  virtual int handle_timeout (const ACE_Time_Value &,
+                              const void *arg);
 };
 
 STDIN_Handler::STDIN_Handler (void)
 {
   if (ACE_Event_Handler::register_stdin_handler (this,
-						 ACE_Reactor::instance (),
-						 ACE_Thread_Manager::instance ()) == -1)
+                                                 ACE_Reactor::instance (),
+                                                 ACE_Thread_Manager::instance ()) == -1)
     ACE_ERROR ((LM_ERROR,
                 "%p\n",
                 "register_stdin_handler"));
 
-  // Register the STDIN_Handler to be dispatched once every <timeout>
-  // seconds.
+  // Register the <STDIN_Handler> to be dispatched once every
+  // <timeout> seconds starting in <timeout> seconds.  This example
+  // uses the "interval timer" feature of the <ACE_Reactor>'s timer
+  // queue.
   else if (ACE_Reactor::instance ()->schedule_timer
-	   (this,
+           (this,
             0,
             ACE_Time_Value (timeout),
             ACE_Time_Value (timeout)) == -1)
@@ -186,20 +195,35 @@ STDIN_Handler::STDIN_Handler (void)
                 1));
 }
 
-int 
+STDIN_Handler::~STDIN_Handler (void)
+{
+  if (ACE_Event_Handler::remove_stdin_handler (ACE_Reactor::instance (),
+                                               ACE_Thread_Manager::instance ()) == -1)
+    ACE_ERROR ((LM_ERROR,
+                "%p\n",
+                "remove_stdin_handler"));
+  else if (ACE_Reactor::instance ()->cancel_timer
+           (this) == -1)
+    ACE_ERROR ((LM_ERROR,
+                "%p\n%a",
+                "cancel_timer",
+                1));
+}
+
+int
 STDIN_Handler::handle_timeout (const ACE_Time_Value &tv,
-			       const void *)
+                               const void *)
 {
   ACE_DEBUG ((LM_DEBUG,
               "(%t) timeout occurred at %d sec, %d usec\n",
-	      tv.sec (),
+              tv.sec (),
               tv.usec ()));
   return 0;
 }
 
 // Read from input handle and write to stdout handle.
 
-int 
+int
 STDIN_Handler::handle_input (ACE_HANDLE handle)
 {
   char buf[BUFSIZ];
@@ -209,10 +233,10 @@ STDIN_Handler::handle_input (ACE_HANDLE handle)
     {
     case -1:
       if (errno == EINTR)
-	return 0;
+        return 0;
         /* NOTREACHED */
       else
-	ACE_ERROR ((LM_ERROR,
+        ACE_ERROR ((LM_ERROR,
                     "%p\n",
                     "read"));
       /* FALLTHROUGH */
@@ -221,13 +245,13 @@ STDIN_Handler::handle_input (ACE_HANDLE handle)
       break;
     default:
       {
-	ssize_t result = ACE::write_n (ACE_STDOUT, buf, n);
+        ssize_t result = ACE::write_n (ACE_STDOUT, buf, n);
 
-	if (result != n)
-	  ACE_ERROR_RETURN ((LM_ERROR,
+        if (result != n)
+          ACE_ERROR_RETURN ((LM_ERROR,
                              "%p\n",
-                             "write"), 
-			    result == -1 && errno == EINTR ? 0 : -1);
+                             "write"),
+                            result == -1 && errno == EINTR ? 0 : -1);
       }
     }
   return 0;
@@ -254,14 +278,14 @@ private:
 
 Message_Handler::Message_Handler (void)
   : notification_strategy_ (ACE_Reactor::instance (),
-			    this,
-			    ACE_Event_Handler::READ_MASK)
+                            this,
+                            ACE_Event_Handler::READ_MASK)
 {
   // Set this to the Reactor notification strategy.
   this->msg_queue ()->notification_strategy (&this->notification_strategy_);
 
   if (this->activate ())
-    ACE_ERROR ((LM_ERROR, 
+    ACE_ERROR ((LM_ERROR,
                 "%p\n",
                 "activate"));
 }
@@ -285,16 +309,16 @@ Message_Handler::svc (void)
       // thereby informing the <ACE_Reactor> Singleton to call our
       // <handle_input> method.
       if (this->putq (mb) == -1)
-	{
-	  if (errno == ESHUTDOWN)
-	    ACE_ERROR_RETURN ((LM_ERROR,
+        {
+          if (errno == ESHUTDOWN)
+            ACE_ERROR_RETURN ((LM_ERROR,
                                "(%t) queue is deactivated"), 0);
-	  else
-	    ACE_ERROR_RETURN ((LM_ERROR,
+          else
+            ACE_ERROR_RETURN ((LM_ERROR,
                                "(%t) %p\n",
                                "putq"),
                               -1);
-	}
+        }
     }
 
   ACE_NOTREACHED (return 0);
@@ -324,7 +348,7 @@ Message_Handler::handle_input (ACE_HANDLE)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   ACE_Service_Config daemon (argv [0]);
 
@@ -346,8 +370,8 @@ main (int argc, char *argv[])
 
   // Loop handling signals and I/O events until SIGQUIT occurs.
 
-  while (ACE_Reactor::event_loop_done() == 0)
-    ACE_Reactor::run_event_loop ();
+  while (ACE_Reactor::instance ()->event_loop_done () == 0)
+    ACE_Reactor::instance ()->run_reactor_event_loop ();
 
   // Deactivate the message queue.
   mh.msg_queue ()->deactivate ();
@@ -355,6 +379,6 @@ main (int argc, char *argv[])
   // Wait for the thread to exit.
   ACE_Thread_Manager::instance ()->wait ();
   ACE_DEBUG ((LM_DEBUG,
-              "(%t) leaving main\n"));
+              ACE_TEXT ("(%t) leaving main\n")));
   return 0;
 }

@@ -2,6 +2,7 @@
 
 #include "Blob.h"
 #include "Blob_Handler.h"
+#include "ace/OS_NS_string.h"
 
 ACE_RCSID(Blobby, Blob, "$Id$")
 
@@ -17,13 +18,12 @@ ACE_Blob::~ACE_Blob (void)
 // initialize address and filename. No network i/o in open
 
 int
-ACE_Blob::open (char *filename, char *hostname , u_short port)
+ACE_Blob::open (const ACE_TCHAR *filename, const ACE_TCHAR *hostname , u_short port)
 {
-  filename_ = ACE_OS::strdup(filename);
+  filename_ = ACE_OS::strdup (filename);
   inet_addr_.set (port, hostname);
   return 0;
 }
-
 
 // read from connection length bytes from offset, into Message block
 
@@ -75,20 +75,3 @@ ACE_Blob::close (void)
 
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Connector<ACE_Blob_Handler, ACE_SOCK_CONNECTOR>;
-template class ACE_Svc_Tuple <ACE_Blob_Handler>;
-template class ACE_Map_Entry<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *>;
-template class ACE_Map_Iterator_Base<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Iterator<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Reverse_Iterator<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Manager<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Connector<ACE_Blob_Handler, ACE_SOCK_CONNECTOR>
-#pragma instantiate ACE_Svc_Tuple <ACE_Blob_Handler>
-#pragma instantiate ACE_Map_Entry<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *>
-#pragma instantiate ACE_Map_Iterator_Base<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Iterator<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Reverse_Iterator<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Manager<ACE_HANDLE, ACE_Svc_Tuple <ACE_Blob_Handler> *, ACE_SYNCH_RW_MUTEX>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */

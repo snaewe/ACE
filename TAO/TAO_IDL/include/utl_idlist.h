@@ -64,37 +64,23 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
  */
 
-#ifndef	_UTL_IDLIST_UTL_IDLIST_HH
-#define	_UTL_IDLIST_UTL_IDLIST_HH
+#ifndef _UTL_IDLIST_UTL_IDLIST_HH
+#define _UTL_IDLIST_UTL_IDLIST_HH
 
-// utl_idlist.hh
-//
 // List of Identifiers
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-/*
-** DEPENDENCIES: utl_list.hh, utl_identifier.hh
-**
-** USE: Included from util.hh
-*/
+#include "utl_list.h"
+#include "ace/iosfwd.h"
 
-#include	"idl_fwd.h"
-#include	"utl_list.h"
-#include	"utl_identifier.h"
-#include	"utl_string.h"
+class Identifier;
 
-class UTL_IdList : public UTL_List
+class TAO_IDL_FE_Export UTL_IdList : public UTL_List
 {
   // =TITLE
   //  UTL_IdList
@@ -102,35 +88,41 @@ class UTL_IdList : public UTL_List
   //  Used to maintain a list of identifiers. The primary usage of this class
   //  is to maintain a scoped name.
 public:
-  UTL_IdList (Identifier *car, UTL_IdList *cdr);
+  UTL_IdList (Identifier *car,
+              UTL_IdList *cdr);
   // Constructor(s)
 
-  virtual ~UTL_IdList() {}
+  virtual ~UTL_IdList (void) {}
   // destructor
 
-  // =AST Dumping
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+  // Dump to ostream.
 
-  virtual void dump (ostream &o);
-  // dump to ostream
+  virtual void destroy (void);
+  // Cleanup function.
 
-  // Other operations
+  UTL_List *copy (void);
+  // Copy the list.
 
-  UTL_List *copy ();
-  // Copy the list
+  Identifier *head (void);
+  // Get element.
 
-  Identifier *head ();
-  // get element
+  Identifier *last_component (void);
+  // Get last element in this list.
 
-  Identifier  *last_component ();
-  // Get last element in this list
+  Identifier *first_component (void);
+  // Get first element in this list holding a non-empty string.
+
+  int compare (UTL_IdList *other);
+  // Compares each component for equality.
 private:
   Identifier *pd_car_data;
 };
 
-// Active iterator for UTL_IdList
+// Active iterator for UTL_IdList.
 
-class	UTL_IdListActiveIterator :
-	public UTL_ListActiveIterator
+class TAO_IDL_FE_Export UTL_IdListActiveIterator
+  : public UTL_ListActiveIterator
 {
   // =TITLE
   //  UTL_IdListActiveIterator
@@ -138,10 +130,9 @@ class	UTL_IdListActiveIterator :
   //  Iterator for the IDList
 public:
   UTL_IdListActiveIterator (UTL_IdList *s);
-  // Constructor(s)
 
-  Identifier *item ();
-  // retrieves the next item
+  Identifier *item (void);
+  // Retrieves the next item.
 };
 
-#endif		// _UTL_IDLIST_UTL_IDLIST_HH
+#endif          // _UTL_IDLIST_UTL_IDLIST_HH

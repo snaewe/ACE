@@ -19,49 +19,41 @@
 //
 // ============================================================================
 
-#if !defined (BE_STRING_H)
+#ifndef BE_STRING_H
 #define BE_STRING_H
 
-/*
- * BE_String
- */
+#include "be_type.h"
+#include "ast_string.h"
+
+class AST_Expression;
+class be_visitor;
+
 class be_string : public virtual AST_String,
                   public virtual be_type
 {
 public:
-  // Operations
-
   be_string (void);
-  //  default constructor
+  //  Default constructor.
 
-  be_string (AST_Expression *v);
-  // constructor
+  be_string (AST_Decl::NodeType nt,
+             UTL_ScopedName *n,
+             AST_Expression *v,
+             long width);
+  // Constructor.
 
-  be_string (AST_Expression *v, long wide);
-  // constructor
-
-  virtual int gen_typecode (void);
-  // generate the typecode
-
-  virtual int gen_encapsulation (void);
-  // encapsulation for parameters
-
-  virtual long tc_size (void);
-  // return typecode size
-
-  virtual long tc_encap_len (void);
-  // return length of encapsulation
-
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
 
-  // Narrowing
+  // Cleanup.
+  virtual void destroy (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS2 (be_string, AST_String, be_type);
   DEF_NARROW_FROM_DECL (be_string);
 
 protected:
   virtual void compute_tc_name (void);
-  // overridden method to compute typecode name
+  // Overridden method to compute typecode name.
 };
 
 #endif

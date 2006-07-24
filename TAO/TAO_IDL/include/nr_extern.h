@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,10 +67,13 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _NR_EXTERN_NR_EXTERN_HH
 #define _NR_EXTERN_NR_EXTERN_HH
 
+class UTL_Scope;
+class AST_Decl;
+
 // nr_extern.hh - Defines entry points provided by narrowing
 
-// Convert between an UTL_Scope and an AST_Decl
-extern	AST_Decl	*ScopeAsDecl(UTL_Scope *s);
-extern	UTL_Scope	*DeclAsScope(AST_Decl *d);
+// Convert between an UTL_Scope and an AST_Decl.
+extern TAO_IDL_FE_Export AST_Decl *ScopeAsDecl (UTL_Scope *s);
+extern TAO_IDL_FE_Export UTL_Scope *DeclAsScope (AST_Decl *d);
 
-#endif	// _NR_EXTERN_NR_EXTERN_HH
+#endif  // _NR_EXTERN_NR_EXTERN_HH

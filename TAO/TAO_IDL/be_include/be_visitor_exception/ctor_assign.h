@@ -21,7 +21,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_EXCEPTION_CTOR_ASSIGN_H_)
+#ifndef _BE_VISITOR_EXCEPTION_CTOR_ASSIGN_H_
 #define _BE_VISITOR_EXCEPTION_CTOR_ASSIGN_H_
 
 class be_visitor_exception_ctor_assign : public be_visitor_scope
@@ -58,6 +58,15 @@ public:
   virtual int visit_interface_fwd (be_interface_fwd *node);
   // visit interface forward
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit valuebox
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit valuetype
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
+  // visit valuetype forward
+
   virtual int visit_predefined_type (be_predefined_type *node);
   // visit predefined type
 
@@ -75,6 +84,10 @@ public:
 
   virtual int visit_typedef (be_typedef *node);
   // visit the typedef type
+
+private:
+  int emit_valuetype_common (be_type *node);
+
 
 };
 

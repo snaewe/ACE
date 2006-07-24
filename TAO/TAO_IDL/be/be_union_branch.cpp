@@ -19,96 +19,166 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_union_branch.h"
+#include "be_union.h"
+#include "be_type.h"
+#include "be_enum.h"
+#include "be_visitor.h"
+#include "be_helper.h"
+#include "ast_union_label.h"
+#include "ace/Log_Msg.h"
 
-ACE_RCSID(be, be_union_branch, "$Id$")
+ACE_RCSID (be, 
+           be_union_branch, 
+           "$Id$")
 
-
-/*
- * BE_UnionBranch
- */
 be_union_branch::be_union_branch (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Field (),
+    AST_UnionBranch (),
+    be_decl ()
 {
 }
 
-be_union_branch::be_union_branch (AST_UnionLabel *lab, AST_Type *ft,
-                                  UTL_ScopedName *n, UTL_StrList *p)
-  : AST_UnionBranch (lab, ft, n, p),
-    AST_Field (AST_Decl::NT_union_branch, ft, n, p),
-    AST_Decl (AST_Decl::NT_union_branch, n, p)
+be_union_branch::be_union_branch (UTL_LabelList *ll,
+                                  AST_Type *ft,
+                                  UTL_ScopedName *n)
+  : COMMON_Base (ft->is_local (),
+                 ft->is_abstract ()),
+    AST_Decl (AST_Decl::NT_union_branch,
+              n),
+    AST_Field (AST_Decl::NT_union_branch,
+               ft,
+               n),
+    AST_UnionBranch (ll,
+                     ft,
+                     n),
+    be_decl (AST_Decl::NT_union_branch,
+             n)
 {
 }
 
 int
-be_union_branch::gen_encapsulation (void)
+be_union_branch::gen_label_value (TAO_OutStream *os, unsigned long index)
 {
-  TAO_OutStream *cs; // output stream
-  TAO_NL  nl;        // end line
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
-  be_type *bt;  // our type node
-  long i, arrlen;
-  long *arr;  // an array holding string names converted to array of longs
+  AST_Expression *e = this->label (index)->label_val ();
 
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
-
-  // emit the case label value
-  *cs << this->label ()->label_val ();
-  *cs << ", // union case label (evaluated)" << nl;
-  // emit name
-  *cs << (ACE_OS::strlen (this->local_name ()->get_string ())+1) << ", ";
-  (void)this->tc_name2long(this->local_name ()->get_string (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
+  if (e->ec () != AST_Expression::EC_symbol)
     {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
+      // Easy, just a number...
+      *os << e;
+      return 0;
     }
-  *cs << " // name = " << this->local_name () << "\n";
 
-  // hand over code generation to our type node
-  bt = be_type::narrow_from_decl (this->field_type ());
-  if (!bt)
-    return -1;
-  return bt->gen_typecode ();
+  // If the enum is not in the global scope we have to prefix it.
+  be_union *u =
+    be_union::narrow_from_scope (this->defined_in ());
+
+  if (u == 0)
+    {
+      return -1;
+    }
+
+  be_type* dt =
+    be_type::narrow_from_decl (u->disc_type ());
+
+  if (dt == 0)
+    {
+      return -1;
+    }
+
+  // Check if discriminator is a typedef of an integer. If so, and the
+  // first IF block in this function didn't catch it, then we
+  // are a constant of this type. We can't generate the constant's name,
+  // we must generate the underlying integer value for the
+  // label value.
+  if (dt->node_type () == AST_Decl::NT_pre_defined)
+    {
+      *os << e;
+      return 0;
+    }
+
+  // Find where was the enum defined, if it was defined in the globa
+  // scope, then it is easy to generate the enum values....
+  be_scope* scope =
+    be_scope::narrow_from_scope (dt->defined_in ());
+
+  if (scope == 0)
+    {
+      *os << e->n ();
+      return 0;
+    }
+
+  // But if it was generated inside a module or something similar then
+  // we must prefix the enum value with something...
+  be_decl* decl = scope->decl ();
+
+  *os << decl->full_name () << "::" << e->n ()->last_component ();
+
+  return 0;
 }
 
-long
-be_union_branch::tc_encap_len (void)
-{
-  if (this->encap_len_ == -1)
-    {
-      be_type *bt;
-
-      this->encap_len_ = 4; // case label;
-      this->encap_len_ += this->name_encap_len (); // for name
-      bt = be_type::narrow_from_decl (this->field_type ());
-      if (!bt)
-        {
-          ACE_ERROR ((LM_ERROR, "be_union_branch: bad field type\n"));
-          return -1;
-        }
-      this->encap_len_ += bt->tc_size (); // note that we add the typecode size
-                                          // of the type
-    }
-  return this->encap_len_;
-}
-
-// compute the size type of the node in question
 int
-be_union_branch::compute_size_type (void)
+be_union_branch::gen_default_label_value (TAO_OutStream *os,
+                                          be_union *bu)
 {
-  be_type *type = be_type::narrow_from_decl (this->field_type ());
-  if (!type)
+  be_union::DefaultValue dv;
+
+  if (bu->default_value (dv) == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_field::compute_size_type - "
-                         "bad field type\n"), -1);
+                         "(%N:%l) be_visitor_union_branch::"
+                         "gen_default_label_value - "
+                         "computing default value failed\n"),
+                        -1);
     }
 
-  // our size type is the same as our type
-  this->size_type (type->size_type ()); // as a side effect will also update
-                                        // the size type of parent
+  switch (bu->udisc_type ())
+    {
+      case AST_Expression::EV_short:
+        *os << dv.u.short_val;
+        break;
+      case AST_Expression::EV_ushort:
+        *os << dv.u.ushort_val;
+        break;
+      case AST_Expression::EV_long:
+        *os << dv.u.long_val;
+        break;
+      case AST_Expression::EV_ulong:
+        *os << dv.u.ulong_val;
+        break;
+      case AST_Expression::EV_char:
+        os->print ("%d", dv.u.char_val);
+        break;
+      case AST_Expression::EV_bool:
+        *os << (dv.u.bool_val == 0 ? "false" : "true");
+        break;
+      case AST_Expression::EV_enum:
+        // The discriminant is an enum. Some compilers will
+        // not accept a numeric value assigned to this
+        // discriminant, so we must generate the string name.
+        {
+          AST_ConcreteType *act = bu->disc_type ();
+          be_enum *be = be_enum::narrow_from_decl (act);
+
+          // The function value_to_name() takes care of adding
+          // any necessary scoping to the output.
+          *os << be->value_to_name (dv.u.enum_val);
+          break;
+        }
+      case AST_Expression::EV_longlong:
+      case AST_Expression::EV_ulonglong:
+        // Unimplemented.
+      default:
+        // Error caught earlier.
+        ACE_ERROR_RETURN ((LM_ERROR,
+                           "(%N:%l) be_visitor_union_branch::"
+                           "gen_default_label_value - "
+                           "bad or unimplemented discriminant type\n"),
+                          -1);
+    }
+
   return 0;
 }
 
@@ -118,6 +188,13 @@ be_union_branch::accept (be_visitor *visitor)
   return visitor->visit_union_branch (this);
 }
 
-// Narrowing
+void
+be_union_branch::destroy (void)
+{
+  this->be_decl::destroy ();
+  this->AST_UnionBranch::destroy ();
+}
+
+// Narrowing.
 IMPL_NARROW_METHODS2 (be_union_branch, AST_UnionBranch, be_decl)
 IMPL_NARROW_FROM_DECL (be_union_branch)

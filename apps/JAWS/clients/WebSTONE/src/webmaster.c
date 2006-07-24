@@ -1,5 +1,5 @@
+/* $Id$ */
 /**************************************************************************
-$Header$
  *									  *
  * 		 Copyright (C) 1995 Silicon Graphics, Inc.		  *
  *									  *
@@ -10,6 +10,7 @@ $Header$
  *									  *
  **************************************************************************/
 
+/* FUZZ: disable check_for_math_include */
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>

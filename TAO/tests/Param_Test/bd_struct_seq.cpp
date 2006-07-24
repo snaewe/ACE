@@ -19,7 +19,9 @@
 #include "helper.h"
 #include "bd_struct_seq.h"
 
-ACE_RCSID(Param_Test, bd_struct_seq, "$Id$")
+ACE_RCSID (Param_Test, 
+           bd_struct_seq, 
+           "$Id$")
 
 const CORBA::ULong MAX_STRUCTSEQ_LEN = 1;
 
@@ -49,24 +51,55 @@ Test_Bounded_Struct_Sequence::opname (void) const
   return this->opname_;
 }
 
+void
+Test_Bounded_Struct_Sequence::dii_req_invoke (CORBA::Request *req
+                                              ACE_ENV_ARG_DECL)
+{
+  req->add_in_arg ("s1") <<= this->in_;
+  req->add_inout_arg ("s2") <<= this->inout_.in ();
+  req->add_out_arg ("s3") <<= this->out_.in ();
+  req->set_return_type (Param_Test::_tc_Bounded_StructSeq);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  Param_Test::Bounded_StructSeq *tmp;
+  req->return_value () >>= tmp;
+  this->ret_ = new Param_Test::Bounded_StructSeq (*tmp);
+
+  CORBA::NamedValue_ptr arg2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *arg2->value () >>= tmp;
+  this->inout_ = new Param_Test::Bounded_StructSeq (*tmp);
+
+  CORBA::NamedValue_ptr arg3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *arg3->value () >>= tmp;
+  this->out_ = new Param_Test::Bounded_StructSeq (*tmp);
+}
+
 int
-Test_Bounded_Struct_Sequence::init_parameters (Param_Test_ptr objref,
-                                               CORBA::Environment &env)
+Test_Bounded_Struct_Sequence::init_parameters (Param_Test_ptr /* objref */
+                                               ACE_ENV_ARG_DECL_NOT_USED /* env */)
 {
   Generator *gen = GENERATOR::instance (); // value generator
-
-  ACE_UNUSED_ARG (objref);
-  ACE_UNUSED_ARG (env);
 
   // set the length of the sequence
   this->in_.length (MAX_STRUCTSEQ_LEN);
   // now set each individual element
   for (CORBA::ULong i = 0; i < this->in_.length (); i++)
     {
-      // generate some arbitrary string to be filled into the ith location in
+      // generate some arbitrary struct to be filled into the ith location in
       // the sequence
       this->in_[i] = gen->gen_fixed_struct ();
     }
+
+  this->inout_->length (0);
+  this->out_->length (0);
+  this->ret_->length (0);
+
   return 0;
 }
 
@@ -76,60 +109,38 @@ Test_Bounded_Struct_Sequence::reset_parameters (void)
   this->inout_ = new Param_Test::Bounded_StructSeq; // delete the previous ones
   this->out_ = new Param_Test::Bounded_StructSeq;
   this->ret_ = new Param_Test::Bounded_StructSeq;
+
+  this->inout_->length (0);
+  this->out_->length (0);
+  this->ret_->length (0);
+
   return 0;
 }
 
 int
-Test_Bounded_Struct_Sequence::run_sii_test (Param_Test_ptr objref,
-                                            CORBA::Environment &env)
+Test_Bounded_Struct_Sequence::run_sii_test (Param_Test_ptr objref
+                                            ACE_ENV_ARG_DECL)
 {
-  Param_Test::Bounded_StructSeq_out out (this->out_.out ());
-  this->ret_ = objref->test_bounded_struct_sequence (this->in_,
-                                                     this->inout_.inout (),
-                                                     out,
-                                                     env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      Param_Test::Bounded_StructSeq_out out (this->out_.out ());
 
-int
-Test_Bounded_Struct_Sequence::add_args (CORBA::NVList_ptr param_list,
-                                        CORBA::NVList_ptr retval,
-                                        CORBA::Environment &env)
-{
-  CORBA::Any in_arg (Param_Test::_tc_Bounded_StructSeq, 
-                     &this->in_,
-                     CORBA::B_FALSE);
+      this->ret_ = objref->test_bounded_struct_sequence (this->in_,
+                                                         this->inout_.inout (),
+                                                         out
+                                                         ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-  CORBA::Any inout_arg (Param_Test::_tc_Bounded_StructSeq,
-                        &this->inout_.inout (),
-                        CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_Bounded_Struct_Sequence::run_sii_test\n");
 
-  CORBA::Any out_arg (Param_Test::_tc_Bounded_StructSeq,
-                      &this->out_.inout (), // .out () causes crash
-                      CORBA::B_FALSE);
-
-  // add parameters
-  param_list->add_value ("s1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("s2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("s3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // add return value type
-  retval->item (0, env)->value ()->replace (Param_Test::_tc_Bounded_StructSeq,
-                                            &this->ret_.inout (), // see above
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
@@ -144,9 +155,8 @@ Test_Bounded_Struct_Sequence::check_validity (void)
 }
 
 CORBA::Boolean
-Test_Bounded_Struct_Sequence::check_validity (CORBA::Request_ptr req)
+Test_Bounded_Struct_Sequence::check_validity (CORBA::Request_ptr)
 {
-  ACE_UNUSED_ARG (req);
   return this->check_validity ();
 }
 
@@ -224,4 +234,3 @@ Test_Bounded_Struct_Sequence::print_sequence (const Param_Test::Bounded_StructSe
                   vs.l, vs.c, vs.s, vs.o, vs.f, vs.b, vs.d));
     }
 }
-

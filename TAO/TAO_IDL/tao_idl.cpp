@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,11 +62,232 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
+
+#include "idl_defines.h"
+#include "be_extern.h"
+#include "global_extern.h"
+#include "fe_extern.h"
+#include "ast_root.h"
+#include "ast_extern.h"
+#include "utl_string.h"
+#include "utl_identifier.h"
+#include "drv_extern.h"
+#include "tao/Version.h"
+
+#if !defined (ACE_LACKS_IOSTREAM_TOTALLY)
+// FUZZ: disable check_for_streams_include
+#  include "ace/streams.h"
+#endif /* ! ACE_LACKS_IOSTREAM_TOTALLY */
+
+ACE_RCSID (TAO_IDL,
+           tao_idl,
+           "$Id$")
+
+extern const char *DRV_arglist[];
+extern unsigned long DRV_argcount;
+
+char *DRV_files[NFILES];
+long DRV_nfiles = 0;
+long DRV_file_index = -1;
+
+void
+DRV_version (void)
+{
+  ACE_DEBUG ((LM_DEBUG,
+              "%s\n"
+              "%s %s (%s %s)\n",
+              idl_global->prog_name (),
+              ACE_TEXT ("TAO_IDL_FE, version"),
+              ACE_TEXT (TAO_VERSION),
+              ACE_TEXT ("Based on Sun IDL FE, version"),
+              ACE_TEXT (SUN_IDL_FE_VERSION)));
+
+  BE_version ();
+}
+
+int
+DRV_init (int &argc, char *argv[])
+{
+  // Initialize front end.
+  FE_init ();
+
+  // Initialize driver private data
+  DRV_nfiles = 0;
+  DRV_file_index = 0;
+
+#if defined (TAO_IDL_PREPROCESSOR)
+  idl_global->set_cpp_location (TAO_IDL_PREPROCESSOR);
+#elif defined (ACE_CC_PREPROCESSOR)
+  idl_global->set_cpp_location (ACE_CC_PREPROCESSOR);
+#else
+  // Just default to cc
+  idl_global->set_cpp_location ("cc");
+#endif /* TAO_IDL_PREPROCESSOR */
+
+  // Does nothing for IDL compiler, stores -ORB args, initializes
+  // ORB and IFR for IFR loader.
+  return BE_init (argc, argv);
+}
+
+void
+DRV_refresh (void)
+{
+  idl_global->set_err_count (0);
+  idl_global->set_filename (0);
+  idl_global->set_main_filename (0);
+  idl_global->set_real_filename (0);
+  idl_global->set_stripped_filename (0);
+  idl_global->set_lineno (-1);
+  idl_global->reset_flag_seen ();
+}
+
+void
+DRV_cleanup (void)
+{
+  // In case we got here via an init error or
+  // usage/version option - otherwise it's idempotent.
+  BE_cleanup ();
+
+  be_global->destroy ();
+  delete be_global;
+  be_global = 0;
+
+  idl_global->fini ();
+  delete idl_global;
+  idl_global = 0;
+
+  for (DRV_file_index = 0;
+       DRV_file_index < DRV_nfiles;
+       ++DRV_file_index)
+    {
+      ACE::strdelete (DRV_files[DRV_file_index]);
+    }
+
+  for (unsigned long i = 0; i < DRV_argcount; ++i)
+    {
+      delete [] (const_cast<char *> (DRV_arglist[i]));
+    }
+}
 
 /*
-** drv_main.cc - Main program for IDL compiler driver
+** Drive the compilation
 **
+** LOGIC:
+**
+** 2. Initialize the BE. This builds an instance of the generator
+** 3. Initialize the FE. This builds the global scope
+**    and populates it with the predefined types
+** 4. Invoke FE_yyparse
+** 5. Check for errors from FE_yyparse. If any, exit now
+** 6. Check for undefined forward declared interfaces. If any, exit now
+** 7. Check if asked to dump AST. If so, do.
+** 8. Invoke BE.
+*/
+
+void
+DRV_drive (const char *s)
+{
+  // Set the name of the IDL file we are parsing. This is useful to
+  // the backend when it generates C++ headers and files.
+  idl_global->idl_src_file (idl_global->utl_string_factory (s));
+
+  // Pass through CPP.
+  if (idl_global->compile_flags () & IDL_CF_INFORMATIVE)
+    {
+      ACE_DEBUG ((LM_DEBUG,
+                  "%s%s %s\n",
+                  idl_global->prog_name (),
+                  ACE_TEXT (": preprocessing"),
+                  s));
+    }
+
+  DRV_pre_proc (s);
+
+  // Parse.
+  if (idl_global->compile_flags () & IDL_CF_INFORMATIVE)
+    {
+      ACE_DEBUG ((LM_DEBUG,
+                  "%s%s %s\n",
+                  idl_global->prog_name (),
+                  ACE_TEXT (": parsing"),
+                  s));
+    }
+
+  // Return value not used - error count stored in idl_global
+  // and checked below.
+  (void) FE_yyparse ();
+
+  // We must do this as late as possible to make sure any
+  // forward declared structs or unions contained in a
+  // primary key at some level have been fully defined.
+  idl_global->check_primary_keys ();
+
+  // If there were any errors, stop.
+  if (idl_global->err_count () > 0)
+    {
+      ACE_ERROR ((LM_ERROR,
+                  "%s%s %s%s %d %s%s\n",
+                  idl_global->prog_name (),
+                  ACE_TEXT (":"),
+                  s,
+                  ACE_TEXT (": found"),
+                  idl_global->err_count (),
+                  ACE_TEXT ("error"),
+                  ACE_TEXT ((idl_global->err_count () > 1
+                    ? ACE_TEXT ("s")
+                    : ACE_TEXT ("")))));
+
+      // Backend will be cleaned up after the exception is caught.
+      throw FE_Bailout ();
+    }
+
+  // Dump the code.
+  if ((idl_global->compile_flags () & IDL_CF_INFORMATIVE)
+      && (idl_global->compile_flags () & IDL_CF_DUMP_AST))
+    {
+      ACE_DEBUG ((LM_DEBUG,
+                  "%s%s %s\n",
+                  idl_global->prog_name (),
+                  ACE_TEXT (": dump"),
+                  s));
+    }
+
+  if (idl_global->compile_flags () & IDL_CF_DUMP_AST)
+    {
+      ACE_DEBUG ((LM_DEBUG,
+                  ACE_TEXT ("Dump of AST:\n")));
+
+      idl_global->root ()->dump (*ACE_DEFAULT_LOG_STREAM);
+    }
+
+  // Call the main entry point for the BE.
+  if (idl_global->compile_flags () & IDL_CF_INFORMATIVE)
+    {
+      ACE_DEBUG ((LM_DEBUG,
+                  "%s%s %s\n",
+                  idl_global->prog_name (),
+                  ACE_TEXT (": BE processing on"),
+                  s));
+    }
+
+  // Make sure all forward declared structs and unions are defined
+  // before proceeding to code generation.
+  AST_check_fwd_decls ();
+
+  if (0 == idl_global->err_count ())
+    {
+      BE_produce ();
+    }
+  else
+    {
+      throw FE_Bailout ();
+    }
+
+  DRV_refresh ();
+}
+
+/*
 ** LOGIC:
 **
 ** 1. Initialize compiler driver
@@ -75,187 +296,90 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 ** 4. Otherwise, for the single file, invoke DRV_drive
 */
 
-#include	"idl.h"
-#include	"idl_extern.h"
-
-#include	"drv_private.h"
-#include        "drv_link.h"
-
-ACE_RCSID(TAO_IDL, tao_idl, "$Id$")
-
-static void
-DRV_version()
-{
-  cerr << idl_global->prog_name() 
-       << GTDEVEL(", version ")
-       << IDL_CFE_VERSION 
-       << "\n";
-  (*DRV_BE_version)();
-}
-
-/*
-** Drive the compilation
-**
-** LOGIC:
-**
-** 1. Initialize the CFE, stage 1. This builds the scope stack
-** 2. Initialize the BE. This builds an instance of the generator
-** 3. Initialize the CFE, stage 2. This builds the global scope
-**    and populates it with the predefined types
-** 4. Invoke FE_yyparse
-** 5. Check for errors from FE_yyparse. If any, exit now
-** 6. Check for undefined forward declared interfaces. If any, exit now
-** 7. Check if asked to dump AST. If so, do.
-** 8. Invoke BE.
-*/
-void
-DRV_drive(char *s)
-{
-  char	*fn;
-
-  // Macro to avoid "warning: unused parameter" type warning.
-  ACE_UNUSED_ARG (fn);
-
-  // set the name of the IDL file we are parsing. This is useful to the backend
-  // when it generates C++ headers and files
-  idl_global->idl_src_file(new UTL_String(s));
-  /*
-   * Pass through CPP
-   */
-  if (idl_global->compile_flags() & IDL_CF_INFORMATIVE)
-    cerr << idl_global->prog_name()
-	 << GTDEVEL(": preprocessing ")
-	 << s
-	 << "\n";
-  DRV_pre_proc(s);
-  /*
-   * Initialize FE stage 1
-   */
-  (*DRV_FE_init_stage1)();
-  /*
-   * Initialize BE
-   */
-  idl_global->set_gen((*DRV_BE_init)());
-  /*
-   * Initialize FE stage 2
-   */
-  (*DRV_FE_init_stage2)();
-  /*
-   * Parse
-   */
-  if (idl_global->compile_flags() & IDL_CF_INFORMATIVE)
-    cerr << idl_global->prog_name()
-	 << GTDEVEL(": parsing ")
-	 << s
-	 << "\n";
-  (*DRV_FE_yyparse)();
-  /*
-   * If there were any errors, stop
-   */
-  if (idl_global->err_count() > 0) {
-    cerr << idl_global->prog_name()
-	 << ": "
-	 << s 
-	 << GTDEVEL(": found ");
-    cerr << idl_global->err_count()
-	 << GTDEVEL(" error");
-    cerr << (idl_global->err_count() > 1
-	    ? GTDEVEL("s") : "")
-    	 << "\n";
-    /*
-     * Call BE_abort to allow a BE to clean up after itself
-     */
-    (*DRV_BE_abort)();
-    exit((int) idl_global->err_count());
-  }
-  /*
-   * Dump the code
-   */
-  if ((idl_global->compile_flags() & IDL_CF_INFORMATIVE)
-      && (idl_global->compile_flags() & IDL_CF_DUMP_AST))
-    cerr << idl_global->prog_name()
-	 << GTDEVEL(": dump ")
-	 << s
-	 << "\n";
-  if (idl_global->compile_flags() & IDL_CF_DUMP_AST) {
-    cerr << GTDEVEL("Dump of AST:\n");
-    idl_global->root()->dump(cerr);
-  }
-  /*
-   * Call the main entry point for the BE
-   */
-  if (idl_global->compile_flags() & IDL_CF_INFORMATIVE)
-    cerr << idl_global->prog_name()
-	 << GTDEVEL(": BE processing on ")
-	 << s
-	 << "\n";
-  (*DRV_BE_produce)();
-  /*
-   * Exit cleanly
-   */
-  exit(0);
-}
-
-/*
- * IDL compiler main program. Logic as explained in comment at head
- * of file.
- */
 int
-main(int argc, char **argv)
+main (int argc, char *argv[])
 {
-  /*
-   * Open front-end library
-   */
-  DRV_FE_open();
-  /*
-   * Initialize driver and global variables
-   */
-  DRV_init();
-  /*
-   * Open back-end library
-   */
-  DRV_BE_open();
-  /*
-   * Parse arguments
-   */
-  DRV_parse_args(argc, argv);
-  /*
-   * If a version message is requested, print it and exit
-   */
-  if (idl_global->compile_flags() & IDL_CF_VERSION) {
-    DRV_version();
-    exit(0);
-  }
-  /*
-   * If a usage message is requested, give it and exit
-   */
-  if (idl_global->compile_flags() & IDL_CF_ONLY_USAGE) {
-    DRV_usage();
-    exit(0);
-  }
-  /*
-   * Fork off a process for each file to process. Fork only if
-   * there is more than one file to process
-   */
-  if (DRV_nfiles > 1) {
-    /*
-     * DRV_fork never returns
-     */
-    DRV_fork();
-  } else {
-    /*
-     * Do the one file we have to parse
-     *
-     * Check if stdin and handle file name appropriately
-     */
-    if (DRV_nfiles == 0)
-      {
-        DRV_files[0] = "standard input";
-      }
-    DRV_file_index = 0;
-    DRV_drive(DRV_files[DRV_file_index]);
-  }
-  exit(0);
-  /* NOTREACHED */
-  return 0;
+  // Return status.
+  int status = 0;
+
+  try
+    {
+      // Initialize driver and global variables.
+      status = DRV_init (argc, argv);
+
+      if (0 != status)
+        {
+          throw FE_Bailout ();
+        }
+
+      // Parse arguments.
+      DRV_parse_args (argc, argv);
+
+      // If a version message is requested, print it and exit.
+      if (idl_global->compile_flags () & IDL_CF_VERSION)
+        {
+          DRV_version ();
+          throw FE_Bailout ();
+        }
+
+      // If a usage message is requested, give it and exit.
+      if (idl_global->compile_flags () & IDL_CF_ONLY_USAGE)
+        {
+          DRV_usage ();
+          throw FE_Bailout ();
+        }
+
+      // If there are no input files, and we are not using the
+      // directory recursion option, there's no sense going any further.
+      if (0 == DRV_nfiles && 0 == idl_global->recursion_start ())
+        {
+          ACE_ERROR ((LM_ERROR,
+                      ACE_TEXT ("IDL: No input files\n")));
+
+          ++status;
+          throw FE_Bailout ();
+        }
+
+      AST_Generator *gen = be_global->generator_init ();
+
+      if (0 == gen)
+        {
+          ACE_ERROR ((
+              LM_ERROR,
+              ACE_TEXT ("IDL: DRV_generator_init() failed to create ")
+              ACE_TEXT ("generator, exiting\n")
+            ));
+
+          ++status;
+          throw FE_Bailout ();
+        }
+      else
+        {
+          idl_global->set_gen (gen);
+        }
+
+      // Initialize AST and load predefined types.
+      FE_populate ();
+
+      // Does various things in various backends.
+      BE_post_init (DRV_files, DRV_nfiles);
+
+      for (DRV_file_index = 0;
+           DRV_file_index < DRV_nfiles;
+           ++DRV_file_index)
+        {
+          DRV_drive (DRV_files[DRV_file_index]);
+        }
+    }
+  catch (FE_Bailout)
+    {
+    }
+
+  // Case 1: init error, status = 1, nothing added here.
+  // Case 2: other error(s), status = 0, error count added here.
+  status += idl_global->err_count ();
+
+  DRV_cleanup ();
+
+  return status;
 }

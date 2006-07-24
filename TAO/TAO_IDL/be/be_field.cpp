@@ -19,91 +19,58 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_field.h"
+#include "be_visitor.h"
+#include "be_type.h"
+#include "global_extern.h"
+#include "ace/Log_Msg.h"
 
-ACE_RCSID(be, be_field, "$Id$")
+ACE_RCSID (be, 
+           be_field, 
+           "$Id$")
 
-/*
- * BE_Field
- */
 be_field::be_field (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Field (),
+    be_decl ()
 {
 }
-be_field::be_field (AST_Type *ft, UTL_ScopedName *n, UTL_StrList *p)
-  : AST_Field (ft, n, p),
-    AST_Decl (AST_Decl::NT_field, n, p)
+
+be_field::be_field (AST_Type *ft,
+                    UTL_ScopedName *n,
+                    Visibility vis)
+  : COMMON_Base (ft->is_local (),
+                 ft->is_abstract ()),
+    AST_Decl (AST_Decl::NT_field,
+              n),
+    AST_Field (ft,
+               n,
+               vis),
+    be_decl (AST_Decl::NT_field,
+             n)
 {
-}
-
-int
-be_field::gen_encapsulation (void)
-{
-  TAO_OutStream *cs; // output stream
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
-  be_type *bt;  // our type node
-  long i, arrlen;
-  long *arr;  // an array holding string names converted to array of longs
-
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
-
-  // generate name
-  *cs << (ACE_OS::strlen (this->local_name ()->get_string ())+1) << ", ";
-  (void)this->tc_name2long(this->local_name ()->get_string (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
+  // This covers valuetype fields as well, which is what we want.
+  AST_Decl::NodeType nt =
+    ft->unaliased_type ()->node_type ();
+    
+  if (nt == AST_Decl::NT_string || nt == AST_Decl::NT_wstring)
     {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
+      idl_global->string_member_seen_ = true;
     }
-  *cs << " // name = " << this->local_name () << "\n";
-
-  // hand over code generation to our type node
-  bt = be_type::narrow_from_decl (this->field_type ());
-  return bt->gen_typecode ();
-}
-
-long
-be_field::tc_encap_len (void)
-{
-  if (this->encap_len_ == -1)  // not computed yet
-    {
-      be_type *bt;
-
-      // struct member is represented as the "name" followed by the typecode
-
-      this->encap_len_ = this->name_encap_len (); // for name
-
-      // add to this, the size of our typecode
-      bt = be_type::narrow_from_decl (this->field_type ());
-      this->encap_len_ += bt->tc_size (); // note that we must add typecode
-                                          // size of the type
-    }
-  return this->encap_len_;
-}
-
-// compute the size type of the node in question
-int
-be_field::compute_size_type (void)
-{
-  be_type *type = be_type::narrow_from_decl (this->field_type ());
-  if (!type)
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_field::compute_size_type - "
-                         "bad field type\n"), -1);
-    }
-
-  // our size type is the same as our type
-  this->size_type (type->size_type ()); // as a side effect will also update
-                                        // the size type of parent
-  return 0;
 }
 
 int
 be_field::accept (be_visitor *visitor)
 {
   return visitor->visit_field (this);
+}
+
+void
+be_field::destroy (void)
+{
+  this->be_decl::destroy ();
+  this->AST_Field::destroy ();
 }
 
 // Narrowing

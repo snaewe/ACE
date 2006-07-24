@@ -1,4 +1,5 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 //
 // ============================================================================
@@ -16,6 +17,8 @@
 //    Chris Gill
 //
 // ============================================================================
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
 
 //////////////////////
 // Class Task_Entry //
@@ -87,11 +90,15 @@ Task_Entry::dfs_status (Task_Entry::DFS_Status ds)
   dfs_status_ = ds;
 }
 
+// Sets a flag indicating whether node is a thread delineator.
+
 ACE_INLINE void
 Task_Entry::is_thread_delineator (int i)
 {
   is_thread_delineator_ = i;
 }
+
+// Gets the flag indicating whether node is a thread delineator.
 
 ACE_INLINE int
 Task_Entry::is_thread_delineator () const
@@ -99,21 +106,57 @@ Task_Entry::is_thread_delineator () const
   return is_thread_delineator_;
 }
 
-// access set of Task Entries on which this entry depends
+// Sets a flag indicating whether node has unresolved remote dependencies.
+
+ACE_INLINE void
+Task_Entry::has_unresolved_remote_dependencies (int i)
+{
+  has_unresolved_remote_dependencies_ = i;
+}
+
+// Gets the flag indicating whether node has unresolved remote dependencies.
+
+ACE_INLINE int
+Task_Entry::has_unresolved_remote_dependencies () const
+{
+  return has_unresolved_remote_dependencies_;
+}
+
+
+// Sets a flag indicating whether node has unresolved local dependencies.
+
+ACE_INLINE void
+Task_Entry::has_unresolved_local_dependencies (int i)
+{
+  has_unresolved_local_dependencies_ = i;
+}
+
+// Gets the flag indicating whether node has unresolved local dependencies.
+
+ACE_INLINE int
+Task_Entry::has_unresolved_local_dependencies () const
+{
+  return has_unresolved_local_dependencies_;
+}
+
+// Gets the set of Task Entries on which this entry depends.
+
 ACE_INLINE ACE_Unbounded_Set <Task_Entry_Link *> &
 Task_Entry::calls ()
 {
   return calls_;
 }
 
-// access set of Task Entries which depend on this entry
+// Gets the set of Task Entries which depend on this entry.
+
 ACE_INLINE ACE_Unbounded_Set <Task_Entry_Link *> &
 Task_Entry::callers ()
 {
   return callers_;
 }
 
-// get set of arrivals in the effective period
+// Gets set of arrivals in the entry's effective period.
+
 ACE_INLINE ACE_Ordered_MultiSet<Dispatch_Entry_Link> &
 Task_Entry::dispatches ()
 {
@@ -130,13 +173,14 @@ Task_Entry::info_type () const
 ACE_INLINE u_long
 Task_Entry::effective_execution_time () const
 {
-  // Just use low 32 bits.  This will have to change when CosTimeBase.idl
+  // Just use low 32 bits.  This will have to change when TimeBase.idl
   // is finalized.
   ACE_UINT32 worst_case_execution_time =
     ACE_U64_TO_U32 (rt_info_->worst_case_execution_time);
 
-  return (rt_info_->info_type == RtecScheduler::OPERATION)
-         ? worst_case_execution_time * dispatches_.size ()
+  return ((rt_info_->info_type == RtecScheduler::OPERATION) ||
+          (rt_info_->info_type == RtecScheduler::REMOTE_DEPENDANT))
+         ? static_cast<u_long> (worst_case_execution_time * dispatches_.size ())
          : 0;
 }
 
@@ -269,7 +313,7 @@ Dispatch_Entry_Link::~Dispatch_Entry_Link ()
 }
   // dtor
 
-ACE_INLINE int
+ACE_INLINE bool
 Dispatch_Entry_Link::operator < (const Dispatch_Entry_Link &d) const
 {
   return (this->dispatch_entry_ < d.dispatch_entry_);
@@ -367,10 +411,10 @@ TimeLine_Entry::prev (TimeLine_Entry *t)
 }
 
 
-ACE_INLINE int
+ACE_INLINE bool
 TimeLine_Entry::operator < (const TimeLine_Entry &t) const
 {
-  return (start_ < t.start_) ? 1 : 0;
+  return (start_ < t.start_) ? true : false;
 }
   // comparison operator
 
@@ -393,9 +437,11 @@ TimeLine_Entry_Link::entry () const
 }
   // accessor for the underlying entry
 
-ACE_INLINE int
+ACE_INLINE bool
 TimeLine_Entry_Link::operator < (const TimeLine_Entry_Link &l) const
 {
-  return (entry_ < l.entry_) ? 1 : 0;
+  return (entry_ < l.entry_);
 }
   // comparison operator
+
+TAO_END_VERSIONED_NAMESPACE_DECL

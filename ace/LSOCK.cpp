@@ -1,36 +1,42 @@
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/LSOCK.h"
 
 ACE_RCSID(ace, LSOCK, "$Id$")
 
 #if !defined (ACE_LACKS_UNIX_DOMAIN_SOCKETS)
 
-#if defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/LSOCK.i"
-#endif
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_sys_socket.h"
+
+#if !defined (__ACE_INLINE__)
+#include "ace/LSOCK.inl"
+#endif /* __ACE_INLINE__ */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_ALLOC_HOOK_DEFINE(ACE_LSOCK)
 
 void
 ACE_LSOCK::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_LSOCK::dump");
 
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("aux_handle_ = %d"), this->aux_handle_));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("aux_handle_ = %d"), this->aux_handle_));
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
 #if defined (ACE_HAS_MSG)
 // This routine sends an open file descriptor to <this->handle_>.
 
-int
+ssize_t
 ACE_LSOCK::send_handle (const ACE_HANDLE handle) const
 {
   ACE_TRACE ("ACE_LSOCK::send_handle");
-  unsigned char a[2];
+  u_char a[2];
   iovec iov;
   msghdr send_msg;
 #if defined (ACE_HAS_4_4BSD_SENDMSG_RECVMSG)
@@ -67,11 +73,11 @@ ACE_LSOCK::send_handle (const ACE_HANDLE handle) const
 // Note, this routine returns -1 if problems occur, 0 if we recv a
 // message that does not have file descriptor in it, and 1 otherwise.
 
-int
-ACE_LSOCK::recv_handle (ACE_HANDLE &handle, char *pbuf, int *len) const
+ssize_t
+ACE_LSOCK::recv_handle (ACE_HANDLE &handle, char *pbuf, ssize_t *len) const
 {
   ACE_TRACE ("ACE_LSOCK::recv_handle");
-  unsigned char a[2];
+  u_char a[2];
   iovec iov;
   msghdr recv_msg;
 
@@ -103,9 +109,6 @@ ACE_LSOCK::recv_handle (ACE_HANDLE &handle, char *pbuf, int *len) const
 #endif /* ACE_HAS_4_4BSD_SENDMSG_RECVMSG */
 
 #if defined (ACE_HAS_STREAMS)
-#if defined (ACE_HAS_4_4BSD_SENDMSG_RECVMSG)
-  ACE_UNUSED_ARG (handle);
-#endif /* ACE_HAS_4_4BSD_SENDMSG_RECVMSG */
 
   ssize_t nbytes = ACE_OS::recvmsg (this->get_handle (), &recv_msg, 0);
 
@@ -115,22 +118,32 @@ ACE_LSOCK::recv_handle (ACE_HANDLE &handle, char *pbuf, int *len) const
         *len = nbytes;
 
       if (nbytes == sizeof a
-          && ((unsigned char *) iov.iov_base)[0] == 0xab
-          && ((unsigned char *) iov.iov_base)[1] == 0xcd)
-        return 1;
+          && ((u_char *) iov.iov_base)[0] == 0xab
+          && ((u_char *) iov.iov_base)[1] == 0xcd)
+        {
+#if defined (ACE_HAS_4_4BSD_SENDMSG_RECVMSG)
+          cmsghdr *cmsgptr = (cmsghdr *) cmsgbuf;
+          handle = *(ACE_HANDLE *) CMSG_DATA (cmsgptr);
+#endif /* ACE_HAS_4_4BSD_SENDMSG_RECVMSG */
+          return 1;
+        }
       else
         return 0;
     }
 #else
-  ssize_t nbytes = ACE_OS::recvmsg (this->get_handle (), &recv_msg, MSG_PEEK);
+  ssize_t nbytes = ACE_OS::recvmsg (this->get_handle (),
+                                    &recv_msg,
+                                    MSG_PEEK);
 
   if (nbytes != ACE_INVALID_HANDLE)
     {
       if (nbytes == sizeof a
-          && ((unsigned char *) iov.iov_base)[0] == 0xab
-          && ((unsigned char *) iov.iov_base)[1] == 0xcd)
+          && ((u_char *) iov.iov_base)[0] == 0xab
+          && ((u_char *) iov.iov_base)[1] == 0xcd)
         {
 #if defined (ACE_HAS_4_4BSD_SENDMSG_RECVMSG)
+          // Close down the socket that was returned by the MSG_PEEK.
+          ACE_OS::closesocket (*(ACE_HANDLE *) CMSG_DATA ((cmsghdr *) cmsgbuf));
           recv_msg.msg_control = cmsgbuf;
           recv_msg.msg_controllen = sizeof cmsgbuf;
 #else
@@ -145,7 +158,7 @@ ACE_LSOCK::recv_handle (ACE_HANDLE &handle, char *pbuf, int *len) const
             {
 #if defined (ACE_HAS_4_4BSD_SENDMSG_RECVMSG)
               cmsghdr *cmsgptr = (cmsghdr *) cmsgbuf;
-              handle = *(ACE_HANDLE *) CMSG_DATA (cmsgptr) ;
+              handle = *(ACE_HANDLE *) CMSG_DATA (cmsgptr);
 #endif /* ACE_HAS_4_4BSD_SENDMSG_RECVMSG */
               return 1;
             }
@@ -162,4 +175,7 @@ ACE_LSOCK::recv_handle (ACE_HANDLE &handle, char *pbuf, int *len) const
     return ACE_INVALID_HANDLE;
 }
 #endif /* ACE_HAS_MSG */
+
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #endif /* ACE_LACKS_UNIX_DOMAIN_SOCKETS */

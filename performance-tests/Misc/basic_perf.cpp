@@ -22,7 +22,10 @@
 #include "basic_func.h"
 #include "ace/High_Res_Timer.h"
 #include "ace/Get_Opt.h"
-#include "ace/OS.h"
+#include "ace/OS_main.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdlib.h"
+#include "ace/OS_NS_sys_utsname.h"
 
 ACE_RCSID(Misc, basic_perf, "$Id$")
 
@@ -127,7 +130,7 @@ Basic_Test::iteration_time (void)
 {
   return per_iteration (elapsed_time_ > empty_iteration_time_  ?
                           elapsed_time_ - empty_iteration_time_  :
-                          0);
+                          static_cast<ACE_hrtime_t> (0));
 }
 
 void
@@ -493,9 +496,9 @@ Virtual_Member_Call_Test::run (void)
 ///////////////////////////////////////////////////////////////////////////////
 static
 unsigned int
-get_options (int argc, char *argv [])
+get_options (int argc, ACE_TCHAR *argv [])
 {
-  ACE_Get_Opt get_opt (argc, argv, "i:?");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT("i:?"));
   int opt;
 
   while ((opt = get_opt ()) != EOF)
@@ -504,7 +507,7 @@ get_options (int argc, char *argv [])
         {
         case 'i':
           {
-            int temp = ACE_OS::atoi (get_opt.optarg);
+            int temp = ACE_OS::atoi (get_opt.opt_arg ());
             if (temp > 0)
               iterations = (u_int) temp;
             else
@@ -527,7 +530,7 @@ get_options (int argc, char *argv [])
         }
     }
 
-  switch (argc - get_opt.optind)
+  switch (argc - get_opt.opt_ind ())
     {
     case 0:
       // OK
@@ -549,12 +552,12 @@ get_options (int argc, char *argv [])
 ///////////////////////////////////////////////////////////////////////////////
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   if (get_options (argc, argv))
     ACE_OS::exit (-1);
 
-  struct utsname name;
+  ACE_utsname name;
 
   if (ACE_OS::uname (&name) != -1)
     ACE_DEBUG ((LM_INFO, "%s (%s), %s %s at %T\n",

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,71 +62,225 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_predefined_type.cc - Implementation of class AST_PredefinedType
- *
- * AST_PredefinedType nodes denote the various predefined types such
- * as long, short, etc. that are available in IDL. Each AST_PredefinedType
- * node has a field (the value of this field is from the enum
- * AST_PredefinedType::PredefinedType) which denotes the specific predefined
- * type that this node represents. There is only one node in the entire
- * AST which represents each predefined type, such as long etc.
- */
+// AST_PredefinedType nodes denote the various predefined types such
+// as long, short, etc. that are available in IDL. Each AST_PredefinedType
+// node has a field (the value of this field is from the enum
+// AST_PredefinedType::PredefinedType) which denotes the specific predefined
+// type that this node represents. There is only one node in the entire
+// AST which represents each predefined type, such as long etc.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_predefined_type.h"
+#include "ast_visitor.h"
+#include "utl_identifier.h"
+#include "global_extern.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdio.h"
 
-ACE_RCSID(ast, ast_predefined_type, "$Id$")
+ACE_RCSID (ast,
+           ast_predefined_type,
+           "$Id$")
 
-/*
- * Constructor(s)
- */
-AST_PredefinedType::AST_PredefinedType()
-		  : pd_pt(PT_long)
+AST_PredefinedType::AST_PredefinedType (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_ConcreteType (),
+    pd_pt (PT_long)
 {
 }
 
-AST_PredefinedType::AST_PredefinedType(PredefinedType t, UTL_ScopedName *n,
-				       UTL_StrList *p)
-		   : AST_Decl(AST_Decl::NT_pre_defined, n, p),
-		     pd_pt(t)
+AST_PredefinedType::AST_PredefinedType (PredefinedType t,
+                                        UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_pre_defined,
+              n,
+              true),
+    AST_Type (AST_Decl::NT_pre_defined,
+              n),
+    AST_ConcreteType (AST_Decl::NT_pre_defined,
+                      n),
+    pd_pt (t)
+{
+  UTL_ScopedName *new_name = 0;
+  Identifier *id = 0;
+
+  // Generate a new Scoped Name for us such that we belong to the CORBA
+  // namespace.
+  if (t == AST_PredefinedType::PT_void)
+    {
+      ACE_NEW (id,
+               Identifier (n->last_component ()->get_string ()));
+
+      ACE_NEW (new_name,
+               UTL_ScopedName (id,
+                               0));
+    }
+  else
+    {
+      ACE_NEW (id,
+               Identifier (idl_global->nest_orb () ? "NORB" : "CORBA"));
+
+      ACE_NEW (new_name,
+               UTL_ScopedName (id,
+                               0));
+
+      UTL_ScopedName *conc_name = 0;
+
+      switch (this->pt ())
+        {
+        case AST_PredefinedType::PT_long:
+          ACE_NEW (id,
+                   Identifier ("Long"));
+          break;
+        case AST_PredefinedType::PT_ulong:
+          ACE_NEW (id,
+                   Identifier ("ULong"));
+          break;
+        case AST_PredefinedType::PT_short:
+          ACE_NEW (id,
+                   Identifier ("Short"));
+          break;
+        case AST_PredefinedType::PT_ushort:
+          ACE_NEW (id,
+                   Identifier ("UShort"));
+          break;
+        case AST_PredefinedType::PT_float:
+          ACE_NEW (id,
+                   Identifier ("Float"));
+          break;
+        case AST_PredefinedType::PT_double:
+          ACE_NEW (id,
+                   Identifier ("Double"));
+          break;
+        case AST_PredefinedType::PT_char:
+          ACE_NEW (id,
+                   Identifier ("Char"));
+          break;
+        case AST_PredefinedType::PT_octet:
+          ACE_NEW (id,
+                   Identifier ("Octet"));
+          break;
+        case AST_PredefinedType::PT_wchar:
+          ACE_NEW (id,
+                   Identifier ("WChar"));
+          break;
+        case AST_PredefinedType::PT_boolean:
+          ACE_NEW (id,
+                   Identifier ("Boolean"));
+          break;
+        case AST_PredefinedType::PT_longlong:
+          ACE_NEW (id,
+                   Identifier ("LongLong"));
+          break;
+        case AST_PredefinedType::PT_ulonglong:
+          ACE_NEW (id,
+                   Identifier ("ULongLong"));
+          break;
+        case AST_PredefinedType::PT_longdouble:
+          ACE_NEW (id,
+                   Identifier ("LongDouble"));
+          break;
+        case AST_PredefinedType::PT_any:
+          ACE_NEW (id,
+                   Identifier ("Any"));
+          break;
+        case AST_PredefinedType::PT_object:
+          ACE_NEW (id,
+                   Identifier ("Object"));
+          break;
+        case AST_PredefinedType::PT_value:
+          ACE_NEW (id,
+                   Identifier ("ValueBase"));
+          break;
+        case AST_PredefinedType::PT_pseudo:
+          ACE_NEW (id,
+                   Identifier (n->last_component ()->get_string ()));
+          break;
+        default:
+          ACE_ERROR ((LM_ERROR,
+                      "AST_PredefinedType - bad enum value\n"));
+        }
+
+      ACE_NEW (conc_name,
+               UTL_ScopedName (id,
+                               0));
+
+      new_name->nconc (conc_name);
+    }
+
+  // The repo id computation in the AST_Decl constructor can't
+  // be easily modified to work for predefined types.
+  ACE_CString repo_id = ACE_CString ("IDL:omg.org/CORBA/")
+                        + id->get_string ()
+                        + ":"
+                        + this->version ();
+  delete [] this->repoID_;
+  size_t len = repo_id.length ();
+  ACE_NEW (this->repoID_,
+           char[len + 1]);
+  this->repoID_[0] = '\0';
+  ACE_OS::sprintf (this->repoID_,
+                   "%s",
+                   repo_id.c_str ());
+  this->repoID_[len] = '\0';
+
+  this->set_name (new_name);
+}
+
+AST_PredefinedType::~AST_PredefinedType (void)
 {
 }
 
-/*
- * Private operations
- */
+// Redefinition of inherited virtual operations.
 
-/*
- * Public operations
- */
-
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_PredefinedType node to the ostream o
- */
+// Dump this AST_PredefinedType node to the ostream o.
 void
-AST_PredefinedType::dump(ostream &o)
+AST_PredefinedType::dump (ACE_OSTREAM_TYPE &o)
 {
-  AST_Decl::dump(o);
+  AST_Decl::dump (o);
 }
 
-/*
- * Data accessors
- */
+// Compute the size type of the node in question.
+int
+AST_PredefinedType::compute_size_type (void)
+{
+  switch (this->pd_pt)
+  {
+    case AST_PredefinedType::PT_any:
+    case AST_PredefinedType::PT_pseudo:
+    case AST_PredefinedType::PT_object:
+      this->size_type (AST_Type::VARIABLE);
+      break;
+    default:
+      this->size_type (AST_Type::FIXED);
+      break;
+  }
+
+  return 0;
+}
+
+int
+AST_PredefinedType::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_predefined_type (this);
+}
+
+void
+AST_PredefinedType::destroy (void)
+{
+  this->AST_ConcreteType::destroy ();
+}
+
+// Data accessors.
 
 AST_PredefinedType::PredefinedType
-AST_PredefinedType::pt()
+AST_PredefinedType::pt (void)
 {
-  return pd_pt;
+  return this->pd_pt;
 }
 
-// Narrowing
+// Narrowing.
 IMPL_NARROW_METHODS1(AST_PredefinedType, AST_ConcreteType)
 IMPL_NARROW_FROM_DECL(AST_PredefinedType)

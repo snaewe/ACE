@@ -1,11 +1,15 @@
 // $Id$
 
 #include "ace/FIFO_Recv.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 
 ACE_RCSID(FIFO_SAP, FIFO_server, "$Id$")
 
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_OS::unlink (ACE_DEFAULT_RENDEZVOUS);
   ACE_FIFO_Recv server (ACE_DEFAULT_RENDEZVOUS);

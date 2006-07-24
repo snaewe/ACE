@@ -1,13 +1,17 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (_EVENT_ANALYZER_H)
-#define _EVENT_ANALYZER_H     
+#ifndef _EVENT_ANALYZER_H
+#define _EVENT_ANALYZER_H
 
 #include "ace/Stream.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Module.h"
 #include "ace/Task.h"
-#include "ace/Synch.h"
 
 class Event_Analyzer : public ACE_Task<ACE_SYNCH>
 {
@@ -28,9 +32,9 @@ public:
   // Entry point into this task.
 
   // Dynamic linking hooks (not used).
-  virtual int init (int argc, char *argv[]);
+  virtual int init (int argc, ACE_TCHAR *argv[]);
   virtual int fini (void);
-  virtual int info (char **info_string,
+  virtual int info (ACE_TCHAR **info_string,
                     size_t length) const;
 private:
   virtual int control (ACE_Message_Block *);

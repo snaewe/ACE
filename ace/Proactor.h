@@ -1,448 +1,691 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-//
-// = FILENAME
-//    Proactor.h
-//
-// = AUTHOR
-//    Irfan Pyarali (irfan@cs.wustl.edu),
-//    Tim Harrison (harrison@cs.wustl.edu) and
-//    Alexander Babu Arulanthu <alex@cs.wustl.edu>
-//
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Proactor.h
+ *
+ *  $Id$
+ *
+ *  @author Irfan Pyarali <irfan@cs.wustl.edu>
+ *  @author Tim Harrison <harrison@cs.wustl.edu>
+ *  @author Alexander Babu Arulanthu <alex@cs.wustl.edu>
+ *  @author Alexander Libman <alibman@ihug.com.au>
+ */
+//=============================================================================
 
-#if !defined (ACE_PROACTOR_H)
+#ifndef ACE_PROACTOR_H
 #define ACE_PROACTOR_H
 
-#include "ace/OS.h"
-#include "ace/Asynch_IO.h"
-#include "ace/Thread_Manager.h"
-#include "ace/Event_Handler.h"
+#include /**/ "ace/pre.h"
 
-#include "ace/Timer_Queue.h"
-#include "ace/Timer_List.h"
-#include "ace/Timer_Heap.h"
-#include "ace/Timer_Wheel.h"
-#include "ace/Free_List.h"
+#include "ace/config-all.h"
+#include "ace/ACE_export.h"
 
-#if (defined (ACE_WIN32) && !defined (ACE_HAS_WINCE)) || \
-    (defined (ACE_HAS_AIO_CALLS))
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+#pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#if ((defined (ACE_WIN32) && !defined (ACE_HAS_WINCE)) || (defined (ACE_HAS_AIO_CALLS)))
 // This only works on Win32 platforms and on Unix platforms supporting
-// aio calls.
+// POSIX aio calls.
+
+#  include "ace/Asynch_IO.h"
+#  include "ace/Asynch_IO_Impl.h"
+#  include "ace/Thread_Manager.h"
+#  include "ace/Timer_Queue.h"
+#  include "ace/Timer_List.h"
+#  include "ace/Timer_Heap.h"
+#  include "ace/Timer_Wheel.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // Forward declarations.
-class ACE_Asynch_Result;
-class ACE_Asynch_Operation;
+class ACE_Proactor_Impl;
 class ACE_Proactor_Timer_Handler;
-class ACE_Proactor;
 
-class ACE_Export ACE_Proactor_Handle_Timeout_Upcall
+/**
+ * @class ACE_Proactor_Handle_Timeout_Upcall
+ *
+ * @brief Functor for ACE_Timer_Queue.
+ *
+ * This class implements the functor required by the Timer
+ * Queue to call <handle_timeout> on ACE_Handlers.
+ */
+class ACE_Proactor_Handle_Timeout_Upcall
 {
-  // = TITLE
-  //      Functor for <ACE_Timer_Queue>.
-  //
-  // = DESCRIPTION
-  //      This class implements the functor required by the Timer
-  //      Queue to call <handle_timeout> on ACE_Handlers.
-public:
-  friend class ACE_Proactor;
-  // Proactor has special privileges, access needed to: proactor ().
 
+  /// Type def for the timer queue.
   typedef ACE_Timer_Queue_T<ACE_Handler *,
                             ACE_Proactor_Handle_Timeout_Upcall,
                             ACE_SYNCH_RECURSIVE_MUTEX>
-          TIMER_QUEUE;
+  TIMER_QUEUE;
 
+  /// The main Proactor class has special permissions.
+  friend class ACE_Proactor;
+
+public:
+  /// Constructor.
   ACE_Proactor_Handle_Timeout_Upcall (void);
-  // Constructor.
 
+  /// This method is called when a timer is registered.
+  int registration (TIMER_QUEUE &timer_queue,
+                    ACE_Handler *handler,
+                    const void *arg);
+
+  /// This method is called before the timer expires.
+  int preinvoke (TIMER_QUEUE &timer_queue,
+                 ACE_Handler *handler,
+                 const void *arg,
+                 int recurring_timer,
+                 const ACE_Time_Value &cur_time,
+                 const void *&upcall_act);
+
+  /// This method is called when the timer expires.
   int timeout (TIMER_QUEUE &timer_queue,
-	       ACE_Handler *handler,
-	       const void *arg,
-	       const ACE_Time_Value &cur_time);
-  // This method is called when the timer expires.
+               ACE_Handler *handler,
+               const void *arg,
+               int recurring_timer,
+               const ACE_Time_Value &cur_time);
 
-  int cancellation (TIMER_QUEUE &timer_queue,
-		    ACE_Handler *handler);
-  // This method is called when the timer is canceled.
+  /// This method is called after the timer expires.
+  int postinvoke (TIMER_QUEUE &timer_queue,
+                  ACE_Handler *handler,
+                  const void *arg,
+                  int recurring_timer,
+                  const ACE_Time_Value &cur_time,
+                  const void *upcall_act);
 
+  /// This method is called when a handler is canceled.
+  int cancel_type (TIMER_QUEUE &timer_queue,
+                   ACE_Handler *handler,
+                   int dont_call_handle_close,
+                   int &requires_reference_counting);
+
+  /// This method is called when a timer is canceled.
+  int cancel_timer (TIMER_QUEUE &timer_queue,
+                    ACE_Handler *handler,
+                    int dont_call_handle_close,
+                    int requires_reference_counting);
+
+  /// This method is called when the timer queue is destroyed and the
+  /// timer is still contained in it.
   int deletion (TIMER_QUEUE &timer_queue,
                 ACE_Handler *handler,
                 const void *arg);
-  // This method is called when the timer queue is destroyed and the
-  // timer is still contained in it.
 
 protected:
+  /// Set the proactor. This will fail, if one is already set!
   int proactor (ACE_Proactor &proactor);
-  // Set the proactor. This will fail, if one is already set!
 
+  /// Handle to the proactor. This is needed for posting a timer result
+  /// to the Proactor's completion queue.
   ACE_Proactor *proactor_;
-  // Handle to the proactor. This is needed for the completion port. 
 };
 
-class ACE_Export ACE_Proactor : public ACE_Event_Handler
+/**
+ * @class ACE_Proactor
+ *
+ * @brief A manager for asynchronous event demultiplexing.
+ *
+ * See the Proactor pattern description at
+ * http://www.cs.wustl.edu/~schmidt/proactor.ps.gz for more
+ * details.
+ */
+class ACE_Export ACE_Proactor
 {
-  // = TITLE
-  //     A manager for asynchronous event demultiplexing.
-  //
-  // = DESCRIPTION
-  //     See the Proactor pattern description at
-  //     http://www.cs.wustl.edu/~schmidt/proactor.ps.gz for more
-  //     details.
-public:
-  friend class ACE_Proactor_Timer_Handler;
-  // Timer Handler has special privileges because Access needed to:
-  // thr_mgr_
+  // = Here are the private typedefs that the <ACE_Proactor> uses.
 
-  friend class ACE_Proactor_Handle_Timeout_Upcall;
-  // Access needed to: Asynch_Timer, and completion_port_.
-
-  friend class ACE_Asynch_Operation;
-  // For POSIX4-compliant-Unix systems, the
-  // <register_aio_with_proactor> call is used by
-  // <ACE_Asynch_Operation> to store some information with the
-  // Proactor after an <aio_> call is issued, so that the Proactor can
-  // retrive this information to do <aio_return> and <aio_error>. 
-  
-  // = Here are the typedefs that the <ACE_Proactor> uses.
-  
-  // @@ Can these typedefs be capitalized?
-  typedef ACE_Timer_Queue_T<ACE_Handler *,
-                            ACE_Proactor_Handle_Timeout_Upcall,
-                            ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_Queue;
   typedef ACE_Timer_Queue_Iterator_T<ACE_Handler *,
-                                     ACE_Proactor_Handle_Timeout_Upcall,
-                                     ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_Queue_Iterator;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_QUEUE_ITERATOR;
   typedef ACE_Timer_List_T<ACE_Handler *,
-                           ACE_Proactor_Handle_Timeout_Upcall,
-                           ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_List;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_LIST;
   typedef ACE_Timer_List_Iterator_T<ACE_Handler *,
-                                    ACE_Proactor_Handle_Timeout_Upcall,
-                                    ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_List_Iterator;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_LIST_ITERATOR;
   typedef ACE_Timer_Heap_T<ACE_Handler *,
-                           ACE_Proactor_Handle_Timeout_Upcall,
-                           ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_Heap;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_HEAP;
   typedef ACE_Timer_Heap_Iterator_T<ACE_Handler *,
-                                    ACE_Proactor_Handle_Timeout_Upcall,
-                                    ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_Heap_Iterator;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_HEAP_ITERATOR;
   typedef ACE_Timer_Wheel_T<ACE_Handler *,
-                            ACE_Proactor_Handle_Timeout_Upcall,
-                            ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_Wheel;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_WHEEL;
   typedef ACE_Timer_Wheel_Iterator_T<ACE_Handler *,
-                                     ACE_Proactor_Handle_Timeout_Upcall,
-                                     ACE_SYNCH_RECURSIVE_MUTEX>
-          Timer_Wheel_Iterator;
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_WHEEL_ITERATOR;
 
-  enum POSIX_COMPLETION_STRATEGY
-  {
-    // Use the real time signals and do <sigtimedwait> on the
-    // signals. 
-    RT_SIGNALS,
-    // Store the <aio> control blocks with the <Proactor> and do
-    // <aio_suspend> on them, 
-    AIO_CONTROL_BLOCKS
-  };
-  // For Posix4-Compliat-Unix systems how the completion of the
-  // asynchronous calls should be got from the OS.
+  // = Friendship.
 
-  ACE_Proactor (size_t number_of_threads = 0,
-		Timer_Queue *tq = 0,
-		int used_with_reactor_event_loop = 0,
-                POSIX_COMPLETION_STRATEGY completion_strategy = RT_SIGNALS);
-  // A do nothing constructor.
-  
-  virtual ~ACE_Proactor (void);
-  // Virtual destruction.
+  /// Timer handler runs a thread and manages the timers, on behalf of
+  /// the Proactor.
+  friend class ACE_Proactor_Timer_Handler;
 
+public:
+  /// Public type.
+  typedef ACE_Timer_Queue_T<ACE_Handler *,
+    ACE_Proactor_Handle_Timeout_Upcall,
+    ACE_SYNCH_RECURSIVE_MUTEX>
+  TIMER_QUEUE;
+
+  /**
+   * Constructor. If <implementation> is 0, the correct implementation
+   * object will be created. <delete_implementation> flag determines
+   * whether the implementation object should be deleted by the
+   * Proactor or not. If <tq> is 0, a new TIMER_QUEUE is created.
+   */
+  ACE_Proactor (ACE_Proactor_Impl *implementation = 0,
+                int delete_implementation = 0,
+                TIMER_QUEUE *tq = 0);
+
+  /// Destruction.
+  ~ACE_Proactor (void);
+
+  /// Get pointer to a process-wide <ACE_Proactor>.  <threads> should
+  /// be part of another method.
   static ACE_Proactor *instance (size_t threads = 0);
-  // Get pointer to a process-wide <ACE_Proactor>.  <threads> should
-  // be part of another method.
 
-  static ACE_Proactor *instance (ACE_Proactor *);
-  // Set pointer to a process-wide <ACE_Proactor> and return existing
-  // pointer.
+  /// Set pointer to a process-wide <ACE_Proactor> and return existing
+  /// pointer.
+  static ACE_Proactor *instance (ACE_Proactor * proactor,
+                                 int delete_proactor = 0);
 
+  /// Delete the dynamically allocated Singleton.
   static void close_singleton (void);
-  // Delete the dynamically allocated Singleton.
+
+  /// Cleanup method, used by the <ACE_Object_Manager> to destroy the
+  /// singleton.
+  static void cleanup (void *instance, void *arg);
+
+  /// Name of dll in which the singleton instance lives.
+  static const ACE_TCHAR *dll_name (void);
+
+  /// Name of component--ACE_Proactor in this case.
+  static const ACE_TCHAR *name (void);
 
   // = Proactor event loop management methods.
 
+  /// Run the event loop until the <ACE_Proactor::handle_events> method
+  /// returns -1 or the <end_event_loop> method is invoked.
   static int run_event_loop (void);
-  // Run the event loop until the <ACE_Proactor::handle_events> method
-  // returns -1 or the <end_event_loop> method is invoked.
 
+  /**
+   * Run the event loop until the <ACE_Proactor::handle_events> method
+   * returns -1, the <end_event_loop> method is invoked, or the
+   * <ACE_Time_Value> expires, in which case 0 is returned.
+   */
   static int run_event_loop (ACE_Time_Value &tv);
-  // Run the event loop until the <ACE_Proactor::handle_events> method
-  // returns -1, the <end_event_loop> method is invoked, or the
-  // <ACE_Time_Value> expires.
 
+  /**
+   * Instruct the <ACE_Proactor::instance> to terminate its event
+   * loop.
+   * This method wakes up all the threads blocked on waiting for
+   * completions and end the event loop.
+   */
   static int end_event_loop (void);
-  // Instruct the <ACE_Proactor::instance> to terminate its event
-  // loop.
 
+  /**
+   * Resets the <ACE_Proactor::end_event_loop_> static so that the
+   * <run_event_loop> method can be restarted.
+   */
+  static int reset_event_loop (void);
+
+  /**
+   * The singleton proactor is used by the ACE_Service_Config.
+   * Therefore, we must check for the reconfiguration request and
+   * handle it after handling an event.
+   */
+  static int check_reconfiguration (ACE_Proactor *);
+
+  /// Report if the <ACE_Proactor::instance> event loop is finished.
   static int event_loop_done (void);
-  // Report if the <ACE_Proactor::instance> event loop is finished.
 
-  virtual int close (void);
-  // Close the IO completion port.
+  /// Close the associated @c ACE_Proactor_Impl implementation object.
+  /**
+   * If @arg delete_implementation was specified to the @c open() method,
+   * the implementation object is also deleted.
+   */
+  int close (void);
 
-  virtual int register_handle (ACE_HANDLE handle,
-			       const void *completion_key);
-  // This method adds the <handle> to the I/O completion port. This
-  // function is a no-op function for Unix systems.
+   /**
+   * You can add a hook to various run_event methods and the hook will
+   * be called after handling every proactor event.  If this function
+   * returns 0, proactor_run_event_loop will check for the return value of
+   * handle_events.  If it is -1, the the proactor_run_event_loop will return
+   * (pre-maturely.)
+   */
+  typedef int (*PROACTOR_EVENT_HOOK)(ACE_Proactor *);
+
+  // These methods work with an instance of a proactor.
+  /**
+   * Run the event loop until the
+   * <ACE_Proactor::handle_events>
+   * method returns -1 or the <end_proactor_event_loop> method is invoked.
+   */
+  int proactor_run_event_loop (PROACTOR_EVENT_HOOK = 0);
+
+  /**
+   * Run the event loop until the <ACE_Proactor::handle_events>
+   * method returns -1, the
+   * <end_proactor_event_loop> method is invoked,
+   * or the <ACE_Time_Value>
+   * expires, in which case a 0 is returned.
+   */
+  int proactor_run_event_loop (ACE_Time_Value &tv,
+                               PROACTOR_EVENT_HOOK = 0);
+
+  /**
+   * Instruct the ACE_Proactor to terminate its event loop
+   * and notifies the ACE_Proactor so that it can wake up
+   * and close down gracefully.
+   */
+  int proactor_end_event_loop (void);
+
+  /// Report if the ACE_Proactor event loop is finished.
+  int proactor_event_loop_done (void);
+
+  /// Resets the <ACE_Proactor::end_event_loop_> static so that the
+  /// <run_event_loop> method can be restarted.
+  int proactor_reset_event_loop (void);
+
+
+  /// This method adds the <handle> to the I/O completion port. This
+  /// function is a no-op function for Unix systems and returns 0;
+  int register_handle (ACE_HANDLE handle,
+                       const void *completion_key);
 
   // = Timer management.
-  virtual long schedule_timer (ACE_Handler &handler,
-			       const void *act,
-			       const ACE_Time_Value &time);
-  // Schedule a <handler> that will expire after <time>.  If it
-  // expires then <act> is passed in as the value to the <handler>'s
-  // <handle_timeout> callback method.  This method returns a
-  // <timer_id>. This <timer_id> can be used to cancel a timer before
-  // it expires.  The cancellation ensures that <timer_ids> are unique
-  // up to values of greater than 2 billion timers.  As long as timers
-  // don't stay around longer than this there should be no problems
-  // with accidentally deleting the wrong timer.  Returns -1 on
-  // failure (which is guaranteed never to be a valid <timer_id>.
+  /**
+   * Schedule a <handler> that will expire after <time>.  If it
+   * expires then <act> is passed in as the value to the <handler>'s
+   * <handle_timeout> callback method.  This method returns a
+   * <timer_id>. This <timer_id> can be used to cancel a timer before
+   * it expires.  The cancellation ensures that <timer_ids> are unique
+   * up to values of greater than 2 billion timers.  As long as timers
+   * don't stay around longer than this there should be no problems
+   * with accidentally deleting the wrong timer.  Returns -1 on
+   * failure (which is guaranteed never to be a valid <timer_id>).
+   */
+  long schedule_timer (ACE_Handler &handler,
+                       const void *act,
+                       const ACE_Time_Value &time);
 
-  virtual long schedule_repeating_timer (ACE_Handler &handler,
-					 const void *act,
-					 const ACE_Time_Value &interval);
+  long schedule_repeating_timer (ACE_Handler &handler,
+                                 const void *act,
+                                 const ACE_Time_Value &interval);
 
   // Same as above except <interval> it is used to reschedule the
   // <handler> automatically.
 
-  virtual long schedule_timer (ACE_Handler &handler,
-			       const void *act,
-			       const ACE_Time_Value &time,
-			       const ACE_Time_Value &interval);
-  // This combines the above two methods into one. Mostly for backward
-  // compatibility.
+  /// This combines the above two methods into one. Mostly for backward
+  /// compatibility.
+  long schedule_timer (ACE_Handler &handler,
+                       const void *act,
+                       const ACE_Time_Value &time,
+                       const ACE_Time_Value &interval);
 
-  virtual int cancel_timer (ACE_Handler &handler,
-			    int dont_call_handle_close = 1);
-  // Cancel all timers associated with this <handler>.  Returns number
-  // of timers cancelled.
+  /// Cancel all timers associated with this <handler>.  Returns number
+  /// of timers cancelled.
+  int cancel_timer (ACE_Handler &handler,
+                    int dont_call_handle_close = 1);
 
-  virtual int cancel_timer (long timer_id,
-			    const void **act = 0,
-			    int dont_call_handle_close = 1);
-  // Cancel the single <ACE_Handler> that matches the <timer_id> value
-  // (which was returned from the <schedule> method).  If <act> is
-  // non-NULL then it will be set to point to the ``magic cookie''
-  // argument passed in when the <Handler> was registered.  This makes
-  // it possible to free up the memory and avoid memory leaks.
-  // Returns 1 if cancellation succeeded and 0 if the <timer_id>
-  // wasn't found.
+  /**
+   * Cancel the single <ACE_Handler> that matches the <timer_id> value
+   * (which was returned from the <schedule> method).  If <act> is
+   * non-NULL then it will be set to point to the ``magic cookie''
+   * argument passed in when the <Handler> was registered.  This makes
+   * it possible to free up the memory and avoid memory leaks.
+   * Returns 1 if cancellation succeeded and 0 if the <timer_id>
+   * wasn't found.
+   */
+  int cancel_timer (long timer_id,
+                    const void **act = 0,
+                    int dont_call_handle_close = 1);
 
-  virtual int handle_events (ACE_Time_Value &wait_time);
-  // Dispatch a single set of events.  If <wait_time> elapses before
-  // any events occur, return.  Return 0 on success, non-zero (-1) on
-  // timeouts/errors and errno is set accordingly.
+  /**
+   * Dispatch a single set of events, waiting up to a specified time limit
+   * if necessary.
+   * @param wait_time the time to wait for an event to occur. This is
+   * a relative time. On successful return, the time is updated to
+   * reflect the amount of time spent waiting for event(s) to occur.
+   * @return Returns 0 if no events occur before the wait_time expires.
+   * Returns 1 when a completion is dispatched. On error, returns -1
+   * and sets errno accordingly.
+   */
+  int handle_events (ACE_Time_Value &wait_time);
 
-  virtual int handle_events (void);
-  // Block indefinitely until at least one event is dispatched.
-  // Return 0 on success, non-zero (-1) on timeouts/errors and errno
-  // is set accordingly.
+  /**
+   * Block indefinitely until at least one event is dispatched.
+   * @return Returns 1 when a completion is dispatched. On error, returns -1
+   * and sets errno accordingly.
+   */
+  int handle_events (void);
 
-  virtual int post_completion (ACE_Asynch_Result *result);
-  // Post a result to the completion port of the Proactor.  If errors
-  // occur, the result will be deleted by this method.  If successful,
-  // the result will be deleted by the Proactor when the result is
-  // removed from the completion port.  Therefore, the result should
-  // have been dynamically allocated and should be orphaned by the
-  // user once this method is called.
-
+  /// Add wakeup dispatch threads (reinit).
   int wake_up_dispatch_threads (void);
-  // Add wakeup dispatch threads (reinit).
 
+  /// Close all dispatch threads.
   int close_dispatch_threads (int wait);
-  // Close all dispatch threads.
 
+  /// Get number of thread used as a parameter to CreatIoCompletionPort.
   size_t number_of_threads (void) const;
+
+  /// Set number of thread used as a parameter to CreatIoCompletionPort.
   void number_of_threads (size_t threads);
-  // Number of thread used as a parameter to CreatIoCompletionPort. 
 
-  Timer_Queue *timer_queue (void) const;
-  void timer_queue (Timer_Queue *);
-  // Get/Set timer queue.
+  /// Get timer queue.
+  TIMER_QUEUE *timer_queue (void) const;
 
-  virtual ACE_HANDLE get_handle (void) const;
-  // Get the event handle.
+  /// Set timer queue.
+  void timer_queue (TIMER_QUEUE *timer_queue);
 
-#if defined (ACE_HAS_AIO_CALLS)
-  POSIX_COMPLETION_STRATEGY posix_completion_strategy (void);
-  // Return the completion strategy used.
-#endif /* ACE_HAS_AIO_CALLS */  
+  /**
+   * Get the event handle.
+   * It is a no-op in POSIX platforms and it returns
+   * ACE_INVALID_HANDLE.
+   */
+  ACE_HANDLE get_handle (void) const;
+
+  /// Get the implementation class.
+  ACE_Proactor_Impl *implementation (void) const;
+
+  // = Factory methods for the operations
+
+  // Note that the user does not have to use or know about these
+  // methods.
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Read_Stream.
+  ACE_Asynch_Read_Stream_Impl *create_asynch_read_stream (void);
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Write_Stream.
+  ACE_Asynch_Write_Stream_Impl *create_asynch_write_stream (void);
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Read_File.
+  ACE_Asynch_Read_File_Impl *create_asynch_read_file (void);
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Write_File.
+  ACE_Asynch_Write_File_Impl *create_asynch_write_file (void);
+
+  /// Create the correct implementation class for doing Asynch_Accept.
+  ACE_Asynch_Accept_Impl *create_asynch_accept (void);
+
+  /// Create the correct implementation class for doing Asynch_Connect.
+  ACE_Asynch_Connect_Impl *create_asynch_connect (void);
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Transmit_File.
+  ACE_Asynch_Transmit_File_Impl *create_asynch_transmit_file (void);
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Read_Dgram.
+  ACE_Asynch_Read_Dgram_Impl *create_asynch_read_dgram (void);
+
+  /// Create the correct implementation class for doing
+  /// Asynch_Write_Dgram.
+  ACE_Asynch_Write_Dgram_Impl *create_asynch_write_dgram (void);
+
+  // = Factory methods for the results
+
+  // Note that the user does not have to use or know about these
+  // methods unless they want to "fake" results.
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Read_Stream::Result class.
+  ACE_Asynch_Read_Stream_Result_Impl *
+    create_asynch_read_stream_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                      ACE_HANDLE handle,
+                                      ACE_Message_Block &message_block,
+                                      u_long bytes_to_read,
+                                      const void* act,
+                                      ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                      int priority = 0,
+                                      int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Write_Stream::Result.
+  ACE_Asynch_Write_Stream_Result_Impl *
+    create_asynch_write_stream_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                       ACE_HANDLE handle,
+                                       ACE_Message_Block &message_block,
+                                       u_long bytes_to_write,
+                                       const void* act,
+                                       ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                       int priority = 0,
+                                       int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Read_File::Result.
+  ACE_Asynch_Read_File_Result_Impl *
+    create_asynch_read_file_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                    ACE_HANDLE handle,
+                                    ACE_Message_Block &message_block,
+                                    u_long bytes_to_read,
+                                    const void* act,
+                                    u_long offset,
+                                    u_long offset_high,
+                                    ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                    int priority = 0,
+                                    int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Write_File::Result.
+  ACE_Asynch_Write_File_Result_Impl *
+    create_asynch_write_file_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                     ACE_HANDLE handle,
+                                     ACE_Message_Block &message_block,
+                                     u_long bytes_to_write,
+                                     const void* act,
+                                     u_long offset,
+                                     u_long offset_high,
+                                     ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                     int priority = 0,
+                                     int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Read_Dgram::Result.
+  ACE_Asynch_Read_Dgram_Result_Impl *
+    create_asynch_read_dgram_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                     ACE_HANDLE handle,
+                                     ACE_Message_Block *message_block,
+                                     size_t bytes_to_read,
+                                     int flags,
+                                     int protocol_family,
+                                     const void* act,
+                                     ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                     int priority = 0,
+                                     int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Write_Dgram::Result.
+  ACE_Asynch_Write_Dgram_Result_Impl *
+    create_asynch_write_dgram_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                      ACE_HANDLE handle,
+                                      ACE_Message_Block *message_block,
+                                      size_t bytes_to_write,
+                                      int flags,
+                                      const void* act,
+                                      ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                      int priority = 0,
+                                      int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for ACE_Asynch_Accept::Result.
+  ACE_Asynch_Accept_Result_Impl *
+    create_asynch_accept_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                 ACE_HANDLE listen_handle,
+                                 ACE_HANDLE accept_handle,
+                                 ACE_Message_Block &message_block,
+                                 u_long bytes_to_read,
+                                 const void* act,
+                                 ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                 int priority = 0,
+                                 int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for ACE_Asynch_Connect::Result
+  ACE_Asynch_Connect_Result_Impl *
+    create_asynch_connect_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                  ACE_HANDLE  connect_handle,
+                                  const void* act,
+                                  ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                  int priority = 0,
+                                  int signal_number = ACE_SIGRTMIN);
+
+  /// Create the correct implementation class for
+  /// ACE_Asynch_Transmit_File::Result.
+  ACE_Asynch_Transmit_File_Result_Impl *
+    create_asynch_transmit_file_result (ACE_Handler::Proxy_Ptr &handler_proxy,
+                                        ACE_HANDLE socket,
+                                        ACE_HANDLE file,
+                                        ACE_Asynch_Transmit_File::Header_And_Trailer *header_and_trailer,
+                                        u_long bytes_to_write,
+                                        u_long offset,
+                                        u_long offset_high,
+                                        u_long bytes_per_send,
+                                        u_long flags,
+                                        const void *act,
+                                        ACE_HANDLE event = ACE_INVALID_HANDLE,
+                                        int priority = 0,
+                                        int signal_number = ACE_SIGRTMIN);
+
+  /**
+   * Create a timer result object which can be used with the Timer
+   * mechanism of the Proactor.
+   * If <signal_number> is -1, <POSIX_SIG_Proactor> will create a
+   * Timer object with a meaningful signal number, choosing the
+   * largest signal number from the signal mask of the Proactor.
+   */
+  ACE_Asynch_Result_Impl *
+    create_asynch_timer (ACE_Handler::Proxy_Ptr &handler_proxy,
+                         const void *act,
+                         const ACE_Time_Value &tv,
+                         ACE_HANDLE event = ACE_INVALID_HANDLE,
+                         int priority = 0,
+                         int signal_number = ACE_SIGRTMIN);
 
 protected:
-  virtual int handle_signal (int signum, siginfo_t * = 0, ucontext_t * = 0);
-  // Called when object is signaled by OS (either via UNIX signals or
-  // when a Win32 object becomes signaled).
 
-  virtual int handle_close (ACE_HANDLE handle,
-			    ACE_Reactor_Mask close_mask);
-  // Called when object is removed from the ACE_Reactor.
+  /**
+   * Post <how_many> completions to the completion port so that all
+   * threads can wake up. This is used in conjunction with the
+   * <run_event_loop>.
+   */
+  static int post_wakeup_completions (int how_many);
 
-  void application_specific_code (ACE_Asynch_Result *asynch_result,
-				  u_long bytes_transferred,
-				  int success,
-				  const void *completion_key,
-				  u_long error);
-  // Protect against structured exceptions caused by user code when
-  // dispatching handles.
+  /**
+   * Post <how_many> completions to the completion port so that all
+   * threads can wake up. This is used in conjunction with the
+   * <proactor_run_event_loop>.
+   */
+  int proactor_post_wakeup_completions (int how_many);
 
-  virtual int handle_events (unsigned long milli_seconds);
-  // Dispatch a single set of events.  If <milli_seconds> elapses
-  // before any events occur, return.
+  /// Set the implementation class.
+  void implementation (ACE_Proactor_Impl *implementation);
 
-  // @@ Alex, many C++ compilers don't like nested classes.  Can you
-  // please bring this into the "outer scope" and add an "ACE_" prefix
-  // to it?
-  class ACE_Export Asynch_Timer : protected ACE_Asynch_Result
-    {
-      // = TITLE
-      //     This class is posted to the completion port when a timer
-      //     expires. When the complete method of this object is
-      //     called, the <handler>'s handle_timeout method will be
-      //     called.
-    public:
-      friend class ACE_Proactor_Handle_Timeout_Upcall;
-      // Timer Handler has special privileges
-      // Access needed to: convert Asynch_Timer into an OVERLAPPED
+  /// Delegation/implementation class that all methods will be
+  /// forwarded to.
+  ACE_Proactor_Impl *implementation_;
 
-      Asynch_Timer (ACE_Handler &handler,
-		    const void *act,
-		    const ACE_Time_Value &tv,
-		    ACE_HANDLE event = ACE_INVALID_HANDLE);
+  /// Flag used to indicate whether we are responsible for cleaning up
+  /// the implementation instance.
+  int delete_implementation_;
 
-    protected:
-      virtual void complete (u_long bytes_transferred,
-			     int success,
-			     const void *completion_key,
-			     u_long error = 0);
-      // This method calls the <handler>'s handle_timeout method
+  /// Pointer to a process-wide <ACE_Proactor>.
+  static ACE_Proactor *proactor_;
 
-      ACE_Time_Value time_;
-      // Time value requested by caller
-  };
+  /// Must delete the <proactor_> if non-0.
+  static int delete_proactor_;
 
-#if defined (ACE_HAS_AIO_CALLS)
-  aiocb *aiocb_list_ [ACE_RTSIG_MAX];
-  // Use an array to keep track of all the aio's issued
-  // currently. We'll limit the array size to Maximum RT signals that 
-  // can be queued in a process.  This is the upper limit how many aio
-  // operations can be pending at a time.
-
-  size_t aiocb_list_max_size_;
-  // To maintain the maximum size of the array (list).
-  
-  size_t aiocb_list_cur_size_;
-  // To maintain the current size of the array (list).
-#elif defined (ACE_WIN32)
-  ACE_HANDLE completion_port_;
-  // Handle for the completion port. Unix doesnt have completion
-  // ports.
- 
-  size_t number_of_threads_;
-  // This number is passed to the <CreatIOCompletionPort> system
-  // call. 
-#endif /* ACE_HAS_AIO_CALLS */
-
-  Timer_Queue *timer_queue_;
-  // Timer Queue.
-
-  int delete_timer_queue_;
-  // Flag on whether to delete the timer queue.
-
+  /// Handles timeout events.
   ACE_Proactor_Timer_Handler *timer_handler_;
-  // Handles timeouts events.
 
+  /// This will manage the thread in the Timer_Handler.
   ACE_Thread_Manager thr_mgr_;
-  // This will manage the thread in the Timer_Handler.
 
-  ACE_Auto_Event event_;
-  // This event is used in conjunction with Reactor when we try to
-  // integrate the event loops of Reactor and the Proactor.
+  /// Timer Queue.
+  TIMER_QUEUE *timer_queue_;
 
-  int used_with_reactor_event_loop_;
-  // Flag that indicates whether we are used in conjunction with
-  // Reactor.
+  /// Flag on whether to delete the timer queue.
+  int delete_timer_queue_;
 
-#if defined (ACE_HAS_AIO_CALLS)
-  POSIX_COMPLETION_STRATEGY posix_completion_strategy_;
-  // Flag that indicates how the completion status is got from the OS
-  // on the POSIX4-Compliant-Unix systems.
-  
-  sigset_t RT_completion_signals_;
-  // These signals are used for completion notification by the
-  // Proactor.
-  // These signals are masked in the current process.
-  // By default, ACE_SIG_AIO_READ and ACE_SIG_AIO_WRITE are
-  // the  two signals used for completion notification. But if the
-  // user has specified someother signals in any of the
-  // read/write/transmit operations, some other signals might also
-  // have got masked.
-#endif /* ACE_HAS_AIO_CALLS */
+  /// Terminate the proactor event loop.
+  sig_atomic_t end_event_loop_;
+
+  /// Number of threads in the event loop.
+  sig_atomic_t event_loop_thread_count_;
+
+  /// Mutex to protect work with lists.
+  ACE_SYNCH_MUTEX mutex_;
+
 
 private:
-  static ACE_Proactor *proactor_;
-  // Pointer to a process-wide <ACE_Proactor>.
-
-  static int delete_proactor_;
-  // Must delete the <proactor_> if non-0.
-
-  static sig_atomic_t end_event_loop_;
-  // Terminate the proactor event loop.
+  /// Deny access since member-wise won't work...
+  ACE_Proactor (const ACE_Proactor &);
+  ACE_Proactor &operator= (const ACE_Proactor &);
 };
 
-#if defined (__ACE_INLINE__)
-#include "ace/Proactor.i"
-#endif /* __ACE_INLINE__ */
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#  if defined (__ACE_INLINE__)
+#    include "ace/Proactor.inl"
+#  endif /* __ACE_INLINE__ */
 
 #else /* NOT WIN32 or POSIX with AIO features. */
+
+#  include "ace/os_include/os_stddef.h"
+#  include "ace/os_include/os_signal.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+class ACE_Time_Value;
+
 class ACE_Export ACE_Proactor
 {
 public:
   class Timer_Queue {};
   ACE_Proactor (size_t /* number_of_threads */ = 0,
-		Timer_Queue * /* tq */ = 0) {}
-  virtual int handle_events (void) { return -1; }
-  virtual int handle_events (ACE_Time_Value &) { return -1; }
+                Timer_Queue * /* tq */ = 0) {}
+  ~ACE_Proactor (void) {}
+  int handle_events (void) { return -1; }
+  int handle_events (ACE_Time_Value &) { return -1; }
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static ACE_Proactor *instance (size_t threads = 0);
-  // Placeholder to enable compilation on non-Win32 platforms
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static ACE_Proactor *instance (ACE_Proactor *);
-  // Placeholder to enable compilation on non-Win32 platforms
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static void close_singleton (void);
-  // Placeholder to enable compilation on non-Win32 platforms
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static int run_event_loop (void);
-  // Placeholder to enable compilation on non-Win32 platforms
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static int run_event_loop (ACE_Time_Value &tv);
-  // Placeholder to enable compilation on non-Win32 platforms
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static int end_event_loop (void);
-  // Placeholder to enable compilation on non-Win32 platforms
 
+  /// Placeholder to enable compilation on non-Win32 platforms
   static sig_atomic_t event_loop_done (void);
-  // Placeholder to enable compilation on non-Win32 platforms
 };
 
-#endif /* ACE_WIN32 */
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#endif /* ACE_WIN32 && !ACE_HAS_WINCE || ACE_HAS_AIO_CALLS*/
+
+#include /**/ "ace/post.h"
+
 #endif /* ACE_PROACTOR_H */

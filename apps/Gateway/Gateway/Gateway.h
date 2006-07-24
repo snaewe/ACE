@@ -1,11 +1,12 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+//
 // $Id$
 
 // ============================================================================
 //
 // = LIBRARY
 //    gateway
-// 
+//
 // = FILENAME
 //    Gateway.h
 //
@@ -14,16 +15,19 @@
 //    the entry point into the Service Configurator framework.
 //
 // = AUTHOR
-//    Doug Schmidt 
-// 
+//    Doug Schmidt
+//
 // ============================================================================
 
-#if !defined (ACE_GATEWAY)
+#ifndef ACE_GATEWAY
 #define ACE_GATEWAY
 
-#include "ace/OS.h"
+#include "ace/svc_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 ACE_SVC_FACTORY_DECLARE (Gateway)
 
 #endif /* ACE_GATEWAY */
-

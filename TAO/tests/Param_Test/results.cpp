@@ -16,10 +16,13 @@
 //
 // ============================================================================
 
-#include "ace/Log_Msg.h"
 #include "results.h"
+#include "tao/debug.h"
+#include "ace/Log_Msg.h"
 
-ACE_RCSID(Param_Test, results, "$Id$")
+ACE_RCSID (Param_Test,
+           results, 
+           "results.cpp,v 1.8 1999/06/23 14:50:14 parsons Exp")
 
 Results::Results (void)
 {
@@ -41,7 +44,7 @@ Results::print_stats (void)
 
   CORBA::ULong i;
 
-  if (this->error_count_ == 0)
+  if (TAO_debug_level > 0 && this->error_count_ == 0)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "Iteration\tReal time (msec)\tUser time (msec)"
@@ -70,7 +73,7 @@ Results::print_stats (void)
       avg_real_time /= this->call_count_;
       avg_user_time /= this->call_count_;
       avg_system_time /= this->call_count_;
-      cps = 1000 / avg_real_time;
+      cps = 1000 / (avg_real_time < 0.01 ? 0.01 : avg_real_time);
 
       ACE_DEBUG ((LM_DEBUG,
                   "\n*=*=*=*=*= Average *=*=*=*=*=*=\n"
@@ -84,26 +87,27 @@ Results::print_stats (void)
                   (avg_system_time < 0.0? 0.0:avg_system_time),
                   (cps < 0.0? 0.0 : cps)));
 
+      ACE_DEBUG ((LM_DEBUG,
+                  "\t%d calls, %d errors\n"
+                  "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n",
+                  this->call_count_,
+                  this->error_count_));
     }
-  else
+  else if (this->error_count_ != 0)
     {
-      ACE_ERROR ((LM_ERROR,
-                  "\tNo time stats printed.  Call count zero or error ocurred.\n"));
-
+      ACE_DEBUG ((LM_DEBUG,
+                  "\tERROR %d faults in %d calls\n"
+                  "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n",
+                  this->error_count_,
+                  this->call_count_));
     }
-
-  ACE_DEBUG ((LM_DEBUG,
-              "\t%d calls, %d errors\n"
-              "*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=\n",
-              this->call_count_,
-              this->error_count_));
 }
 
 void
-Results::print_exception (const char *call_name,
-                          CORBA::Environment &env)
+Results::print_exception (const char * /* call_name */
+                          ACE_ENV_ARG_DECL_NOT_USED)
 {
-  env.print_exception (call_name);
+  //ACE_PRINT_EXCEPTION (call_name);
 }
 
 void

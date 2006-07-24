@@ -2,11 +2,18 @@
 
 #include "ace/SV_Shared_Memory.h"
 #include "ace/SV_Semaphore_Simple.h"
-#include "ace/Malloc.h"
+#include "ace/SV_Semaphore_Complex.h"
+#include "ace/Shared_Memory_Pool.h"
+#include "ace/Malloc_T.h"
+#include "ace/OS_NS_unistd.h"
 
-ACE_RCSID(SV_Semaphores, Semaphores_1, "$Id$")
 
-#if defined (ACE_HAS_SYSV_IPC)
+ACE_RCSID (SV_Semaphores,
+           Semaphores_1,
+           "$Id$")
+
+
+#if defined (ACE_HAS_SYSV_IPC) && !defined(ACE_LACKS_SYSV_SHMEM)
 
 // Shared memory allocator (note that this chews up the
 // ACE_DEFAULT_SEM_KEY).
@@ -77,23 +84,11 @@ main (int, char *[])
     }
 }
 #else
-int main (int, char *[])
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR,
-	      "SYSV IPC is not supported on this platform\n"));
+              "SYSV IPC, or SYSV SHMEM is not supported on this platform\n"));
   return 0;
 }
 #endif /* ACE_HAS_SYSV_IPC */
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Guard<ACE_SV_Semaphore_Simple>;
-template class ACE_Malloc<ACE_SHARED_MEMORY_POOL, ACE_SV_Semaphore_Simple>;
-template class ACE_Read_Guard<ACE_SV_Semaphore_Simple>;
-template class ACE_Write_Guard<ACE_SV_Semaphore_Simple>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Guard<ACE_SV_Semaphore_Simple>
-#pragma instantiate ACE_Malloc<ACE_SHARED_MEMORY_POOL, ACE_SV_Semaphore_Simple>
-#pragma instantiate ACE_Read_Guard<ACE_SV_Semaphore_Simple>
-#pragma instantiate ACE_Write_Guard<ACE_SV_Semaphore_Simple>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
 

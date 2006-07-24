@@ -13,25 +13,31 @@
 //
 // ============================================================================
 
-#include "CC_LockSet.h"
+#include "orbsvcs/Concurrency/CC_LockSet.h"
 
-ACE_RCSID(Concurrency, CC_LockSet, "$Id$")
+ACE_RCSID (Concurrency,
+           CC_LockSet,
+           "$Id$")
+
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // Default constructor.
 
 CC_LockSet::CC_LockSet (void)
   : related_lockset_ (0)
 {
-  TAO_TRY
+  ACE_TRY_NEW_ENV
     {
-      this->Init (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      this->Init (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("CC_LockSet::CC_LockSet (void)");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "CC_LockSet::CC_LockSet (void)");
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
 }
 
 // Constructor used to create related lock sets.
@@ -39,22 +45,23 @@ CC_LockSet::CC_LockSet (void)
 CC_LockSet::CC_LockSet (CosConcurrencyControl::LockSet_ptr related)
   : related_lockset_ (related)
 {
-  TAO_TRY
+  ACE_TRY_NEW_ENV
     {
-      this->Init (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      this->Init (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("CC_LockSet::CC_LockSet (...)");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "CC_LockSet::CC_LockSet (...)");
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
 }
 
 // Initialization.
 
 void
-CC_LockSet::Init (CORBA::Environment &_env)
+CC_LockSet::Init (ACE_ENV_SINGLE_ARG_DECL)
 {
   // Set the mode of the statically allocated locks
   lock_[CC_IR] = 0;
@@ -65,7 +72,7 @@ CC_LockSet::Init (CORBA::Environment &_env)
 
   // Acquire the semaphore in order to be able to put requests on hold
   if (semaphore_.acquire () == -1)
-    TAO_THROW (CORBA::INTERNAL (CORBA::COMPLETED_NO));
+    ACE_THROW (CORBA::INTERNAL ());
 }
 
 // Destructor
@@ -81,17 +88,18 @@ CORBA::Boolean CC_LockSet::compatible (CC_LockModeEnum mr)
 {
   for (size_t i = CC_IR; i <= CC_W; i++)
     if (this->lock_[i] > 0)
-      if (this->compatible_[i][mr] == CORBA::B_FALSE)
-        return CORBA::B_FALSE;
+      if (this->compatible_[i][mr] == 0)
+        return 0;
 
-  return CORBA::B_TRUE;
+  return 1;
 }
 
 // Locks the lock in the desired mode. Blocks until success.
 
 void
-CC_LockSet::lock (CosConcurrencyControl::lock_mode mode,
-                  CORBA::Environment &_env)
+CC_LockSet::lock (CosConcurrencyControl::lock_mode mode
+                  ACE_ENV_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   ACE_DEBUG ((LM_DEBUG, "CC_LockSet::lock\n"));
 
@@ -104,14 +112,15 @@ CC_LockSet::lock (CosConcurrencyControl::lock_mode mode,
   // the FIFO properties of ACE_Token!
   if (this->lock_i (lm) == 1)
     if (semaphore_.acquire () == -1)
-      TAO_THROW (CORBA::INTERNAL (CORBA::COMPLETED_NO));
+      ACE_THROW (CORBA::INTERNAL ());
 }
 
 // Tries to lock. If it is not possible false is returned.
 
 CORBA::Boolean
-CC_LockSet::try_lock (CosConcurrencyControl::lock_mode mode,
-                      CORBA::Environment &_env)
+CC_LockSet::try_lock (CosConcurrencyControl::lock_mode mode
+                      ACE_ENV_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   CC_LockModeEnum lm = lmconvert (mode);
 
@@ -119,9 +128,9 @@ CC_LockSet::try_lock (CosConcurrencyControl::lock_mode mode,
               "CC_LockSet::try_lock\n"));
 
   if (this->try_lock_i (lm) == 0)
-    return CORBA::B_FALSE;
+    return 0;
   else
-    return CORBA::B_TRUE;
+    return 1;
 }
 
 // Converts the enum from the spec to the internally (ordered)
@@ -150,52 +159,44 @@ CC_LockSet::lmconvert (CosConcurrencyControl::lock_mode mode)
 // Unlock the lock
 
 void
-CC_LockSet::unlock (CosConcurrencyControl::lock_mode mode,
-                    CORBA::Environment &_env)
+CC_LockSet::unlock (CosConcurrencyControl::lock_mode mode
+                    ACE_ENV_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException,
+                     CosConcurrencyControl::LockNotHeld))
 {
   ACE_DEBUG ((LM_DEBUG,
               "CC_LockSet::unlock\n"));
 
   CC_LockModeEnum lm = lmconvert (mode);
 
-  ACE_GUARD (ACE_SYNCH_MUTEX, ace_mon, this->mlock_);
+  ACE_GUARD (TAO_SYNCH_MUTEX, ace_mon, this->mlock_);
 
-  TAO_TRY
+  if (lock_[lm] == 0) // This lock is not held.
+    ACE_THROW (CosConcurrencyControl::LockNotHeld());
+  else
+    lock_[lm]--;
+
+  // If we do not have a lock held in a weaker mode than the
+  // strongest held and we have requests on the semaphore signal
+  // the semaphore.
+  while (lock_queue_.size () > 0)
     {
-      if (lock_[lm] == 0) // This lock is not held.
-        TAO_THROW (CosConcurrencyControl::LockNotHeld());
-      else
-        lock_[lm]--;
+      CC_LockModeEnum lock_on_queue = CC_EM;
 
-      TAO_CHECK_ENV;
+      lock_queue_.dequeue_head (lock_on_queue);
 
-      // If we do not have a lock held in a weaker mode than the
-      // strongest held and we have requests on the semaphore signal
-      // the semaphore.
-      while (lock_queue_.size () > 0)
+      if (compatible (lock_on_queue) == 1)
         {
-          CC_LockModeEnum lock_on_queue = CC_EM;
-
-          lock_queue_.dequeue_head (lock_on_queue);
-
-          if (compatible (lock_on_queue) == CORBA::B_TRUE)
-            {
-              if (semaphore_.release () == -1)
-                TAO_THROW (CORBA::INTERNAL (CORBA::COMPLETED_NO));
-              lock_[lock_on_queue]++;
-            }
-          else
-            {
-              lock_queue_.enqueue_head (lock_on_queue);
-              break;
-            }
+          if (semaphore_.release () == -1)
+            ACE_THROW (CORBA::INTERNAL ());
+          lock_[lock_on_queue]++;
+        }
+      else
+        {
+          lock_queue_.enqueue_head (lock_on_queue);
+          break;
         }
     }
-  TAO_CATCHANY
-    {
-      TAO_RETHROW;
-    }
-  TAO_ENDTRY;
   this->dump ();
 }
 
@@ -203,44 +204,37 @@ CC_LockSet::unlock (CosConcurrencyControl::lock_mode mode,
 
 void
 CC_LockSet::change_mode (CosConcurrencyControl::lock_mode held_mode,
-                         CosConcurrencyControl::lock_mode new_mode,
-                         CORBA::Environment &_env)
+                         CosConcurrencyControl::lock_mode new_mode
+                         ACE_ENV_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException,
+                     CosConcurrencyControl::LockNotHeld))
 {
   ACE_DEBUG ((LM_DEBUG,
               "CC_LockSet::change_mode\n"));
   CC_LockModeEnum lm_held = lmconvert (held_mode);
   CC_LockModeEnum lm_new = lmconvert (new_mode);
 
-  TAO_TRY
+  if (this->lock_held (lm_held) == 0) // This lock is not held
+    ACE_THROW (CosConcurrencyControl::LockNotHeld());
+  else if (this->change_mode_i (lm_held, lm_new)==1)
     {
-      if (this->lock_held (lm_held) == 0) // This lock is not held
-        TAO_THROW (CosConcurrencyControl::LockNotHeld());
-      else if (this->change_mode_i (lm_held, lm_new)==1)
-        {
-          this->unlock (held_mode, _env);
-          TAO_CHECK_ENV;
+      this->unlock (held_mode ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK;
 
-          if (semaphore_.acquire () == -1)
-            TAO_THROW (CORBA::INTERNAL (CORBA::COMPLETED_NO));
-        }
+      if (semaphore_.acquire () == -1)
+        ACE_THROW (CORBA::INTERNAL ());
     }
-  TAO_CATCHANY
-    {
-      TAO_RETHROW;
-    }
-  TAO_ENDTRY;
-
   //  this->dump ();
 }
 
 int
 CC_LockSet::lock_i (CC_LockModeEnum lm)
 {
-  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
+  ACE_GUARD_RETURN (TAO_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
   // If the lock is not compatible with the locks we hold allready or
   // there is lock requests in the queue we cannot grant the lock and
   // thus we queue the request. Otherwise update the lock count.
-  if (compatible (lm) == CORBA::B_FALSE || lock_queue_.size () > 0)
+  if (compatible (lm) == 0 || lock_queue_.size () > 0)
     {
       // Put the lock mode in the queue
       lock_queue_.enqueue_tail (lm);
@@ -257,10 +251,10 @@ CC_LockSet::lock_i (CC_LockModeEnum lm)
 int
 CC_LockSet::try_lock_i (CC_LockModeEnum lm)
 {
-  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
+  ACE_GUARD_RETURN (TAO_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
   // If the lock we try is compatible with the locks we hold we just
   // opdates the count. Otherwise we return false.
-  if (compatible (lm) == CORBA::B_FALSE)
+  if (compatible (lm) == 0)
     {
       this->dump ();
       return 0;
@@ -276,7 +270,7 @@ int
 CC_LockSet::change_mode_i (CC_LockModeEnum lm_held,
                           CC_LockModeEnum lm_new)
 {
-  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
+  ACE_GUARD_RETURN (TAO_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
   // If the new mode is compatible with the modes we hold we change
   // the counts for the two locks. If not we must queue the new
   // request. We can decrement the count for the old mode without
@@ -285,7 +279,7 @@ CC_LockSet::change_mode_i (CC_LockModeEnum lm_held,
 
   lock_[lm_held]--;
 
-  if (compatible (lm_new) == CORBA::B_TRUE)
+  if (compatible (lm_new) == 1)
     {
       lock_[lm_new]++;
       this->dump ();
@@ -303,7 +297,7 @@ CC_LockSet::change_mode_i (CC_LockModeEnum lm_held,
 int
 CC_LockSet::lock_held (CC_LockModeEnum lm)
 {
-  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
+  ACE_GUARD_RETURN (TAO_SYNCH_MUTEX, ace_mon, this->mlock_, 1);
   if (lock_[lm] > 0)
     return 1;
   else
@@ -323,19 +317,14 @@ CC_LockSet::dump (void)
               lock_[CC_W]));
 }
 
-CORBA::Boolean CC_LockSet::compatible_[NUMBER_OF_LOCK_MODES][NUMBER_OF_LOCK_MODES] ={
-  {CORBA::B_TRUE, CORBA::B_TRUE, CORBA::B_TRUE, CORBA::B_TRUE, CORBA::B_FALSE},
-  {CORBA::B_TRUE, CORBA::B_TRUE, CORBA::B_TRUE, CORBA::B_FALSE, CORBA::B_FALSE},
-  {CORBA::B_TRUE, CORBA::B_TRUE, CORBA::B_FALSE, CORBA::B_FALSE, CORBA::B_FALSE},
-  {CORBA::B_TRUE, CORBA::B_FALSE, CORBA::B_FALSE, CORBA::B_TRUE, CORBA::B_FALSE},
-  {CORBA::B_FALSE, CORBA::B_FALSE, CORBA::B_FALSE, CORBA::B_FALSE, CORBA::B_FALSE}};
+CORBA::Boolean const
+CC_LockSet::compatible_[NUMBER_OF_LOCK_MODES][NUMBER_OF_LOCK_MODES] =
+  {
+    {1, 1, 1, 1, 0},
+    {1, 1, 1, 0, 0},
+    {1, 1, 0, 0, 0},
+    {1, 0, 0, 1, 0},
+    {0, 0, 0, 0, 0}
+  };
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Node<CC_LockModeEnum>;
-template class ACE_Unbounded_Queue<CC_LockModeEnum>;
-template class ACE_Unbounded_Queue_Iterator<CC_LockModeEnum>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Node<CC_LockModeEnum>
-#pragma instantiate ACE_Unbounded_Queue<CC_LockModeEnum>
-#pragma instantiate ACE_Unbounded_Queue_Iterator<CC_LockModeEnum>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+TAO_END_VERSIONED_NAMESPACE_DECL

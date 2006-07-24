@@ -20,34 +20,33 @@
 //
 // ============================================================================
 
-#if !defined (BE_CONSTANT_H)
+#ifndef BE_CONSTANT_H
 #define BE_CONSTANT_H
 
-/*
- * BE_Constant
- */
-class be_constant : public virtual AST_Constant , public virtual be_decl
+#include "be_decl.h"
+#include "ast_constant.h"
+
+class be_visitor;
+
+class be_constant : public virtual AST_Constant,
+                    public virtual be_decl
 {
 public:
-  // Operations
-
   be_constant (void);
-  // constructor
+  // Constructor.
 
   be_constant (AST_Expression::ExprType et,
                AST_Expression *v,
-               UTL_ScopedName *n,
-               UTL_StrList *p);
-  // constructor
+               UTL_ScopedName *n);
+  // Constructor.
 
-  // = helper
-  char *exprtype_to_string (void);
-  // returns the appropriate type
-
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
 
-  // Narrowing
+  //Cleanup.
+  virtual void destroy (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS2 (be_constant, AST_Constant, be_decl);
   DEF_NARROW_FROM_DECL (be_constant);
 

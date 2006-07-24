@@ -17,11 +17,18 @@
 //
 // ============================================================================
 
-#if !defined (OPTIONS_H)
+#ifndef OPTIONS_H
 #define OPTIONS_H
 
 #include "ace/Singleton.h"
-#include "tao/corba.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "tao/Basic_Types.h"
+#include "tao/CORBA_String.h"
+#include "tao/orbconf.h"
 
 class Options
 {
@@ -32,15 +39,22 @@ public:
     TEST_SHORT,
     TEST_ULONGLONG,
     TEST_UB_STRING,
+    TEST_UB_WSTRING,
     TEST_BD_STRING,
+    TEST_BD_WSTRING,
     TEST_FIXED_STRUCT,
     TEST_UB_STRING_SEQUENCE,
     TEST_BD_STRING_SEQUENCE,
+    TEST_UB_WSTRING_SEQUENCE,
+    TEST_BD_WSTRING_SEQUENCE,
     TEST_VAR_STRUCT,
     TEST_NESTED_STRUCT,
+    TEST_RECURSIVE_STRUCT,
     TEST_OBJREF_STRUCT,
     TEST_UB_STRUCT_SEQUENCE,
     TEST_BD_STRUCT_SEQUENCE,
+    TEST_UB_ARRAY_SEQUENCE,
+    TEST_BD_ARRAY_SEQUENCE,
     TEST_OBJREF,
     TEST_TYPECODE,
     TEST_ANY,
@@ -53,7 +67,11 @@ public:
     TEST_FIXED_ARRAY,
     TEST_VAR_ARRAY,
     TEST_MULTDIM_ARRAY,
-    TEST_EXCEPTION
+    TEST_EXCEPTION,
+    TEST_BIG_UNION,
+    TEST_SMALL_UNION,
+    TEST_RECURSIVE_UNION,
+    TEST_COMPLEX_ANY
   };
 
   enum INVOKE_TYPE
@@ -71,7 +89,7 @@ public:
   int parse_args (int argc, char **argv);
   // Parses the arguments passed on the command line.
 
-  char *param_test_ior (void);
+  char const * param_test_ior (void) const;
   // return the IOR for the servant
 
   TEST_TYPE test_type (void);
@@ -93,7 +111,7 @@ private:
   int read_ior (char *filename);
   // Function to read the servant IOR from a file.
 
-  char *ior_;
+  CORBA::String_var ior_;
   // IOR for the servant
 
   TEST_TYPE test_type_;
@@ -112,6 +130,6 @@ private:
   // server shutdown flag.
 };
 
-typedef ACE_Singleton<Options, ACE_SYNCH_RECURSIVE_MUTEX> OPTIONS;
+typedef ACE_Singleton<Options, TAO_SYNCH_RECURSIVE_MUTEX> OPTIONS;
 
 #endif /* OPTIONS_H */

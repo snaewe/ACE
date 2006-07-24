@@ -4,19 +4,23 @@
 // The following configuration file is designed to work for the SGI
 // Indigo2EX running Irix 5.3 platform using the GNU C++ Compiler
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
+
+// config-g++-common.h undef's ACE_HAS_STRING_CLASS with -frepo, so
+// this must appear before its #include.
+#define ACE_HAS_STRING_CLASS
 
 #include "ace/config-g++-common.h"
 
 #define ACE_SIZEOF_LONG_DOUBLE 8
 
-#define ACE_NEEDS_SYSTIME_H
 // Platform supports getpagesize() call.
 #define ACE_HAS_GETPAGESIZE
-#define ACE_HAS_STRING_CLASS
 #define IRIX5
 #define ACE_HAS_SIGWAIT
+#define ACE_HAS_DIRENT
 
 // Optimize ACE_Handle_Set for select().
 #define ACE_HAS_HANDLE_SET_OPTIMIZED_FOR_SELECT
@@ -31,10 +35,13 @@
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-#define ACE_HAS_SYSCALL_H
+#define ACE_HAS_SYS_SYSCALL_H
 
 // Compiler/platform supports alloca()
-#define ACE_HAS_ALLOCA
+// Although ACE does have alloca() on this compiler/platform combination, it is
+// disabled by default since it can be dangerous.  Uncomment the following line
+// if you ACE to use it.
+//#define ACE_HAS_ALLOCA
 
 // Compiler/platform has <alloca.h>
 #define ACE_HAS_ALLOCA_H
@@ -45,10 +52,6 @@
 // Compiler/platform has the getrusage() system call.
 #define ACE_HAS_GETRUSAGE
 
-// Denotes that IRIX 5.3 has second argument to gettimeofday()
-// which is variable ...
-#define ACE_HAS_IRIX_GETTIMEOFDAY
-
 // Denotes that GNU has cstring.h as standard
 // which redefines memchr()
 #define ACE_HAS_GNU_CSTRING_H
@@ -58,7 +61,6 @@
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Compiler/platform has correctly prototyped header files.
 #define ACE_HAS_CPLUSPLUS_HEADERS
@@ -111,9 +113,5 @@
 // Platform supports IP multicast
 #define ACE_HAS_IP_MULTICAST
 
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

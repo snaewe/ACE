@@ -19,7 +19,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_INTERFACE_INTERFACE_CI_H_)
+#ifndef _BE_INTERFACE_INTERFACE_CI_H_
 #define _BE_INTERFACE_INTERFACE_CI_H_
 
 class be_visitor_interface_ci : public be_visitor_interface
@@ -41,7 +41,6 @@ public:
 
   virtual int visit_interface (be_interface *node);
   // set the right context and make a visitor
-
 };
 
 #endif /* _BE_INTERFACE_INTERFACE_CI_H_ */

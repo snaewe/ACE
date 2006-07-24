@@ -3,7 +3,13 @@
 // This program reads in messages from stdin and sends them to a
 // Log_Wrapper.
 
+#include "ace/OS_main.h"
+#include "ace/OS_NS_stdlib.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_Memory.h"
 #include "ace/Get_Opt.h"
+#include "ace/Log_Msg.h"
 #include "Log_Wrapper.h"
 
 ACE_RCSID(Multicast, client, "$Id$")
@@ -21,34 +27,34 @@ static int max_message_size = BUFSIZ;
 static int iterations = 0;
 
 static void
-parse_args (int argc, char *argv[])
+parse_args (int argc, ACE_TCHAR *argv[])
 {
   ACE_LOG_MSG->open (argv[0]);
 
   // Start at argv[1]
-  ACE_Get_Opt getopt (argc, argv, "m:ui:", 1); 
+  ACE_Get_Opt getopt (argc, argv, ACE_TEXT("m:ui:"), 1);
 
   for (int c; (c = getopt ()) != -1; )
     switch (c)
       {
       case 'm':
-        max_message_size = ACE_OS::atoi (getopt.optarg) * BUFSIZ;
+        max_message_size = ACE_OS::atoi (getopt.opt_arg ()) * BUFSIZ;
         break;
       case 'i':
-        iterations = ACE_OS::atoi (getopt.optarg);
+        iterations = ACE_OS::atoi (getopt.opt_arg ());
         break;
       case 'u':
         // usage fallthrough
       default:
-        ACE_ERROR ((LM_ERROR, 
-		    "%n: -m max_message_size (in k) -i iterations\n%a", 
+        ACE_ERROR ((LM_ERROR,
+		    "%n: -m max_message_size (in k) -i iterations\n%a",
 		    1));
         /* NOTREACHED */
       }
 }
 
 int
-main (int argc, char **argv) 
+ACE_TMAIN (int argc, ACE_TCHAR **argv)
 {
   int user_prompt;
 
@@ -73,7 +79,7 @@ main (int argc, char **argv)
       ACE_OS::memset (buf, 1, max_message_size);
 
       while (iterations--)
-        if (log.log_message (Log_Wrapper::LOG_DEBUG, buf) == -1)
+        if (log.log_message (Log_Wrapper::LM_DEBUG, buf) == -1)
 	  ACE_ERROR_RETURN ((LM_ERROR, "%p\n" "log"), -1);
     }
 
@@ -85,7 +91,7 @@ main (int argc, char **argv)
         user_prompt = 1;
       else
         user_prompt = 0;
-      
+
       // Continually read messages from stdin and log them.
 
       for (int count = 1;;)
@@ -98,7 +104,7 @@ main (int argc, char **argv)
           if (nbytes <= 0)
             break; // End of file or error.
           buf[nbytes - 1] = '\0';
-          
+
           // Quitting?
           if (user_prompt)
 	    {
@@ -109,10 +115,10 @@ main (int argc, char **argv)
 	    ACE_OS::sleep (1);
 
           // Send the message to the logger.
-          if (log.log_message (Log_Wrapper::LOG_DEBUG, buf) == -1)
+          if (log.log_message (Log_Wrapper::LM_DEBUG, buf) == -1)
 	    ACE_ERROR_RETURN ((LM_ERROR, "%p\n" "log_message"), -1);
 	  ACE_DEBUG ((LM_DEBUG, "finished sending message %d\n", count++));
-        } 
+        }
     }
 
   ACE_DEBUG ((LM_DEBUG, "Client done.\n"));

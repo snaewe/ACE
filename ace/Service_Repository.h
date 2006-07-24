@@ -1,178 +1,223 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Service_Repository.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Service_Repository.h
+ *
+ *  $Id$
+ *
+ *  @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//=============================================================================
 
-#if !defined (ACE_SERVICE_REPOSITORY_H)
+#ifndef ACE_SERVICE_REPOSITORY_H
 #define ACE_SERVICE_REPOSITORY_H
 
-#include "ace/Service_Types.h"
+#include /**/ "ace/pre.h"
 
+#include "ace/ACE_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "ace/Default_Constants.h"
+#include "ace/Recursive_Thread_Mutex.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+class ACE_Service_Type;
+
+#define ACE_Component_Repository ACE_Service_Repository
+/**
+ * @class ACE_Service_Repository
+ *
+ * @brief Contains all the services offered by a Service
+ * Configurator-based application.
+ *
+ * This class contains a vector of <ACE_Service_Types> *'s and
+ * allows an administrative entity to centrally manage and
+ * control the behavior of application services.  Note that if
+ * services are removed from the middle of the repository the
+ * order won't necessarily be maintained since the <remove>
+ * method performs compaction.  However, the common case is not
+ * to remove services, so typically they are deleted in the
+ * reverse order that they were added originally.
+ */
 class ACE_Export ACE_Service_Repository
 {
-  // = TITLE
-  //     A container for all services offered by a Service
-  //     Configurator-based application.  This allows an
-  //     administrative entity to centrally manage and control the
-  //     behavior of application services.
-  //
-  // = DESCRIPTION
-  //     This class contains a vector of <ACE_Service_Types> *'s.
 public:
   friend class ACE_Service_Repository_Iterator;
 
-  enum {DEFAULT_SIZE = 50};
+  enum
+  {
+    DEFAULT_SIZE = ACE_DEFAULT_SERVICE_REPOSITORY_SIZE
+  };
+
   // = Initialization and termination methods.
+  /// Initialize the repository.
   ACE_Service_Repository (void);
-  // Initialize the repository.
 
-  ACE_Service_Repository (int size);
-  // Initialize the repository.
+  /// Initialize the repository.
+  ACE_Service_Repository (size_t size);
 
-  static ACE_Service_Repository *instance (int size = ACE_Service_Repository::DEFAULT_SIZE);
-  // Get pointer to a process-wide <ACE_Service_Repository>.
+  /// Initialize the repository.
+  int open (size_t size = DEFAULT_SIZE);
 
-  static ACE_Service_Repository *instance (ACE_Service_Repository *);
-  // Set pointer to a process-wide <ACE_Service_Repository> and return
-  // existing pointer.  
-
-  static void close_singleton (void);
-  // Delete the dynamically allocated Singleton
-
-  int open (int size = DEFAULT_SIZE);
-  // Initialize the repository.
-
+  /// Close down the repository and free up dynamically allocated
+  /// resources.
   ~ACE_Service_Repository (void);
-  // Terminate the repository.
 
-  int fini (void);
-  // Finalize (call fini() and possibly delete) all the services.
-
+  /// Close down the repository and free up dynamically allocated
+  /// resources.
   int close (void);
-  // Terminate the repository.
 
-  // = Search structure operations (all acquire locks as necessary). 
+  /// Finalize all the services by calling <fini> and deleting
+  /// dynamically allocated services.
+  int fini (void);
 
+  /// Get pointer to a process-wide ACE_Service_Repository.
+  static ACE_Service_Repository * instance
+    (size_t size = ACE_Service_Repository::DEFAULT_SIZE);
+
+  /// Set pointer to a process-wide ACE_Service_Repository and return
+  /// existing pointer.
+  static ACE_Service_Repository *instance (ACE_Service_Repository *);
+
+  /// Delete the dynamically allocated Singleton.
+  static void close_singleton (void);
+
+  // = Search structure operations (all acquire locks as necessary).
+
+  /// Insert a new service record.  Returns -1 when the service repository
+  /// is full and 0 on success.
   int insert (const ACE_Service_Type *);
-  // Insert a new service record.
 
-  int find (const ASYS_TCHAR name[], 
-	    const ACE_Service_Type **srp = 0, 
-	    int ignore_suspended = 1);
-  // Locate an entry with <name> in the table.  If <ignore_suspended>
-  // is set then only consider services marked as resumed.  If the
-  // caller wants the located entry, pass back a pointer to the
-  // located entry via <srp>.  If <name> is not found, -1 is returned.
-  // If <name> is found, but it is suspended and the caller wants to
-  // ignore suspended services a -2 is returned.
+  /**
+   * Locate an entry with <name> in the table.  If <ignore_suspended>
+   * is set then only consider services marked as resumed.  If the
+   * caller wants the located entry, pass back a pointer to the
+   * located entry via <srp>.  If <name> is not found, -1 is returned.
+   * If <name> is found, but it is suspended and the caller wants to
+   * ignore suspended services a -2 is returned.
+   */
+  int find (const ACE_TCHAR name[],
+            const ACE_Service_Type **srp = 0,
+            int ignore_suspended = 1) const;
 
-  int remove (const ASYS_TCHAR[]);
-  // Remove an existing service record.
+  /// Remove an existing service record. If @a sr == 0, the service record
+  /// is deleted before control is returned to the caller. If @a sr != 0,
+  /// the service's record is removed from the repository, but not deleted;
+  /// *sr receives the service record pointer and the caller is responsible
+  /// for properly disposing of it.
+  int remove (const ACE_TCHAR[], ACE_Service_Type **sr = 0);
 
   // = Liveness control
-  int resume (const ASYS_TCHAR[], const ACE_Service_Type ** = 0);
-  // Resume a service record.
+  /// Resume a service record.
+  int resume (const ACE_TCHAR[], const ACE_Service_Type ** = 0);
 
-  int suspend (const ASYS_TCHAR[], const ACE_Service_Type ** = 0);
-  // Suspend a service record.
+  /// Suspend a service record.
+  int suspend (const ACE_TCHAR[], const ACE_Service_Type ** = 0);
 
-  int current_size (void);
-  // Return the current size of the repository.
+  /// Return the current size of the repository.
+  size_t current_size (void) const;
 
-  int total_size (void);
-  // Return the total size of the repository.
+  /// Return the total size of the repository.
+  size_t total_size (void) const;
 
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 private:
-  int find_i (const ASYS_TCHAR service_name[],
-	      const ACE_Service_Type ** = 0, 
-	      int ignore_suspended = 1);
-  // Locates <service_name>.  Must be called without locks being
-  // held...
+  /// Locates <service_name>.  Must be called without locks being
+  /// held...
+  int find_i (const ACE_TCHAR service_name[],
+              const ACE_Service_Type ** = 0,
+              int ignore_suspended = 1) const;
 
+  /// Contains all the configured services.
   const ACE_Service_Type **service_vector_;
-  // Contains all the configured services.
 
-  int current_size_;
-  // Current number of services.
+  /// Current number of services.
+  size_t current_size_;
 
-  int total_size_;
-  // Maximum number of service.
+  /// Maximum number of services.
+  size_t total_size_;
 
+  /// Pointer to a process-wide ACE_Service_Repository.
   static ACE_Service_Repository *svc_rep_;
-  // Pointer to a process-wide <ACE_Service_Repository>.
 
+  /// Must delete the <svc_rep_> if non-0.
   static int delete_svc_rep_;
-  // Must delete the <svc_rep_> if non-0.
-
 
 #if defined (ACE_MT_SAFE) && (ACE_MT_SAFE != 0)
-  ACE_Thread_Mutex lock_; 
-  // Synchronization variable for the MT_SAFE Repository 
+  /// Synchronization variable for the MT_SAFE Repository
+  mutable ACE_Recursive_Thread_Mutex lock_;
 #endif /* ACE_MT_SAFE */
 };
 
+/**
+ * @class ACE_Service_Repository_Iterator
+ *
+ * @brief Iterate through the ACE_Service_Repository.
+ *
+ * Make sure not to delete entries as the iteration is going on
+ * since this class is not designed as a robust iterator.
+ */
 class ACE_Export ACE_Service_Repository_Iterator
 {
 public:
-  // = TITLE
-  //     Iterate through the <ACE_Service_Repository>.
+  // = Initialization and termination methods.
+  /// Constructor initializes the iterator.
+  ACE_Service_Repository_Iterator (ACE_Service_Repository &sr,
+                                   int ignored_suspended = 1);
 
-  // = Initialization method.
-  ACE_Service_Repository_Iterator (ACE_Service_Repository &sr, 
-				   int ignored_suspended = 1);
-
+  /// Destructor.
   ~ACE_Service_Repository_Iterator (void);
-  // dtor.
 
   // = Iteration methods.
 
+  /// Pass back the <next_item> that hasn't been seen in the repository.
+  /// Returns 0 when all items have been seen, else 1.
   int next (const ACE_Service_Type *&next_item);
-  // Pass back the <next_item> that hasn't been seen in the set.
-  // Returns 0 when all items have been seen, else 1.
 
+  /// Returns 1 when all items have been seen, else 0.
   int done (void) const;
-  // Returns 1 when all items have been seen, else 0.
 
+  /// Move forward by one element in the repository.  Returns 0 when all the
+  /// items in the set have been seen, else 1.
   int advance (void);
-  // Move forward by one element in the set.  Returns 0 when all the
-  // items in the set have been seen, else 1.
 
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 private:
+  bool valid (void) const;
+  ACE_Service_Repository_Iterator (const ACE_Service_Repository_Iterator&);
+
+private:
+  /// Reference to the Service Repository we are iterating over.
   ACE_Service_Repository &svc_rep_;
-  // Reference to the Service Repository we are iterating over.
 
-  int next_;
-  // Next index location that we haven't yet seen.
+  /// Next index location that we haven't yet seen.
+  size_t next_;
 
+  /// Are we ignoring suspended services?
   int ignore_suspended_;
-  // Are we ignoring suspended services?
 };
 
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #if defined (__ACE_INLINE__)
-#include "ace/Service_Repository.i"
+#include "ace/Service_Repository.inl"
 #endif /* __ACE_INLINE__ */
+
+#include /**/ "ace/post.h"
 
 #endif /* _SERVICE_REPOSITORY_H */

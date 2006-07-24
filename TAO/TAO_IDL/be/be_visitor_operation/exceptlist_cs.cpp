@@ -19,21 +19,17 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_operation.h"
-
-ACE_RCSID(be_visitor_operation, exceptlist_cs, "$Id$")
-
+ACE_RCSID (be_visitor_operation,
+           exceptlist_cs,
+           "$Id$")
 
 // ****************************************************************************
 // visitor to generate the exception list for operations
 // ****************************************************************************
 
-be_visitor_operation_exceptlist_cs::be_visitor_operation_exceptlist_cs (be_visitor_context
-                                                            *ctx)
+be_visitor_operation_exceptlist_cs::be_visitor_operation_exceptlist_cs (
+    be_visitor_context *ctx
+  )
   : be_visitor_decl (ctx)
 {
 }
@@ -45,52 +41,54 @@ be_visitor_operation_exceptlist_cs::~be_visitor_operation_exceptlist_cs (void)
 int
 be_visitor_operation_exceptlist_cs::visit_operation (be_operation *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // grab the out stream
-  // don't do anything if the exception list is empty
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  // Don't do anything if the exception list is empty.
   if (node->exceptions ())
     {
-      os->indent ();
-#if 0
-      *os << "static CORBA::TypeCode_ptr " << "_tao_" << node->flatname ()
-          << "_exceptlist [] = {" << be_idt_nl;
-#endif
-      *os << "static TAO_Exception_Data " << "_tao_" << node->flatname ()
-          << "_exceptiondata [] = " << be_nl;
+      *os << be_nl << be_nl
+          << "static TAO::Exception_Data" << be_nl
+          << "_tao_" << node->flat_name ()
+          << "_exceptiondata [] = " << be_idt_nl;
       *os << "{" << be_idt_nl;
-      // initialize an iterator to iterate thru the exception list
-      UTL_ExceptlistActiveIterator *ei;
-      ACE_NEW_RETURN (ei,
-                      UTL_ExceptlistActiveIterator (node->exceptions ()),
-                      -1);
-      // continue until each element is visited
-      while (!ei->is_done ())
+
+      be_exception *ex = 0;
+
+      // Initialize an iterator to iterate thru the exception list.
+      // Continue until each element is visited.
+      // Iterator must be advanced explicitly inside the loop.
+      for (UTL_ExceptlistActiveIterator ei (node->exceptions ());
+           !ei.is_done ();)
         {
-          be_exception *excp = be_exception::narrow_from_decl (ei->item ());
+          ex = be_exception::narrow_from_decl (ei.item ());
 
-          if (excp == 0)
+          *os << "{" << be_idt_nl
+              << "\"" << ex->repoID () << "\"," << be_nl
+              << ex->name () << "::_alloc"
+              << "\n#if TAO_HAS_INTERCEPTORS == 1" << be_nl;
+
+          if (be_global->tc_support ())
             {
-              delete ei;
-              ACE_ERROR_RETURN ((LM_ERROR,
-                                 "(%N:%l) be_visitor_operation_exceptlist_cs"
-                                 "visit_operation - "
-                                 "codegen for scope failed\n"), -1);
-
+              *os << ", " << ex->tc_name ();
             }
-          *os << "{";
-          *os << excp->tc_name ();
-          *os << ", ";
-          *os << excp->name () << "::_alloc}";
-          ei->next ();
-          if (!ei->is_done ())
+          else
             {
-              *os << ",\n";
-              os->indent ();
+              *os << ", 0";
             }
-          // except the last one is processed?
 
-        } // end of while loop
-      delete ei;
-      *os << be_uidt_nl << "};\n\n";
-    } // end of if
+          *os << "\n#endif /* TAO_HAS_INTERCEPTORS */" << be_uidt_nl
+              << "}";
+
+          ei.next ();
+
+          if (!ei.is_done ())
+            {
+              *os << "," << be_nl << be_nl;
+            }
+        }
+
+      *os << be_uidt_nl << "};" << be_uidt;
+    }
+
   return 0;
 }

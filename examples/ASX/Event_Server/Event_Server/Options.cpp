@@ -1,8 +1,12 @@
 // $Id$
 
 #include "ace/Get_Opt.h"
-#include "ace/Synch.h"
 #include "ace/Thread.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdio.h"
+#if defined (ACE_HAS_TRACE)
+# include "ace/OS_NS_strings.h"
+#endif /* ACE_HAS_TRACE */
 
 #include "Options.h"
 
@@ -62,29 +66,29 @@ void Options::print_results (void)
 		"%8d = messages sent\n"
 		"%8d = messages received\n"
 		"%8d = signals received\n"
-		"%8ds, %dms = wait-cpu (latency) time\n"		
+		"%8ds, %dms = wait-cpu (latency) time\n"
 		"%8ds, %dms = user lock wait sleep time\n"
 		"%8ds, %dms = all other sleep time\n"
 		"%8d = voluntary context switches\n"
 		"%8d = involuntary context switches\n"
 		"%8d = system calls\n"
 		"%8d = chars read/written\n",
-		rusage.pr_lwpid,
-		rusage.pr_count,
-		rusage.pr_minf,
-		rusage.pr_majf,
-		rusage.pr_inblk,
-		rusage.pr_oublk,
-		rusage.pr_msnd,
-		rusage.pr_mrcv,
-		rusage.pr_sigs,
-		rusage.pr_wtime.tv_sec, rusage.pr_wtime.tv_nsec / 1000000,
-		rusage.pr_ltime.tv_sec, rusage.pr_ltime.tv_nsec / 1000000,
-		rusage.pr_slptime.tv_sec, rusage.pr_slptime.tv_nsec / 1000000,
-		rusage.pr_vctx,
-		rusage.pr_ictx,
-		rusage.pr_sysc,
-		rusage.pr_ioch);
+		(int) rusage.pr_lwpid,
+		(int) rusage.pr_count,
+		(int) rusage.pr_minf,
+		(int) rusage.pr_majf,
+		(int) rusage.pr_inblk,
+		(int) rusage.pr_oublk,
+		(int) rusage.pr_msnd,
+		(int) rusage.pr_mrcv,
+		(int) rusage.pr_sigs,
+		(int) rusage.pr_wtime.tv_sec, (int) rusage.pr_wtime.tv_nsec / 1000000,
+		(int) rusage.pr_ltime.tv_sec, (int) rusage.pr_ltime.tv_nsec / 1000000,
+		(int) rusage.pr_slptime.tv_sec, (int) rusage.pr_slptime.tv_nsec / 1000000,
+		(int) rusage.pr_vctx,
+		(int) rusage.pr_ictx,
+		(int) rusage.pr_sysc,
+		(int) rusage.pr_ioch);
 #else
       /* Someone needs to write the corresponding dump for rusage... */
 #endif /* ACE_HAS_PRUSAGE_T */
@@ -100,11 +104,11 @@ void Options::print_results (void)
 }
 
 void
-Options::parse_args (int argc, char *argv[])
+Options::parse_args (int argc, ACE_TCHAR *argv[])
 {
   ACE_LOG_MSG->open (argv[0]);
 
-  ACE_Get_Opt get_opt (argc, argv, "c:bdH:i:L:l:M:ns:t:T:v");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT ("c:bdH:i:L:l:M:ns:t:T:v"));
   int c;
 
   while ((c = get_opt ()) != EOF)
@@ -114,40 +118,42 @@ Options::parse_args (int argc, char *argv[])
 	this->t_flags (THR_BOUND);
 	break;
       case 'c':
-	this->consumer_port (ACE_OS::atoi (get_opt.optarg));
+	this->consumer_port (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'd':
 	this->debugging_ = 1;
 	break;
       case 'H':
-	this->high_water_mark (ACE_OS::atoi (get_opt.optarg));
+	this->high_water_mark (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'i':
-	this->iterations (ACE_OS::atoi (get_opt.optarg));
+	this->iterations (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'L':
-	this->low_water_mark (ACE_OS::atoi (get_opt.optarg));
+	this->low_water_mark (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'l':
-	this->initial_queue_length (ACE_OS::atoi (get_opt.optarg));
+	this->initial_queue_length (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'M':
-	this->message_size (ACE_OS::atoi (get_opt.optarg));
+	this->message_size (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'n':
 	this->t_flags (THR_NEW_LWP);
 	break;
       case 's':
-	this->supplier_port (ACE_OS::atoi (get_opt.optarg));
+	this->supplier_port (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'T':
-	if (ACE_OS::strcasecmp (get_opt.optarg, "ON") == 0)
+#if defined (ACE_HAS_TRACE)
+	if (ACE_OS::strcasecmp (get_opt.opt_arg (), ACE_TEXT ("ON")) == 0)
 	  ACE_Trace::start_tracing ();
-	else if (ACE_OS::strcasecmp (get_opt.optarg, "OFF") == 0)
+	else if (ACE_OS::strcasecmp (get_opt.opt_arg (), ACE_TEXT ("OFF")) == 0)
 	  ACE_Trace::stop_tracing ();
+#endif /* ACE_HAS_TRACE */
 	break;
       case 't':
-	this->thr_count (ACE_OS::atoi (get_opt.optarg));
+	this->thr_count (ACE_OS::atoi (get_opt.opt_arg ()));
 	break;
       case 'v':
 	this->verbosity_ = 1;
@@ -160,26 +166,32 @@ Options::parse_args (int argc, char *argv[])
 		   "\t[-H high water mark]\n"
 		   "\t[-i number of test iterations]\n"
 		   "\t[-L low water mark]\n"
-		   "\t[-M] message size \n" 
-		   "\t[-n] (THR_NEW_LWP)\n" 
+		   "\t[-M] message size \n"
+		   "\t[-n] (THR_NEW_LWP)\n"
 		   "\t[-q max queue size]\n"
 		   "\t[-s supplier port]\n"
 		   "\t[-t number of threads]\n"
 		   "\t[-v] (verbose) \n",
-		   argv[0]);
+		   ACE_TEXT_ALWAYS_CHAR (argv[0]));
 	::exit (1);
 	/* NOTREACHED */
 	break;
       }
 
+  // This is a major hack to get the size_t format spec to be a narrow
+  // char, same as the other strings for printf() here. It only works
+  // because this is the end of the source file. It makes the
+  // ACE_SIZE_T_FORMAT_SPECIFIER not use ACE_LIB_TEXT, effectively.
+#undef ACE_LIB_TEXT
+#define ACE_LIB_TEXT(A) A
   if (this->verbose ())
     ACE_OS::printf ("%8d = initial concurrency hint\n"
-	      "%8d = total iterations\n"
-	      "%8d = thread count\n"
-	      "%8d = low water mark\n"
-	      "%8d = high water mark\n"
-	      "%8d = message_size\n"
-	      "%8d = initial queue length\n"
+	      ACE_SIZE_T_FORMAT_SPECIFIER " = total iterations\n"
+	      ACE_SIZE_T_FORMAT_SPECIFIER " = thread count\n"
+	      ACE_SIZE_T_FORMAT_SPECIFIER " = low water mark\n"
+	      ACE_SIZE_T_FORMAT_SPECIFIER " = high water mark\n"
+	      ACE_SIZE_T_FORMAT_SPECIFIER " = message_size\n"
+	      ACE_SIZE_T_FORMAT_SPECIFIER " = initial queue length\n"
 	      "%8d = THR_BOUND\n"
 	      "%8d = THR_NEW_LWP\n",
 	      ACE_Thread::getconcurrency (),

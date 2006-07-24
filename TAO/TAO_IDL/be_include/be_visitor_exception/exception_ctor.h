@@ -20,7 +20,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_EXCEPTION_EXCEPTION_CTOR_H_)
+#ifndef _BE_VISITOR_EXCEPTION_EXCEPTION_CTOR_H_
 #define _BE_VISITOR_EXCEPTION_EXCEPTION_CTOR_H_
 
 class be_visitor_exception_ctor : public be_visitor_scope
@@ -37,7 +37,7 @@ public:
   ~be_visitor_exception_ctor (void);
   // dtor
 
-  virtual int post_process (void);
+  virtual int post_process (be_decl *);
   // post processing after each element
 
   virtual int visit_exception (be_exception *node);

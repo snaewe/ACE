@@ -1,4 +1,16 @@
+// -*- C++ -*-
+//
 // $Id$
+
+#include "ace/Time_Value.h"
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+ACE_INLINE TimeBase::TimeT
+ORBSVCS_Time::zero ()
+{
+  return 0;
+}
 
 ACE_INLINE void
 ORBSVCS_Time::TimeT_to_hrtime (ACE_hrtime_t &lhs,
@@ -28,7 +40,10 @@ ACE_INLINE void
 ORBSVCS_Time::Time_Value_to_TimeT (TimeBase::TimeT& lhs,
                                    const ACE_Time_Value& rhs)
 {
-  ACE_hrtime_t t = rhs.sec () * ACE_ONE_SECOND_IN_NSECS + rhs.usec () * 1000;
+  ACE_hrtime_t t =
+    static_cast<ACE_hrtime_t> (rhs.sec ()) * ACE_U_ONE_SECOND_IN_NSECS +
+    static_cast<ACE_hrtime_t> (rhs.usec ()) * 1000u;
+
   ORBSVCS_Time::hrtime_to_TimeT (lhs, t);
 }
 
@@ -40,8 +55,8 @@ ORBSVCS_Time::TimeT_to_Time_Value (ACE_Time_Value& lhs,
 
   ORBSVCS_Time::TimeT_to_hrtime (t, rhs);
 
-  lhs.set (ACE_static_cast(ACE_UINT32, t / ACE_ONE_SECOND_IN_NSECS),
-           ACE_static_cast(ACE_UINT32, (t % ACE_ONE_SECOND_IN_NSECS) / 1000));
+  lhs.set (static_cast<ACE_UINT32> (t / ACE_U_ONE_SECOND_IN_NSECS),
+           static_cast<ACE_UINT32> ((t % ACE_U_ONE_SECOND_IN_NSECS) / 1000));
 }
 
 ACE_INLINE ACE_Time_Value
@@ -51,3 +66,38 @@ ORBSVCS_Time::to_Time_Value (const TimeBase::TimeT& t)
   ORBSVCS_Time::TimeT_to_Time_Value (r, t);
   return r;
 }
+
+ACE_INLINE void
+ORBSVCS_Time::Absolute_Time_Value_to_TimeT (TimeBase::TimeT& lhs,
+					    const ACE_Time_Value& rhs)
+{
+  ACE_hrtime_t t =
+    static_cast<ACE_hrtime_t> (rhs.sec ()) * ACE_U_ONE_SECOND_IN_NSECS +
+    static_cast<ACE_hrtime_t> (rhs.usec ()) * 1000u;
+  
+  t += Time_Base_Offset;
+  ORBSVCS_Time::hrtime_to_TimeT (lhs, t);
+}
+
+ACE_INLINE void
+ORBSVCS_Time::Absolute_TimeT_to_Time_Value (ACE_Time_Value& lhs,
+					    const TimeBase::TimeT& rhs)
+{
+  ACE_hrtime_t t;
+
+  ORBSVCS_Time::TimeT_to_hrtime (t, rhs);
+  t -= Time_Base_Offset;
+
+  lhs.set(static_cast<ACE_UINT32> (t / ACE_U_ONE_SECOND_IN_NSECS),
+	  static_cast<ACE_UINT32> ((t % ACE_U_ONE_SECOND_IN_NSECS) / 1000));
+}
+
+ACE_INLINE ACE_Time_Value
+ORBSVCS_Time::to_Absolute_Time_Value (const TimeBase::TimeT& t)
+{
+  ACE_Time_Value r;
+  ORBSVCS_Time::Absolute_TimeT_to_Time_Value (r, t);
+  return r;
+}
+
+TAO_END_VERSIONED_NAMESPACE_DECL

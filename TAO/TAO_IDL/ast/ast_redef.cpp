@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,49 +62,56 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_redef.cc - Implement utility function to decide when redefinition
- * 		  is allowed
- */
+#include "ast_decl.h"
 
-#include	"idl.h"
-#include	"idl_extern.h"
+ACE_RCSID (ast,
+           ast_redef,
+           "$Id$")
 
-ACE_RCSID(ast, ast_redef, "$Id$")
-
-/*
- * Return TRUE if the node d represents an IDL construct whose name
- * can be redefined.
- */
-idl_bool
-can_be_redefined(AST_Decl *d)
+// Return TRUE if the node d represents an IDL construct whose name
+// can be redefined.
+bool
+can_be_redefined (AST_Decl *d)
 {
-  switch (d->node_type()) {
-  case AST_Decl::NT_module:
-  case AST_Decl::NT_interface:
-  case AST_Decl::NT_interface_fwd:
-  case AST_Decl::NT_const:
-  case AST_Decl::NT_except:
-  case AST_Decl::NT_argument:
-  case AST_Decl::NT_enum_val:
-  case AST_Decl::NT_string:
-  case AST_Decl::NT_array:
-  case AST_Decl::NT_sequence:
-  case AST_Decl::NT_union:
-  case AST_Decl::NT_struct:
-  case AST_Decl::NT_enum:
-  case AST_Decl::NT_typedef:
-    return I_TRUE;
+  switch (d->node_type ())
+    {
+    case AST_Decl::NT_module:
+    case AST_Decl::NT_interface:
+    case AST_Decl::NT_interface_fwd:
+    case AST_Decl::NT_valuetype:
+    case AST_Decl::NT_valuetype_fwd:
+    case AST_Decl::NT_component:
+    case AST_Decl::NT_component_fwd:
+    case AST_Decl::NT_eventtype:
+    case AST_Decl::NT_eventtype_fwd:
+    case AST_Decl::NT_home:
+    case AST_Decl::NT_const:
+    case AST_Decl::NT_except:
+    case AST_Decl::NT_argument:
+    case AST_Decl::NT_enum_val:
+    case AST_Decl::NT_string:
+    case AST_Decl::NT_wstring:
+    case AST_Decl::NT_array:
+    case AST_Decl::NT_sequence:
+    case AST_Decl::NT_union:
+    case AST_Decl::NT_union_fwd:
+    case AST_Decl::NT_struct:
+    case AST_Decl::NT_struct_fwd:
+    case AST_Decl::NT_enum:
+    case AST_Decl::NT_typedef:
+    case AST_Decl::NT_valuebox:
+      return true;
 
-  case AST_Decl::NT_union_branch:
-  case AST_Decl::NT_field:
-  case AST_Decl::NT_attr:
-  case AST_Decl::NT_op:
-  case AST_Decl::NT_pre_defined:
-  default:
-    return I_FALSE;
-  }
+    case AST_Decl::NT_union_branch:
+    case AST_Decl::NT_field:
+    case AST_Decl::NT_attr:
+    case AST_Decl::NT_op:
+    case AST_Decl::NT_pre_defined:
+    case AST_Decl::NT_factory:
+    default:
+      return false;
+    }
 }
 

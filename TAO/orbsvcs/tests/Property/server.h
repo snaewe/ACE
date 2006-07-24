@@ -17,11 +17,11 @@
 //
 // ============================================================================
 
-#if !defined (COSPROPERTYSERVICE_SERVER_H)
+#ifndef COSPROPERTYSERVICE_SERVER_H
 #define COSPROPERTYSERVICE_SERVER_H
 
-#include "tao/TAO.h"
+#include "tao/Utils/ORB_Manager.h"
 #include "orbsvcs/Property/CosPropertyService_i.h"
-#include "orbsvcs/Naming/Naming_Utils.h"
+#include "orbsvcs/Naming/Naming_Client.h"
 
 #endif /* COSPROPERTYSERVICE_SERVER_H */

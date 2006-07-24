@@ -1,33 +1,22 @@
 // $Id$
 
-#if !defined (ACE_IOSTREAM_T_C)
-#define ACE_IOSTREAM_T_C
-
-#define ACE_BUILD_DLL
+#ifndef ACE_IOSTREAM_T_CPP
+#define ACE_IOSTREAM_T_CPP
 
 #include "ace/IOStream_T.h"
+#include "ace/OS_Memory.h"
 
-ACE_RCSID(ace, IOStream_T, "$Id$")
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 #if !defined (ACE_LACKS_ACE_IOSTREAM)
 
-#if defined (ACE_HAS_MINIMUM_IOSTREAMH_INCLUSION) && defined (__GNUG__)
-# if !defined (ACE_IOSTREAM_T_H)
-    // _Only_ define this when compiling this .cpp file standalone, not
-    // when instantiating templates.  Its purpose is to provide something
-    // for global constructors and destructors to be tied to.  Without it,
-    // they would be tied to the file(name).  With Cygnus g++ 2.7.2/VxWorks,
-    // that name is used directly in variable names in the munched ctor/dtor
-    // file.  That name contains a ".", so it's not a legal C variable name.
-    // The root of all this trouble is a static instance (of Iostream_init)
-    // declared in the iostream.h header file.
-    int ACE_IOStream_global_of_builtin_type_to_avoid_munch_problems = 0;
-# endif /* ! ACE_IOSTREAM_T_H */
-#endif /* ACE_HAS_MINIMUM_IOSTREAMH_INCLUSION && __GNUG__ */
-
 #if !defined (__ACE_INLINE__)
-#include "ace/IOStream_T.i"
+#include "ace/IOStream_T.inl"
 #endif /* !__ACE_INLINE__ */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // We will be given a STREAM by the iostream object which creates us.
 // See the ACE_IOStream template for how that works.  Like other
@@ -59,6 +48,54 @@ ACE_Streambuf_T<STREAM>::ACE_Streambuf_T (STREAM *peer,
 #endif /* ! ACE_LACKS_LINEBUFFERED_STREAMBUF */
 }
 
+template <class STREAM> ssize_t
+ACE_Streambuf_T<STREAM>::send (char *buf, ssize_t len)
+{
+  return peer_->send_n (buf,len);
+}
+
+template <class STREAM> ssize_t
+ACE_Streambuf_T<STREAM>::recv (char *buf,
+                               ssize_t len,
+                               ACE_Time_Value *tv)
+{
+  return this->recv (buf, len, 0, tv);
+}
+
+template <class STREAM> ssize_t
+ACE_Streambuf_T<STREAM>::recv (char *buf,
+                               ssize_t len,
+                               int flags,
+                               ACE_Time_Value * tv)
+{
+  this->timeout_ = 0;
+  errno = ESUCCESS;
+  ssize_t rval = peer_->recv (buf, len, flags, tv);
+  if (errno == ETIME)
+    this->timeout_ = 1;
+  return rval;
+}
+
+template <class STREAM> ssize_t
+ACE_Streambuf_T<STREAM>::recv_n (char *buf,
+                                 ssize_t len,
+                                 int flags,
+                                 ACE_Time_Value *tv)
+{
+  this->timeout_ = 0;
+  errno = ESUCCESS;
+  ssize_t rval = peer_->recv_n (buf, len, flags, tv);
+  if (errno == ETIME)
+    this->timeout_ = 1;
+  return rval;
+}
+
+template <class STREAM> ACE_HANDLE
+ACE_Streambuf_T<STREAM>::get_handle (void)
+{
+  return peer_ ? peer_->get_handle () : 0;
+}
+
 // The typical constructor.  This will initiailze your STREAM and then
 // setup the iostream baseclass to use a custom streambuf based on
 // STREAM.
@@ -70,7 +107,7 @@ ACE_IOStream<STREAM>::ACE_IOStream (STREAM &stream,
     STREAM (stream)
 {
   ACE_NEW (streambuf_,
-           ACE_Streambuf_T<STREAM> ((STREAM *) this, 
+           ACE_Streambuf_T<STREAM> ((STREAM *) this,
                                     streambuf_size));
   iostream::init (this->streambuf_);
 }
@@ -80,7 +117,7 @@ ACE_IOStream<STREAM>::ACE_IOStream (u_int streambuf_size)
   : iostream (0)
 {
   ACE_NEW (this->streambuf_,
-           ACE_Streambuf_T<STREAM> ((STREAM *) this, 
+           ACE_Streambuf_T<STREAM> ((STREAM *) this,
                                     streambuf_size));
   iostream::init (this->streambuf_);
 }
@@ -141,11 +178,11 @@ ACE_IOStream<STREAM>::operator<< (ACE_IOStream_String &v)
 {
   if (opfx ())
     {
-#if defined (ACE_WIN32)
+#if defined (ACE_WIN32) && defined (_MSC_VER)
       for (int i = 0; i < v.GetLength (); ++i)
 #else
       for (u_int i = 0; i < (u_int) v.length (); ++i)
-#endif /* ACE_WIN32 */
+#endif /* ACE_WIN32 && defined (_MSC_VER) */
         this->put (v[i]);
     }
 
@@ -203,6 +240,8 @@ operator<< (STREAM &stream,
   return stream;
 }
 
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #endif /* ACE_HAS_STRING_CLASS */
 #endif /* ACE_LACKS_ACE_IOSTREAM */
-#endif /* ACE_IOSTREAM_T_C */
+#endif /* ACE_IOSTREAM_T_CPP */

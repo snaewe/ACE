@@ -1,12 +1,14 @@
-// Dump.cpp
 // $Id$
 
-#define ACE_BUILD_DLL
-#include "ace/Synch_T.h"
 #include "ace/Dump.h"
+#include "ace/Guard_T.h"
+#include "ace/Thread_Mutex.h"
 #include "ace/Object_Manager.h"
+#include "ace/Log_Msg.h"
 
 ACE_RCSID(ace, Dump, "$Id$")
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // Implementations (very simple for now...)
 
@@ -40,12 +42,14 @@ ACE_Dumpable_Ptr::operator= (const ACE_Dumpable *dumper) const
   ACE_TRACE ("ACE_Dumpable_Ptr::operator=");
   if (this->dumper_ != dumper)
     {
-      delete (ACE_Dumpable *) this->dumper_;
-      ((ACE_Dumpable_Ptr *) this)->dumper_ = dumper;
+      delete const_cast <ACE_Dumpable *> (this->dumper_);
+      (const_cast<ACE_Dumpable_Ptr *> (this))->dumper_ = dumper;
     }
 }
 
 ACE_ODB::ACE_ODB (void)
+  // Let the Tuple default constructor initialize object_table_
+  : current_size_ (0)
 {
   ACE_TRACE ("ACE_ODB::ACE_ODB");
 }
@@ -63,7 +67,9 @@ ACE_ODB::instance (void)
         ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, *lock, 0));
 
       if (ACE_ODB::instance_ == 0)
-        ACE_NEW_RETURN (ACE_ODB::instance_, ACE_ODB, 0);
+        ACE_NEW_RETURN (ACE_ODB::instance_,
+                        ACE_ODB,
+                        0);
     }
 
   return ACE_ODB::instance_;
@@ -132,11 +138,4 @@ ACE_ODB::remove_object (const void *this_ptr)
 
 ACE_ODB *ACE_ODB::instance_ = 0;
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-ACE_MT (template class ACE_Guard<ACE_Thread_Mutex>);
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#if defined (ACE_MT_SAFE) && (ACE_MT_SAFE != 0)
-#pragma instantiate ACE_Guard<ACE_Thread_Mutex>
-#endif /* ACE_MT_SAFE */
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
+ACE_END_VERSIONED_NAMESPACE_DECL

@@ -5,7 +5,7 @@
 //
 // = LIBRARY
 //    JAWS
-// 
+//
 // = FILENAME
 //    Options.h
 //
@@ -14,33 +14,38 @@
 //
 // = AUTHOR
 //    Prashant Jain and Sumedh Mungee
-// 
+//
 //============================================================================
 
-#if !defined (ACE_BLOBBY_OPTIONS_H)
+#ifndef ACE_BLOBBY_OPTIONS_H
 #define ACE_BLOBBY_OPTIONS_H
 
 #include "Blob.h"
 #include "Blob_Handler.h"
 #include "ace/Get_Opt.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/ARGV.h"
 
-class Options 
+class Options
 {
 public:
   static Options *instance (void);
   // Returns the singleton instance
 
-  void parse_args (int argc, char *argv[]);
+  void parse_args (int argc, ACE_TCHAR *argv[]);
   // parses commandline arguments
 
-  char *hostname_;
+  ACE_TCHAR *hostname_;
   // Hostname to connect to
 
   u_short port_;
-  // Port number to use 
+  // Port number to use
 
-  char *filename_;
+  ACE_TCHAR *filename_;
   // Filename to upload/download
 
   int length_;

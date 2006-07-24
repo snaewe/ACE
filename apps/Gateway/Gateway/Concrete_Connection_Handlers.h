@@ -5,7 +5,7 @@
 //
 // = LIBRARY
 //    gateway
-// 
+//
 // = FILENAME
 //    Concrete_Connection_Handlers.h
 //
@@ -14,11 +14,11 @@
 //    appropriate threaded/reactive Consumer/Supplier behavior.
 //
 // = AUTHOR
-//    Doug Schmidt 
-// 
+//    Doug Schmidt <schmidt@cs.wustl.edu>
+//
 // ============================================================================
 
-#if !defined (CONCRETE_CONNECTION_HANDLER)
+#ifndef CONCRETE_CONNECTION_HANDLER
 #define CONCRETE_CONNECTION_HANDLER
 
 #include "Connection_Handler.h"
@@ -69,8 +69,8 @@ public:
   // = Initialization method.
   Consumer_Handler (const Connection_Config_Info &);
 
-  virtual int put (ACE_Message_Block *event, 
-		   ACE_Time_Value * = 0);
+  virtual int put (ACE_Message_Block *event,
+                   ACE_Time_Value * = 0);
   // Send an event to a Consumer (may be queued if necessary).
 
 protected:
@@ -107,6 +107,18 @@ protected:
 
   virtual int svc (void);
   // Transmit peer messages.
+
+  virtual int handle_close (ACE_HANDLE = ACE_INVALID_HANDLE,
+                            ACE_Reactor_Mask = ACE_Event_Handler::ALL_EVENTS_MASK);
+  // When thread started, connection become blocked, so no need to use
+  // handle_close to reinitiate the connection_handler, so should
+  // override this function to justify if controlling is in thread or
+  // not. If yes, handle_close do nothing, otherwise, it call parent
+  // handle_close().
+
+private:
+  int in_thread_;
+  // If the controlling is in thread's svc() or not.
 };
 
 class Thr_Supplier_Handler : public Supplier_Handler
@@ -120,8 +132,20 @@ public:
   // Initialize the object and spawn a new thread.
 
 protected:
+  virtual int handle_close (ACE_HANDLE = ACE_INVALID_HANDLE,
+                            ACE_Reactor_Mask = ACE_Event_Handler::ALL_EVENTS_MASK);
+  // When thread started, connection become blocked, so no need to use
+  // handle_close to reinitiate the connection_handler, so should
+  // override this function to justify if controlling is in thread or
+  // not. If yes, handle_close do nothing, otherwise, it call parent
+  // handle_close().
+
   virtual int svc (void);
   // Transmit peer messages.
+
+private:
+  int in_thread_;
+  // If the controlling is in thread's svc() or not.
 };
 
 #endif /* CONCRETE_CONNECTION_HANDLER */

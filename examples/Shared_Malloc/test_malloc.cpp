@@ -5,6 +5,12 @@
 
 #include "ace/Thread.h"
 #include "ace/Thread_Manager.h"
+#include "ace/Malloc.h"
+#include "ace/Signal.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_sys_wait.h"
+#include "ace/OS_NS_unistd.h"
 #include "Malloc.h"
 #include "Options.h"
 
@@ -14,8 +20,8 @@ static int
 gen_size (void)
 {
 #if defined (ACE_HAS_THREADS)
-  ACE_RANDR_TYPE seed = ACE_RANDR_TYPE (&seed);
-  return (ACE_OS::rand_r (ACE_RANDR_TYPE (seed)) % Options::instance ()->max_msg_size ()) + 1;
+  ACE_RANDR_TYPE seed = static_cast<ACE_RANDR_TYPE> (reinterpret_cast<unsigned long> (&seed));
+  return (ACE_OS::rand_r (seed) % Options::instance ()->max_msg_size ()) + 1;
 #else
   return (ACE_OS::rand () % Options::instance ()->max_msg_size ()) + 1;
 #endif /* ACE_HAS_THREADS */
@@ -31,9 +37,11 @@ malloc_recurse (int count)
   if (count <= 0)
     {
       if (Options::instance ()->debug ())
-        // Note that you'll need to #define ACE_HAS_MALLOC_STATS in
-        // the main ACE config.h file and remake ACE to enable this.
-        AMS (Malloc::instance ()->print_stats ());
+        {
+          // Note that you'll need to #define ACE_HAS_MALLOC_STATS in
+          // the main ACE config.h file and remake ACE to enable this.
+          ACE_MALLOC_STATS (Malloc::instance ()->print_stats ());
+        }
     }
   else
     {
@@ -102,29 +110,36 @@ spawn (void)
 #endif /* ACE_HAS_THREADS */
     }
 #if !defined (ACE_WIN32)
-  else if (ACE_OS::fork (Options::instance ()->program_name ()) == 0)
+  else if (ACE_OS::fork (ACE_TEXT_CHAR_TO_TCHAR (Options::instance ()->program_name ())) == 0)
     {
       if (Options::instance ()->exec_slave ())
         {
           char iterations[20];
           char msg_size[20];
 
-          ACE_OS::sprintf (iterations,
-                           "%d",
-                           Options::instance ()->iteration_count ());
-          ACE_OS::sprintf (msg_size,
-                           "%d",
-                           Options::instance ()->max_msg_size ());
-          char *argv[] =
+          ACE_OS::sprintf (iterations, "%lu",
+                           (unsigned long)
+                             Options::instance ()->iteration_count ());
+          ACE_OS::sprintf (msg_size, "%lu",
+                           (unsigned long)
+                             Options::instance ()->max_msg_size ());
+          const char *cp = 0;
+
+          if (Options::instance ()->debug ())
+            cp = "-d";
+          else
+            cp = "";
+
+          const char *argv[] =
           {
-            (char *) Options::instance ()->slave_name (),
+            Options::instance ()->slave_name (),
             "-p",
             "-n",
             iterations,
             "-L",
             msg_size,
-            Options::instance ()->debug () ? "-d" : "",
-            (char *) 0
+            cp,
+            0
           };
 
           if (ACE_OS::execv (Options::instance ()->program_name (),
@@ -179,7 +194,7 @@ handler (int)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   // Register a signal handler.
   ACE_Sig_Action sa ((ACE_SignalHandler) handler, SIGINT);

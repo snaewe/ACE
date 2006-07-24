@@ -19,7 +19,9 @@
 #include "helper.h"
 #include "ub_string.h"
 
-ACE_RCSID(Param_Test, ub_string, "$Id$")
+ACE_RCSID (Param_Test,
+           ub_string, 
+           "$Id$")
 
 // ************************************************************************
 //               Test_Unbounded_String
@@ -54,13 +56,45 @@ Test_Unbounded_String::opname (void) const
   return this->opname_;
 }
 
+void
+Test_Unbounded_String::dii_req_invoke (CORBA::Request *req
+                                       ACE_ENV_ARG_DECL)
+{
+  req->add_in_arg ("s1") <<= this->in_;
+  req->add_inout_arg ("s2") <<= this->inout_;
+  req->add_out_arg ("s3") <<= this->out_;
+
+  // The Any arg manages its memory but this class member does not.
+  CORBA::string_free (this->inout_);
+
+  req->set_return_type (CORBA::_tc_string);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  const char *tmp;
+  req->return_value () >>= tmp;
+  this->ret_ = CORBA::string_dup (tmp);
+
+  CORBA::NamedValue_ptr o2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o2->value () >>= tmp;
+  this->inout_ = CORBA::string_dup (tmp);
+
+  CORBA::NamedValue_ptr o3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o3->value () >>= tmp;
+  this->out_ = CORBA::string_dup (tmp);
+}
+
 int
-Test_Unbounded_String::init_parameters (Param_Test_ptr objref,
-                                        CORBA::Environment &env)
+Test_Unbounded_String::init_parameters (Param_Test_ptr
+                                        ACE_ENV_ARG_DECL_NOT_USED)
 {
   Generator *gen = GENERATOR::instance (); // value generator
-  ACE_UNUSED_ARG (objref);
-  ACE_UNUSED_ARG (env);
+
 
   // release any previously occupied values
   CORBA::string_free (this->in_);
@@ -81,6 +115,9 @@ int
 Test_Unbounded_String::reset_parameters (void)
 {
   // release any previously occupied values
+  CORBA::string_free (this->inout_);
+  CORBA::string_free (this->out_);
+  CORBA::string_free (this->ret_);
   this->inout_ = 0;
   this->out_ = 0;
   this->ret_ = 0;
@@ -90,57 +127,29 @@ Test_Unbounded_String::reset_parameters (void)
 }
 
 int
-Test_Unbounded_String::run_sii_test (Param_Test_ptr objref,
-                                     CORBA::Environment &env)
+Test_Unbounded_String::run_sii_test (Param_Test_ptr objref
+                                     ACE_ENV_ARG_DECL)
 {
-  CORBA::String_out str_out (this->out_);
-  this->ret_ = objref->test_unbounded_string (this->in_,
-                                              this->inout_,
-                                              str_out,
-                                              env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      CORBA::String_out str_out (this->out_);
 
-int
-Test_Unbounded_String::add_args (CORBA::NVList_ptr param_list,
-				 CORBA::NVList_ptr retval,
-				 CORBA::Environment &env)
-{
-  // create the parmaters
-  CORBA::Any in_arg (CORBA::_tc_string,
-                     &this->in_,
-                     CORBA::B_FALSE);
+      this->ret_ = objref->test_unbounded_string (this->in_,
+                                                  this->inout_,
+                                                  str_out
+                                                  ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-  CORBA::Any inout_arg (CORBA::_tc_string,
-                        &this->inout_,
-                        CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_Unbounded_String::run_sii_test\n");
 
-  CORBA::Any out_arg (CORBA::_tc_string,
-                      &this->out_,
-                      CORBA::B_FALSE);
-
-  // add parameters
-  param_list->add_value ("s1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("s2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("s3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // add return value
-  retval->item (0, env)->value ()->replace (CORBA::_tc_string,
-                                            &this->ret_,
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
@@ -159,11 +168,10 @@ Test_Unbounded_String::check_validity (void)
 }
 
 CORBA::Boolean
-Test_Unbounded_String::check_validity (CORBA::Request_ptr req)
+Test_Unbounded_String::check_validity (CORBA::Request_ptr )
 {
   // No need to retrieve anything because, for all the args and
   // the return, we provided the memory and we own it.
-  ACE_UNUSED_ARG (req);
   return this->check_validity ();
 }
 
@@ -186,4 +194,3 @@ Test_Unbounded_String::print_values (void)
               (this->ret_ ? ACE_OS::strlen (this->ret_):0),
               (this->ret_ ? this->ret_:"<nul string>")));
 }
-

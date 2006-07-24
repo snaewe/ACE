@@ -18,387 +18,500 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_visitor_enum/enum_ch.h"
+#include "be_visitor_sequence/sequence_ch.h"
+#include "nr_extern.h"
 
-#include "be_visitor_field.h"
-
-ACE_RCSID(be_visitor_field, field_ch, "$Id$")
-
+ACE_RCSID (be_visitor_field,
+           field_ch,
+           "$Id$")
 
 // **********************************************
-//  visitor for field in the client header file
+//  Visitor for field in the client header file.
 // **********************************************
 
-// constructor
 be_visitor_field_ch::be_visitor_field_ch (be_visitor_context *ctx)
   : be_visitor_decl (ctx)
 {
 }
 
-// destructor
 be_visitor_field_ch::~be_visitor_field_ch (void)
 {
 }
 
-// visit the field node
 int
 be_visitor_field_ch::visit_field (be_field *node)
 {
-  TAO_OutStream *os; // output stream
-  be_type *bt; // field's type
+  TAO_OutStream *os = this->ctx_->stream ();
+  be_type *bt = be_type::narrow_from_decl (node->field_type ());
 
-  os = this->ctx_->stream ();
-  // first generate the type information
-  bt = be_type::narrow_from_decl (node->field_type ());
   if (!bt)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_field_ch::"
                          "visit_field - "
-                         "Bad field type\n"
-                         ), -1);
+                         "Bad field type\n"),
+                        -1);
     }
 
-  this->ctx_->node (node); // save the node
+  this->ctx_->node (node);
+
+  *os << be_nl;
+
   if (bt->accept (this) == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_field_ch::"
                          "visit_field - "
-                         "codegen for field type failed\n"
-                         ), -1);
+                         "codegen for field type failed\n"),
+                        -1);
     }
-  // now output the field name. However, don't do it if the type was an
-  // anonymous array because generation of the field member got handled by the
-  // array code generation
 
-  if (bt->node_type () != AST_Decl::NT_array)
-    *os << " " << node->local_name () << ";\n";
+  // Now output the field name.
+  *os << " " << node->local_name () << ";";
+
   return 0;
 }
 
-// =visit operations on all possible data types  that a field can be
+// Visit operations on all possible data types  that a field can be.
 
-// visit array type
 int
 be_visitor_field_ch::visit_array (be_array *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
 
-  os = this->ctx_->stream ();
-  // set the right type;
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
-  // if not a typedef and we are defined in the use scope, we must be defined
-
-  if (!this->ctx_->alias () // not a typedef
+  // If not a typedef and we are defined in the use scope, we must be defined.
+  if (!this->ctx_->alias ()
       && node->is_child (this->ctx_->scope ()))
     {
-      // this is the case for anonymous arrays.
+      // This is the case for anonymous arrays.
 
-      // instantiate a visitor context with a copy of our context. This info
+      // Instantiate a visitor context with a copy of our context. This info
       // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
       ctx.node (node); // set the node to be the node being visited. The scope
                        // is still the same
 
-      // first generate the struct declaration
+      // First generate the array declaration
       ctx.state (TAO_CodeGen::TAO_ARRAY_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+      be_visitor_array_ch visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_field_ch::"
                              "visit_array - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_array - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
+
+      ctx.state (TAO_CodeGen::TAO_ROOT_CH);
+
+      // Having defined all array type and its supporting operations, now
+      // generate the actual variable that is a field of the structure.
+      *os << be_nl << be_nl << "_" << bt->local_name ();
     }
   else
     {
-      // this was a typedefed array
-      os->indent (); // start from current indentation level
-      *os << bt->nested_type_name (this->ctx_->scope ());
+      // This was a typedefed array.
+      // ACE_NESTED_CLASS macro generated by nested_type_name
+      // is necessary if the struct, union, or valuetype containing this
+      // field was not defined inside a module. In such a case, VC++
+      // complains that the non-module scope is not yet fully defined.
+      UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+      AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+      if (hc_decl->node_type () != AST_Decl::NT_module)
+        {
+          *os << bt->nested_type_name (this->ctx_->scope ());
+        }
+      else
+        {
+          *os << bt->name ();
+        }
     }
+
   return 0;
 }
 
-// visit enum type
 int
 be_visitor_field_ch::visit_enum (be_enum *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
 
-  os = this->ctx_->stream ();
-
-  // set the right type;
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
-  // if not a typedef and we are defined in the use scope, we must be defined
+  // If not a typedef and we are defined in the use scope, we must be defined.
   if (!this->ctx_->alias () // not a typedef
       && node->is_child (this->ctx_->scope ()))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
+      // Instantiate a visitor context with a copy of our context. This info
+      // will be modified based on what type of node we are visiting.
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
+      ctx.node (node);
 
-      // first generate the enum declaration
-      ctx.state (TAO_CodeGen::TAO_ENUM_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+      // First generate the enum declaration.
+      be_visitor_enum_ch visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_field_ch::"
                              "visit_enum - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_enum - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
     }
 
-  // now use this enum as a "type" for the subsequent declarator
-  os->indent (); // start from current indentation level
-  *os << bt->nested_type_name (this->ctx_->scope ());
+  // This was a typedefed array.
+  // ACE_NESTED_CLASS macro generated by nested_type_name
+  // is necessary if the struct, union, or valuetype containing this
+  // field was not defined inside a module. In such a case, VC++
+  // complains that the non-module scope is not yet fully defined.
+  UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+  AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+  if (hc_decl->node_type () != AST_Decl::NT_module)
+    {
+      *os << bt->nested_type_name (this->ctx_->scope ());
+    }
+  else
+    {
+      *os << bt->name ();
+    }
 
   return 0;
 }
 
-// visit interface type
 int
 be_visitor_field_ch::visit_interface (be_interface *node)
 {
-  TAO_OutStream *os; // output stream
-  be_type *bt;
-
-  os = this->ctx_->stream ();
-  // set the right type;
-  if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
-  else
-    bt = node;
-
-  // if not a typedef and we are defined in the use scope, we must be defined
-  os->indent ();
-  *os << "TAO_Object_Field_T<"
-      <<  bt->nested_type_name (this->ctx_->scope (), "")
-      << ">";
-  return 0;
+  return this->emit_common (node);
 }
 
-// visit interface forward type
 int
 be_visitor_field_ch::visit_interface_fwd (be_interface_fwd *node)
 {
-  TAO_OutStream *os; // output stream
+  return this->emit_common (node);
+}
+
+int
+be_visitor_field_ch::visit_valuebox (be_valuebox *node)
+{
+  return this->emit_common (node);
+}
+
+int
+be_visitor_field_ch::visit_valuetype (be_valuetype *node)
+{
+  return this->emit_common (node);
+}
+
+int
+be_visitor_field_ch::visit_valuetype_fwd (be_valuetype_fwd *node)
+{
+  return this->emit_common (node);
+}
+
+
+int
+be_visitor_field_ch::emit_common (be_type *node)
+{
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
 
-  os = this->ctx_->stream ();
-  // set the right type;
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
-  // if not a typedef and we are defined in the use scope, we must be defined
-  os->indent ();
-  *os << "TAO_Object_Field_T<"
-      <<  bt->nested_type_name (this->ctx_->scope (), "")
-      << ">";
+  // ACE_NESTED_CLASS macro generated by nested_type_name
+  // is necessary if the struct, union, or valuetype containing this
+  // field was not defined inside a module. In such a case, VC++
+  // complains that the non-module scope is not yet fully defined.
+  UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+  AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+  if (hc_decl->node_type () != AST_Decl::NT_module)
+    {
+      *os << bt->nested_type_name (this->ctx_->scope (), "_var");
+    }
+  else
+    {
+      *os << bt->name () << "_var";
+    }
+
   return 0;
 }
 
-// visit predefined type
 int
 be_visitor_field_ch::visit_predefined_type (be_predefined_type *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
+  be_typedef *td = this->ctx_->alias ();
 
-  os = this->ctx_->stream ();
-  // set the right type;
-  if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+  if (td != 0)
+    {
+      bt = td;
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
-  // if not a typedef and we are defined in the use scope, we must be defined
-  os->indent (); // start from current indentation level
-  if (node->pt () == AST_PredefinedType::PT_pseudo) // is a psuedo obj
-    *os << bt->nested_type_name (this->ctx_->scope (), "_var");
+  // If we are a typedef of a basic type, ACE_NESTED_CLASS might
+  // be emitted as part of the type name, in which case the '::'
+  // would be incorrect for certain expansions of the macro.
+  if (td == 0)
+    {
+      *os << "::";
+    }
+
+  if (node->pt () == AST_PredefinedType::PT_object)
+    {
+      *os << bt->name () << "_var";
+    }
+  else if (node->pt () == AST_PredefinedType::PT_value)
+    {
+      *os << bt->name () << " *";
+    }
+  else if (node->pt () == AST_PredefinedType::PT_pseudo)
+    {
+      // This was a typedefed array.
+      // ACE_NESTED_CLASS macro generated by nested_type_name
+      // is necessary if the struct, union, or valuetype containing this
+      // field was not defined inside a module. In such a case, VC++
+      // complains that the non-module scope is not yet fully defined.
+      UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+      AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+      if (hc_decl->node_type () != AST_Decl::NT_module)
+        {
+          *os << bt->nested_type_name (this->ctx_->scope (), "_var");
+        }
+      else
+        {
+          *os << bt->name () << "_var";
+        }
+    }
   else
-    *os << bt->nested_type_name (this->ctx_->scope ());
+    {
+      // This was a typedefed array.
+      // ACE_NESTED_CLASS macro generated by nested_type_name
+      // is necessary if the struct, union, or valuetype containing this
+      // field was not defined inside a module. In such a case, VC++
+      // complains that the non-module scope is not yet fully defined.
+      UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+      AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+      if (hc_decl->node_type () != AST_Decl::NT_module)
+        {
+          *os << bt->nested_type_name (this->ctx_->scope ());
+        }
+      else
+        {
+          // All the predefined types are in the CORBA namespace,
+          // so we go ahead and add the global :: qualifier.
+          *os << bt->name ();
+        }
+    }
+
   return 0;
 }
 
-// visit sequence type
 int
 be_visitor_field_ch::visit_sequence (be_sequence *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
 
-  os = this->ctx_->stream ();
-  // set the right type;
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
-  else
-    bt = node;
-
-  // if not a typedef and we are defined in the use scope, we must be defined
-  if (!this->ctx_->alias () // not a typedef
-      && node->is_child (this->ctx_->scope ()))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
-      be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
-
-      // first generate the sequence declaration
-      ctx.state (TAO_CodeGen::TAO_SEQUENCE_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_sequence - "
-                             "Bad visitor\n"
-                             ), -1);
-        }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_sequence - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
+      bt = this->ctx_->alias ();
+    }
+  else
+    {
+      bt = node;
     }
 
-  os->indent (); // start from current indentation level
-  *os << bt->nested_type_name (this->ctx_->scope ());
+  if (!this->ctx_->alias ()
+      && node->is_child (this->ctx_->scope ()))
+    {
+      // Put the field node into the (anonymous) sequence node, to be
+      // used later for unique name generation.
+      be_field *member_node =
+        be_field::narrow_from_decl (this->ctx_->node ());
+      node->field_node (member_node);
+
+      be_visitor_context ctx (*this->ctx_);
+      ctx.node (node);
+
+      // First generate the sequence declaration.
+      be_visitor_sequence_ch visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_field_ch::"
+                             "visit_sequence - "
+                             "codegen failed\n"),
+                            -1);
+        }
+
+      // If we are being reused by valutype, this would get generated
+      // in the private section of the OBV_xx class, so we must
+      // generate the typedef for that case elsewhere.
+      if (this->ctx_->scope ()->node_type () != AST_Decl::NT_valuetype)
+        {
+          // Generate the anonymous sequence member typedef.
+          be_decl *bs = this->ctx_->scope ();
+
+          *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+              << "// " << __FILE__ << ":" << __LINE__ << be_nl << be_nl;
+
+          *os << "typedef " << bt->nested_type_name (bs)
+              << " _" << this->ctx_->node ()->local_name ()
+              << "_seq;" << be_nl;
+        }
+    }
+
+  // ACE_NESTED_CLASS macro generated by nested_type_name
+  // is not necessary in all cases.
+  be_typedef *tdef = be_typedef::narrow_from_decl (bt);
+
+  // This was a typedefed array.
+  // ACE_NESTED_CLASS macro generated by nested_type_name
+  // is necessary if the struct, union, or valuetype containing this
+  // field was not defined inside a module. In such a case, VC++
+  // complains that the non-module scope is not yet fully defined.
+  UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+  AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+  if (hc_decl->node_type () != AST_Decl::NT_module
+      || !tdef)
+    {
+      *os << bt->nested_type_name (this->ctx_->scope ());
+    }
+  else
+    {
+      *os << bt->name ();
+    }
+
   return 0;
 }
 
-// visit string type
 int
 be_visitor_field_ch::visit_string (be_string *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  os = this->ctx_->stream ();
-  os->indent (); // start from current indentation level
-  // set the right type;
-  if (this->ctx_->alias ())
+  if (node->width () == (long) sizeof (char))
     {
-      *os << this->ctx_->alias ()->nested_type_name (this->ctx_->scope ())
-          << "_var";
+      *os << "TAO::String_Manager";
     }
   else
-    *os << "CORBA::String_var";
+    {
+      *os << "TAO::WString_Manager";
+    }
+
   return 0;
 }
 
-// visit structure type
 int
 be_visitor_field_ch::visit_structure (be_structure *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
 
-  os = this->ctx_->stream ();
-  // set the right type;
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
-
-  // if not a typedef and we are defined in the use scope, we must be defined
+    {
+      bt = node;
+    }
 
   if (!this->ctx_->alias () // not a typedef
       && node->is_child (this->ctx_->scope ()))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
+      ctx.node (node);
 
-      // first generate the struct declaration
-      ctx.state (TAO_CodeGen::TAO_STRUCT_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+      be_visitor_structure_ch visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_field_ch::"
                              "visit_struct - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_struct - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
     }
 
-  os->indent (); // start from current indentation level
-  *os << bt->nested_type_name (this->ctx_->scope ());
+  // This was a typedefed array.
+  // ACE_NESTED_CLASS macro generated by nested_type_name
+  // is necessary if the struct, union, or valuetype containing this
+  // field was not defined inside a module. In such a case, VC++
+  // complains that the non-module scope is not yet fully defined.
+  UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+  AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+  if (hc_decl->node_type () != AST_Decl::NT_module)
+    {
+      *os << bt->nested_type_name (this->ctx_->scope ());
+    }
+  else
+    {
+      *os << bt->name ();
+    }
+
   return 0;
 }
 
-// visit typedefed type
+// Visit typedefed type.
 int
 be_visitor_field_ch::visit_typedef (be_typedef *node)
 {
-  this->ctx_->alias (node);     // save the node for use in code generation and
-                               // indicate that the field of the field node
-                               // is a typedefed quantity
+  this->ctx_->alias (node);
 
-  // make a decision based on the primitive base type
+  // Make a decision based on the primitive base type.
   be_type *bt = node->primitive_base_type ();
+
   if (!bt || (bt->accept (this) == -1))
     {
       ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_visitor_field_spec_ch::"
+                         "(%N:%l) be_visitor_field_ch::"
                          "visit_typedef - "
-                         "Bad primitive type\n"
-                         ), -1);
+                         "Bad primitive type\n"),
+                        -1);
     }
+
+  // Reset the alias.
   this->ctx_->alias (0);
   return 0;
 }
@@ -407,49 +520,88 @@ be_visitor_field_ch::visit_typedef (be_typedef *node)
 int
 be_visitor_field_ch::visit_union (be_union *node)
 {
-  TAO_OutStream *os; // output stream
+  TAO_OutStream *os = this->ctx_->stream ();
   be_type *bt;
 
-  os = this->ctx_->stream ();
-  // set the right type;
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
-  else
-    bt = node;
-
-  // if not a typedef and we are defined in the use scope, we must be defined
-  if (!this->ctx_->alias () // not a typedef
-      && node->is_child (this->ctx_->scope ()))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
-      be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
-
-      // first generate the enum declaration
-      ctx.state (TAO_CodeGen::TAO_ENUM_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_enum - "
-                             "Bad visitor\n"
-                             ), -1);
-        }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_field_ch::"
-                             "visit_enum - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
+      bt = this->ctx_->alias ();
+    }
+  else
+    {
+      bt = node;
     }
 
-  os->indent (); // start from current indentation level
-  *os << bt->nested_type_name (this->ctx_->scope ());
+  if (!this->ctx_->alias ()
+      && node->is_child (this->ctx_->scope ()))
+    {
+      be_visitor_context ctx (*this->ctx_);
+      ctx.node (node);
+
+      be_visitor_union_ch visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_field_ch::"
+                             "visit_union - "
+                             "codegen failed\n"),
+                            -1);
+        }
+    }
+
+  *os << be_nl << be_nl;
+
+  // This was a typedefed array.
+  // ACE_NESTED_CLASS macro generated by nested_type_name
+  // is necessary if the struct, union, or valuetype containing this
+  // field was not defined inside a module. In such a case, VC++
+  // complains that the non-module scope is not yet fully defined.
+  UTL_Scope *holds_container = this->ctx_->scope ()->defined_in ();
+  AST_Decl *hc_decl = ScopeAsDecl (holds_container);
+
+  if (hc_decl->node_type () != AST_Decl::NT_module)
+    {
+      *os << bt->nested_type_name (this->ctx_->scope ());
+    }
+  else
+    {
+      *os << bt->name ();
+    }
+
   return 0;
 }
+
+int
+be_visitor_field_ch::visit_component (
+    be_component *node
+  )
+{
+  return this->visit_interface (node);
+}
+
+int
+be_visitor_field_ch::visit_component_fwd (
+    be_component_fwd *node
+  )
+{
+  return this->visit_interface_fwd (node);
+}
+
+int
+be_visitor_field_ch::visit_eventtype (
+    be_eventtype *node
+  )
+{
+  return this->visit_valuetype (node);
+}
+
+int
+be_visitor_field_ch::visit_eventtype_fwd (
+    be_eventtype_fwd *node
+  )
+{
+  return this->visit_valuetype_fwd (node);
+}
+
+

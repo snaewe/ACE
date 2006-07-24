@@ -17,13 +17,18 @@
 //
 // ============================================================================
 
-#if !defined (MT_CLIENT_H)
+#ifndef MT_CLIENT_H
 #define MT_CLIENT_H
 
 #include "ace/Get_Opt.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Task.h"
 #include "ace/Thread_Manager.h"
-#include "tao/corba.h"
+#include "tao/ORB.h"
 #include "MT_Client_TestC.h"
 
 class MT_Client
@@ -43,9 +48,9 @@ public:
   int run (void);
   // Execute client example code.
 
-  int init (int argc, 
+  int init (int argc,
             char **argv,
-	    int client_number);
+            int client_number);
   // Initialize the client communication endpoint with server.
 
 private:
@@ -67,11 +72,11 @@ private:
   int shutdown_;
   // Flag to tell server to shutdown.
 
-  MT_Object_var mT_Object_var_;
-  // pointer to the mt Object
-
   CORBA::ORB_var orb_var_;
   // Remember our orb.
+
+  MT_Object_var mT_Object_var_;
+  // pointer to the mt Object
 
   int client_number_;
   // This is used to choose the server...

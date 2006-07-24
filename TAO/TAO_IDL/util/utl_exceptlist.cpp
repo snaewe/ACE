@@ -62,7 +62,7 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 // utl_exceptlist.cc
 //
@@ -73,75 +73,76 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 //	 It relies on a type-unsafe cast from UTL_List to subclasses, which
 //	 will cease to operate correctly if you use either multiple or
 //	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include	"utl_exceptlist.h"
 
-ACE_RCSID(util, utl_exceptlist, "$Id$")
+#include "ace/OS_Memory.h"
 
-/*
- * Constructor(s)
- */
+ACE_RCSID (util, 
+           utl_exceptlist, 
+           "$Id$")
 
-UTL_ExceptList::UTL_ExceptList(AST_Exception *s, UTL_ExceptList *cdr)
-	      : UTL_List(cdr),
-	        pd_car_data(s)
+UTL_ExceptList::UTL_ExceptList (AST_Exception *s, 
+                                UTL_ExceptList *cdr)
+  : UTL_List (cdr),
+	  pd_car_data (s)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Get list item
+// Get list item.
 AST_Exception *
-UTL_ExceptList::head()
+UTL_ExceptList::head (void)
 {
-  return pd_car_data;
+  return this->pd_car_data;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
+// The two methods below make direct calls on the
+// cdr list (we have been made a friend of the base
+// class UTL_List's private member). This is so we
+// can avoid copying the contained quantity, an
+// AST_Exception.
 
-// UTL_ExceptList active iterator
+void
+UTL_ExceptList::destroy (void)
+{
+  if (this->pd_cdr_data != 0)
+    {
+      this->pd_cdr_data->destroy ();
+    }
+    
+  delete this;
+}
 
-/*
- * Constructor
- */
+UTL_ExceptList *
+UTL_ExceptList::copy (void)
+{
+  UTL_ExceptList *retval = 0;
+  ACE_NEW_RETURN (retval,
+                  UTL_ExceptList (
+                      this->pd_car_data,
+                      this->pd_cdr_data != 0
+                        ? (UTL_ExceptList *) this->pd_cdr_data->copy ()
+                        : 0
+                    ),
+                  0);
+                  
+  return retval;
+}
 
-UTL_ExceptlistActiveIterator::UTL_ExceptlistActiveIterator(UTL_ExceptList *s)
-			    : UTL_ListActiveIterator(s)
+UTL_ExceptlistActiveIterator::UTL_ExceptlistActiveIterator (UTL_ExceptList *s)
+	: UTL_ListActiveIterator(s)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Get current item
+// Get current item.
 AST_Exception *
-UTL_ExceptlistActiveIterator::item()
+UTL_ExceptlistActiveIterator::item (void)
 {
-  if (source == NULL)
-    return NULL;
-  return ((UTL_ExceptList *) source)->head();
+  if (source == 0)
+    {
+      return 0;
+    }
+
+  return ((UTL_ExceptList *) source)->head ();
 }
 
-/*
- * Redefinition of inherited virtual operations
- */

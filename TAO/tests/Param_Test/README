@@ -22,6 +22,12 @@ Type "make" to make the application. The server executable is called
 You should have the TAO IDL compiler and the TAO library installed
 before using this application.
 
+The -GA options has been added the IDL compiler command line for this
+test. This option moves the generation of implementations for type
+codes and Any insertion/extraction operators to a separate file with
+the extension *A.cpp. Adding this option tests that it is handled
+correctly for all the various IDL types used in this test.
+
 To run the server, type
 
    server [arguments to ORB_init] [-d] [-o <ior_output_file>]
@@ -43,8 +49,6 @@ To run the client, type
    [-f servant-IOR-file]		reads the servant-IOR from the
                                         specified file. 
    [-k Param_Test-obj-ref-key]          object key of Param_Test object
-   [-h hostname]                        host to bind to
-   [-p port]                            port number of server
    [-i invocation (sii/dii)]            default is static invocation
                                         interface. To use DII, type
                                         -i dii
@@ -54,10 +58,14 @@ To run the client, type
        short                for shorts
        ulonglong            for unsigned long long
        ubstring             for unbounded string
+       ubwstring            for unbounded wide string
        bdstring             for bounded string
+       bswstring            for bounded wide string
        fixed_struct         for fixed sized structs
        ub_strseq            for sequences of strings
+       ub_wstrseq           for sequences of wide strings
        bd_strseq            for bounded sequences of strings
+       bd_wstrseq           for bounded sequences of wide strings
        var_struct           for variable structs
        nested_struct        for nested structs
        objref_struct        for object references inside structures
@@ -75,6 +83,7 @@ To run the client, type
        var_array            for arrays of var sized types (strings)
        typecode             for typecode
        exception            for exceptions
+       multdim_array        for multi dimensional arrays
 
 
 	There are 2 options of giving the Param_obj-ref-key i.e IOR to

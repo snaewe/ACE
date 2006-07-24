@@ -28,26 +28,21 @@
 // ============================================================================
 
 #include "test_config.h"
-#include "ace/OS.h"
+#include "ace/OS_NS_sys_utsname.h"
 #include "ace/INET_Addr.h"
 
 ACE_RCSID(tests, Enum_Interfaces_Test, "$Id$")
 
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
-
 int
-main (int, ASYS_TCHAR *[])
+run_main (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Enum_Interfaces_Test"));
+  ACE_START_TEST (ACE_TEXT ("Enum_Interfaces_Test"));
 
-  struct utsname uname;
-  ACE_OS::uname(&uname);
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("Machine: %s running on %s\n"),
+  ACE_utsname uname;
+  ACE_OS::uname (&uname);
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Machine: %s running on %s\n"),
               uname.nodename, uname.machine ));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("Platform: %s, %s, %s\n"),
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Platform: %s, %s, %s\n"),
               uname.sysname, uname.release, uname.version ));
 
   ACE_INET_Addr *the_addr_array;
@@ -57,22 +52,22 @@ main (int, ASYS_TCHAR *[])
 
   if (rc != 0)
     ACE_ERROR ((LM_ERROR,
-		ASYS_TEXT ("%p\n"),
-		ASYS_TEXT ("ACE::get_ip_interfaces failed")));
+                ACE_TEXT ("%p\n"),
+                ACE_TEXT ("ACE::get_ip_interfaces failed")));
   else if (how_many == 0)
     ACE_ERROR ((LM_ERROR,
-		ASYS_TEXT ("No interfaces presently configured in the kernel\n")));
+                ACE_TEXT ("No interfaces presently configured in the kernel\n")));
   else
     {
-      ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("there are %d interfaces\n"), how_many));
+      ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("there are %d interfaces\n"), how_many));
 
       for (size_t i = 0; i < how_many; i++)
-	ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\t%s\n"), the_addr_array[i].get_host_addr ()));
+        ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("\t%s\n"),
+                    ACE_TEXT_CHAR_TO_TCHAR (the_addr_array[i].get_host_addr ())));
 
       delete [] the_addr_array;
     }
 
   ACE_END_TEST;
-  return rc != 0;	// return 1 if get_ip_interfaces failed
+  return rc != 0;       // return 1 if get_ip_interfaces() failed
 }
-

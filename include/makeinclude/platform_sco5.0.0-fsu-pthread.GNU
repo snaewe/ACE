@@ -1,37 +1,46 @@
 # $Id$
+#
+# Note 1: the above file from ACE 4.6 has been modified by Mike P. to get 
+# rid of thread related stuff until we can obtain fsu-threads library.
+#
+# Note 2: You must setup FSU_PTHREADS_DIR environment var to your FSU
+# pthreads directory.  
 
-# Requires FSU pthreads and gcc 2.7.2 Skunkware 97
+# Requires gcc 2.7.2 Skunkware 97
 # to produce libACE.so correctly changed the specs file for gcc 2.7.2
 # for not link -lc and -lgcc and other not shared libraries
 
-debug = 1
+debug = 0
 optimize = 1
 
 CC              = gcc
-# for threads
 # for no threads
-#CXX		= gcc -fno-implicit-templates -w -fno-strict-prototypes
-# LDFLAGS	+= -L $(ACE_ROOT)/ace -L ./ ${FSU_PTHREADS_DIR}/init/init.o # -z muldefs
-# LDLIBS	+= -L $(ACE_ROOT)/ace -L ./ ${FSU_PTHREADS_DIR}/init/init.o -lACE # -z muldefs
-LDLIBS	+= -lm -L $(ACE_ROOT)/ace # -z muldefs
+LDLIBS		+= -lm -L $(ACE_ROOT)/lib
 CXX		= g++
-CFLAGS		+= -melf -w 
-CCFLAGS		+= -melf -fno-implicit-templates -I ${FSU_PTHREADS_DIR}/include 
+CFLAGS		+= -melf -m386 -w 
+CCFLAGS		+= -melf -m386  
+ifneq ($(FSU_PTHREADS_DIR),"")
+CCFLAGS		+= -I$(FSU_PTHREADS_DIR)/include
+endif
+# -g option not supported for C++ on systems using the DWARF debugging format
 DCFLAGS		+= -g
 DCCFLAGS	+= $(DCFLAGS)
 DLD             = $(CXX)
 LD              = $(CXX) /usr/lib/libc.so.1
-#LD              = $(CXX)
-#LIBS            = -lm -L${FSU_PTHREADS_DIR}/lib -lgthreads -lnsl -lsocket  -lgthreads
-LIBS            = -L${FSU_PTHREADS_DIR}/lib -lgthreads -lnsl -lsocket  -lgthreads
-#OCFLAGS		+= -O2
+ifneq ($(FSU_PTHREADS_DIR),"")
+LIBS		+= -L$(FSU_PTHREADS_DIR)/lib
+endif
+LIBS		+= -lgthreads
+LIBS            += -lnsl -lsocket
+LIBS		+= -lgthreads
+OCFLAGS		+= -O2
 OCCFLAGS        += $(OCFLAGS)
-PIC             = -fPIC
+PIC             = -fpic
 AR              = ar
 ARFLAGS         = ruv
 RANLIB          = /bin/true
 
-SOFLAGS = $(CPPFLAGS) -melf -fPIC -G
-SOBUILD = $(COMPILE.cc) $(PIC) -o $(VSHDIR)$*.so $<
-# SOLINK	= $(SOLINK.cc) -o $@ $(LDFLAGS) $<
+SOFLAGS = 
+SOLINK = gcc $(PIC) -melf -shared
+SOBUILD = $(SOLINK) -o $(VSHDIR)$*.so $<
 PRELIB  = @true

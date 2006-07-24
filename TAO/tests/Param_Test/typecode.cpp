@@ -19,7 +19,9 @@
 #include "helper.h"
 #include "typecode.h"
 
-ACE_RCSID(Param_Test, typecode, "$Id$")
+ACE_RCSID (Param_Test,
+           typecode, 
+           "$Id$")
 
 // ************************************************************************
 //               Test_TypeCode
@@ -42,11 +44,41 @@ Test_TypeCode::opname (void) const
   return this->opname_;
 }
 
-int
-Test_TypeCode::init_parameters (Param_Test_ptr objref,
-                                CORBA::Environment &env)
+void
+Test_TypeCode::dii_req_invoke (CORBA::Request *req
+                               ACE_ENV_ARG_DECL)
 {
-  static CORBA::TypeCode_ptr tc_table [] = 
+  req->add_in_arg ("s1") <<= this->in_.in ();
+  req->add_inout_arg ("s2") <<= this->inout_.in ();
+  req->add_out_arg ("s3") <<= this->out_.in ();
+
+  req->set_return_type (CORBA::_tc_TypeCode);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  CORBA::TypeCode_ptr tmp;
+  req->return_value () >>= tmp;
+  this->ret_ = CORBA::TypeCode::_duplicate (tmp);
+
+  CORBA::NamedValue_ptr o2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o2->value () >>= tmp;
+  this->inout_ = CORBA::TypeCode::_duplicate (tmp);
+
+  CORBA::NamedValue_ptr o3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o3->value () >>= tmp;
+  this->out_ = CORBA::TypeCode::_duplicate (tmp);
+}
+
+int
+Test_TypeCode::init_parameters (Param_Test_ptr
+                                ACE_ENV_ARG_DECL_NOT_USED)
+{
+  static CORBA::TypeCode_ptr tc_table [] =
     {
       // primitive parameterless typecodes
       CORBA::_tc_short,
@@ -59,17 +91,19 @@ Test_TypeCode::init_parameters (Param_Test_ptr objref,
       Param_Test::_tc_Nested_Struct
     };
 
-  Generator *gen = GENERATOR::instance (); // value generator
-  CORBA::ULong index = 
-    (CORBA::ULong) (gen->gen_long () % sizeof(tc_table)/sizeof(CORBA::TypeCode_ptr));
+  static CORBA::ULong index = 0;
 
   this->tc_holder_ = CORBA::TypeCode::_duplicate (tc_table [index]);
   this->in_ = this->tc_holder_;
   this->inout_ = CORBA::TypeCode::_duplicate (CORBA::_tc_null);
-  
+
   // Must initialize these for DII
-  this->out_ = CORBA::TypeCode::_duplicate (CORBA::_tc_null);
-  this->ret_ = CORBA::TypeCode::_duplicate (CORBA::_tc_null);
+  this->out_ = CORBA::TypeCode::_nil ();
+  this->ret_ = CORBA::TypeCode::_nil ();
+
+  index++;
+  if (index >= sizeof(tc_table)/sizeof(tc_table[0]))
+    index = 0;
 
   return 0;
 }
@@ -83,72 +117,71 @@ Test_TypeCode::reset_parameters (void)
 }
 
 int
-Test_TypeCode::run_sii_test (Param_Test_ptr objref,
-                             CORBA::Environment &env)
+Test_TypeCode::run_sii_test (Param_Test_ptr objref
+                             ACE_ENV_ARG_DECL)
 {
-  CORBA::TypeCode_out out (this->out_);
-  this->ret_ = objref->test_typecode (this->in_.in (),
-                                      this->inout_.inout (),
-                                      out,
-                                      env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      this->init_parameters (objref ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-int
-Test_TypeCode::add_args (CORBA::NVList_ptr param_list,
-			 CORBA::NVList_ptr retval,
-			 CORBA::Environment &env)
-{
-  CORBA::Any in_arg (CORBA::_tc_TypeCode, 
-                     &this->in_, 
-                     CORBA::B_FALSE);
+      CORBA::TypeCode_out out (this->out_);
 
-  CORBA::Any inout_arg (CORBA::_tc_TypeCode, 
-                        &this->inout_,
-                        CORBA::B_FALSE);
+      this->ret_ = objref->test_typecode (this->in_.in (),
+                                          this->inout_.inout (),
+                                          out
+                                          ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-  CORBA::Any out_arg (CORBA::_tc_TypeCode, 
-                      &this->out_, 
-                      CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_TypeCode::run_sii_test\n");
 
-  // add parameters
-  param_list->add_value ("s1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("s2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("s3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // add return value
-  retval->item (0, env)->value ()->replace (CORBA::_tc_TypeCode,
-                                            &this->ret_,
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
 Test_TypeCode::check_validity (void)
 {
-  CORBA::Environment env;
-  if (this->in_.in ()->equal (this->inout_.in (), env) &&
-      this->in_.in ()->equal (this->out_.in (), env) &&
-      this->in_.in ()->equal (this->ret_.in (), env))
-    return 1;
-  else
-    return 0;
+  ACE_DECLARE_NEW_CORBA_ENV;
+
+  ACE_TRY
+    {
+      CORBA::Boolean one, two, three;
+
+      one = this->in_.in ()->equal (this->inout_.in ()
+                                    ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      two = this->in_.in ()->equal (this->out_.in ()
+                                    ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      three = this->in_.in ()->equal (this->ret_.in ()
+                                      ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      if (one && two && three)
+        return 1;
+      else
+        return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_TypeCode::check_validity\n");
+    }
+  ACE_ENDTRY;
+  return 0;
 }
 
 CORBA::Boolean
-Test_TypeCode::check_validity (CORBA::Request_ptr req)
+Test_TypeCode::check_validity (CORBA::Request_ptr)
 {
   return this->check_validity ();
 }
@@ -157,4 +190,3 @@ void
 Test_TypeCode::print_values (void)
 {
 }
-

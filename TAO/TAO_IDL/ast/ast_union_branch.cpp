@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,72 +62,138 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_union_branch.cc - Implementation of class AST_UnionBranch
- *
- * AST_UnionBranch nodes represent a single branch of an IDL union
- * declaration.
- * AST_UnionBranch is a subclass of AST_Field, adding a label (which
- * is a subclass of AST_UnionLabel).
- */
+// AST_UnionBranch nodes represent a single branch of an IDL union
+// declaration.
+// AST_UnionBranch is a subclass of AST_Field, adding a label (which
+// is a subclass of AST_UnionLabel).
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_union_branch.h"
+#include "ast_union_label.h"
+#include "ast_union.h"
+#include "ast_visitor.h"
+#include "utl_labellist.h"
 
 ACE_RCSID(ast, ast_union_branch, "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_UnionBranch::AST_UnionBranch()
-	       : pd_label(NULL)
+AST_UnionBranch::AST_UnionBranch (void)
+  : COMMON_Base (),
+    AST_Decl (),
+	  AST_Field (),
+	  pd_ll (0)
 {
 }
 
-AST_UnionBranch::AST_UnionBranch(AST_UnionLabel *fl, AST_Type *ft,
-				   UTL_ScopedName *n, UTL_StrList *p)
-		: AST_Field(AST_Decl::NT_union_branch, ft, n, p),
-		  AST_Decl(AST_Decl::NT_union_branch, n, p),
-		  pd_label(fl)
+AST_UnionBranch::AST_UnionBranch (UTL_LabelList *ll,
+                                  AST_Type *ft,
+				                          UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_union_branch,
+              n),
+	  AST_Field (AST_Decl::NT_union_branch,
+               ft,
+               n),
+	  pd_ll (ll)
 {
 }
 
-/*
- * Private operations
- */
+AST_UnionBranch::~AST_UnionBranch (void)
+{
+}
 
-/*
- * Public operations
- */
+// Redefinition of inherited virtual operations.
 
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_UnionBranch node to the ostream o
- */
+// Dump this AST_UnionBranch node to the ostream o.
 void
-AST_UnionBranch::dump(ostream &o)
+AST_UnionBranch::dump (ACE_OSTREAM_TYPE &o)
 {
-  o << "case ";
-  pd_label->dump(o);
-  o << ": ";
-  AST_Field::dump(o);
+  for (unsigned long i = 0; i < this->label_list_length (); ++i)
+    {
+      this->dump_i (o, "case ");
+
+      AST_UnionLabel *ul = this->label (i);
+      ul->dump (o);
+
+      this->dump_i (o, ": \n");
+    }
+
+  AST_Field::dump (o);
 }
 
-/*
- * Data accessors
- */
+int
+AST_UnionBranch::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_union_branch (this);
+}
+
+void
+AST_UnionBranch::destroy (void)
+{
+  this->pd_ll->destroy ();
+  delete this->pd_ll;
+  this->pd_ll = 0;
+  
+  this->AST_Field::destroy ();
+}
+
+// Data accessors.
 
 AST_UnionLabel *
-AST_UnionBranch::label()
+AST_UnionBranch::label (unsigned long index)
 {
-  return pd_label;
+  unsigned long i = 0;
+
+  for (UTL_LabellistActiveIterator iter (this->pd_ll); 
+       !iter.is_done (); 
+       iter.next ())
+    {
+      if (i == index)
+        {
+          return iter.item ();
+        }
+
+      ++i;
+    }
+
+  return 0;
 }
 
-// Narrowing
+unsigned long
+AST_UnionBranch::label_list_length (void)
+{
+  if (this->pd_ll)
+    {
+      return this->pd_ll->length ();
+    }
+  else
+    {
+      return 0;
+    }
+}
+
+void
+AST_UnionBranch::add_labels (AST_Union *u)
+{
+  AST_UnionLabel *ul = 0;
+  AST_Expression *ex = 0;
+
+  for (UTL_LabellistActiveIterator i (this->pd_ll);
+       !i.is_done ();
+       i.next ())
+    {
+      ul = i.item ();
+      
+      if (ul->label_kind () == AST_UnionLabel::UL_default)
+        {
+          return;
+        }
+        
+      ex = ul->label_val ();
+      u->add_to_name_referenced (ex->n ()->first_component ());
+    }
+}
+
+// Narrowing.
 IMPL_NARROW_METHODS1(AST_UnionBranch, AST_Field)
 IMPL_NARROW_FROM_DECL(AST_UnionBranch)

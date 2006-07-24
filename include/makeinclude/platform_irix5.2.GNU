@@ -8,7 +8,7 @@ optimize = 1
 MAKE		= gmake
 CC		= gcc
 CXX		= g++
-CCFLAGS		+= $(CFLAGS) -fno-implicit-templates
+
 DCFLAGS		+= -g
 DLD		= $(CXX)
 LD		= $(CXX) 
@@ -19,3 +19,10 @@ PIC		= -fpic
 RANLIB		= echo
 SOFLAGS		=
 SOBUILD		=
+
+# Test for template instantiation, add to SOFLAGS if SONAME set, 
+# add -E to LDFLAGS if using GNU ld
+#
+include $(ACE_ROOT)/include/makeinclude/platform_g++_common.GNU
+
+CCFLAGS		+= $(CFLAGS) $(TEMPLATES_FLAG)

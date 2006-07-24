@@ -9,13 +9,12 @@
 //    Reactor_Performance_Test.cpp
 //
 // = DESCRIPTION
-//
 //    This test is used to time the dispatching mechanisms of the
-//    ACE_Reactors. Both the WFMO_Reactor and Select_Reactor can be
-//    tested.
+//    <ACE_Reactor>s. Both the <ACE_WFMO_Reactor> and
+//    <ACE_Select_Reactor> can be tested.
 //
 // = AUTHOR
-//    Irfan Pyarali
+//    Irfan Pyarali <irfan@cs.wustl.edu>
 //
 // ============================================================================
 
@@ -34,19 +33,12 @@
 
 ACE_RCSID(tests, Reactor_Performance_Test, "$Id$")
 
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
-
 #if defined (ACE_HAS_THREADS)
 
+static const char ACE_ALPHABET[] = "abcdefghijklmnopqrstuvwxyz";
+
 // Number of client (user) threads
-#if (!defined (ACE_WIN32) || (defined (ACE_HAS_WINNT4) && ACE_HAS_WINNT4 != 0))
-static int opt_nconnections = 20;
-#else /* ACE_WIN32 || (ACE_HAS_WINNT4 && ACE_HAS_WINNT4 != 0) */
 static int opt_nconnections = 5;
-#endif /* ACE_WIN32 || (ACE_HAS_WINNT4 && ACE_HAS_WINNT4 != 0) */
 
 // Number of data exchanges
 static int opt_nloops = 200;
@@ -56,6 +48,9 @@ static int opt_wfmo_reactor = 0;
 
 // Use the Select_Reactor
 static int opt_select_reactor = 0;
+
+// Extra debug messages
+static int opt_debug = 0;
 
 int Read_Handler::waiting_ = 0;
 
@@ -71,13 +66,17 @@ Read_Handler::open (void *)
 {
   if (this->peer ().enable (ACE_NONBLOCK) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       ASYS_TEXT ("(%t) Read_Handler::open, cannot set non blocking mode\n")), -1);
+                       ACE_TEXT ("(%t) Read_Handler::open, cannot set non blocking mode\n")),
+                      -1);
 
   if (reactor ()->register_handler (this, READ_MASK) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       ASYS_TEXT ("(%t) Read_Handler::open, cannot register handler\n")), -1);
+                       ACE_TEXT ("(%t) Read_Handler::open, cannot register handler\n")),
+                      -1);
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%t) created svc_handler for handle %d\n"), get_handle ()));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%t) created svc_handler for handle %d\n"),
+              get_handle ()));
   return 0;
 }
 
@@ -86,26 +85,47 @@ int
 Read_Handler::handle_input (ACE_HANDLE handle)
 {
   ACE_UNUSED_ARG (handle);
-
   char buf[BUFSIZ];
 
-  ssize_t result = this->peer ().recv (buf, sizeof (buf));
-  if (result <= 0)
+  while (1)
     {
-      if (result < 0 && errno == EWOULDBLOCK)
-        return 0;
+      ssize_t result = this->peer ().recv (buf, sizeof (buf) - 1);
 
-      if (result != 0)
-        ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%t) %p\n"), ASYS_TEXT ("Read_Handler::handle_input")));
+      if (result > 0)
+        {
+          if (opt_debug)
+            {
+              buf[result] = 0;
+              ACE_DEBUG ((LM_DEBUG,
+                          ACE_TEXT ("(%t) Read_Handler::handle_input: %s\n"),
+                          buf));
+            }
+        }
+      else if (result < 0)
+        {
+          if (errno == EWOULDBLOCK)
+            return 0;
+          else
+            {
+              ACE_ERROR ((LM_ERROR, ACE_TEXT ("handle_input: %p (errno: %d)\n"),
+                          ACE_TEXT ("recv"), errno));
 
-      // This will cause handle_close to get called
-      return -1;
+              // This will cause handle_close to get called.
+              return -1;
+            }
+        }
+      else // result == 0
+        {
+          // This will cause handle_close to get called.
+          return -1;
+        }
     }
 
-  return 0;
+  ACE_NOTREACHED (return 0);
 }
 
-// Handle connection shutdown
+// Handle connection shutdown.
+
 int
 Read_Handler::handle_close (ACE_HANDLE handle,
                             ACE_Reactor_Mask close_mask)
@@ -113,23 +133,20 @@ Read_Handler::handle_close (ACE_HANDLE handle,
   ACE_UNUSED_ARG (handle);
   ACE_UNUSED_ARG (close_mask);
 
-  // Reduce count
+  // Reduce count.
   waiting_--;
 
-  // If no connections are open
+  // If no connections are open.
   if (waiting_ == 0)
-    {
-      ACE_Reactor::instance ()->end_event_loop ();
-    }
+    ACE_Reactor::instance ()->end_reactor_event_loop ();
 
   ACE_DEBUG ((LM_DEBUG,
-              ASYS_TEXT ("(%t) Read_Handler::handle_close closing down\n")));
+              ACE_TEXT ("(%t) Read_Handler::handle_close closing down\n")));
 
   // Shutdown
   this->destroy ();
   return 0;
 }
-
 
 int
 Write_Handler::open (void *)
@@ -142,9 +159,12 @@ Write_Handler::send_data (void)
 {
   int send_size = sizeof (ACE_ALPHABET) - 1;
 
-  if (this->peer ().send_n (ACE_ALPHABET, send_size) != send_size)
-    ACE_ERROR_RETURN ((LM_ERROR, ASYS_TEXT ("(%t) %p\n"), ASYS_TEXT ("send_n")), -1);
-
+  if (this->peer ().send_n (ACE_ALPHABET,
+                            send_size) != send_size)
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       ACE_TEXT ("(%t) %p\n"),
+                       ACE_TEXT ("send_n")),
+                      -1);
   return 0;
 }
 
@@ -156,31 +176,36 @@ typedef ACE_Acceptor<Read_Handler, ACE_SOCK_ACCEPTOR> ACCEPTOR;
 void *
 client (void *arg)
 {
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%t) running client\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%t) running client\n")));
 
-  ACE_INET_Addr *connection_addr = (ACE_INET_Addr*) arg;
+  ACE_INET_Addr *connection_addr =
+    reinterpret_cast<ACE_INET_Addr *> (arg);
   CONNECTOR connector;
 
   int i;
 
-  // Automagic memory cleanup
-  ACE_Auto_Basic_Array_Ptr <Write_Handler *> writers;
-  Write_Handler **temp_writers;
-  ACE_NEW_RETURN (temp_writers, Write_Handler *[opt_nconnections], 0);
-  writers = temp_writers;
+  // Automagic memory cleanup.
+  Write_Handler **temp_writers = 0;
+  ACE_NEW_RETURN (temp_writers,
+                  Write_Handler *[opt_nconnections],
+                  0);
+  ACE_Auto_Basic_Array_Ptr <Write_Handler *> writers (temp_writers);
 
-  ACE_Auto_Basic_Array_Ptr <ASYS_TCHAR> failed_svc_handlers;
-  ASYS_TCHAR *temp_failed;
-  ACE_NEW_RETURN (temp_failed, ASYS_TCHAR[opt_nconnections], 0);
-  failed_svc_handlers = temp_failed;
+  ACE_TCHAR *temp_failed = 0;
+  ACE_NEW_RETURN (temp_failed,
+                  ACE_TCHAR[opt_nconnections],
+                  0);
+  ACE_Auto_Basic_Array_Ptr <ACE_TCHAR> failed_svc_handlers (temp_failed);
 
-  // Automagic memory cleanup
-  ACE_Auto_Array_Ptr <ACE_INET_Addr> addresses;
+  // Automagic memory cleanup.
   ACE_INET_Addr *temp_addresses;
-  ACE_NEW_RETURN (temp_addresses, ACE_INET_Addr [opt_nconnections], 0);
-  addresses = temp_addresses;
+  ACE_NEW_RETURN (temp_addresses,
+                  ACE_INET_Addr [opt_nconnections],
+                  0);
+  ACE_Auto_Array_Ptr <ACE_INET_Addr> addresses (temp_addresses);
 
-  // Initialize array
+  // Initialize array.
   for (i = 0; i < opt_nconnections; i++)
     {
       writers[i] = 0;
@@ -199,7 +224,8 @@ client (void *arg)
         if (failed_svc_handlers.get ()[i])
           {
             ACE_INET_Addr failed_addr = addresses.get()[i];
-            ACE_ERROR ((LM_ERROR, ASYS_TEXT ("(%t) connection failed to %s, %d\n"),
+            ACE_ERROR ((LM_ERROR,
+                        ACE_TEXT ("(%t) connection failed to %s, %d\n"),
                         failed_addr.get_host_name (),
                         failed_addr.get_port_number ()));
           }
@@ -207,22 +233,26 @@ client (void *arg)
     }
 
   // If no connections failed (result == 0) then there should be valid
-  // ACE_Svc_handler pointers in each writers[] position.
-  // Iterate to send data
+  // ACE_Svc_handler pointers in each writers[] position.  Iterate to
+  // send data
   for (int j = 0; j < opt_nloops; j++)
     for (i = 0; i < opt_nconnections; i++)
       if (writers[i]->send_data () == -1)
-        ACE_ERROR_RETURN ((LM_ERROR, ASYS_TEXT ("(%t) %p\n"), ASYS_TEXT ("writer::send_data")), 0);
-
+        ACE_ERROR_RETURN ((LM_ERROR,
+                           ACE_TEXT ("(%t) %p\n"),
+                           ACE_TEXT ("writer::send_data")),
+                          0);
   // Cleanup
   for (i = 0; i < opt_nconnections; i++)
     writers[i]->destroy ();
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%t) finishing client\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%t) finishing client\n")));
   return 0;
 }
 
-// Sets up the correct reactor (based on platform and options)
+// Sets up the correct reactor (based on platform and options).
+
 void
 create_reactor (void)
 {
@@ -231,49 +261,61 @@ create_reactor (void)
   if (opt_wfmo_reactor)
     {
 #if defined (ACE_WIN32) && !defined (ACE_HAS_WINCE)
-      ACE_NEW (impl, ACE_WFMO_Reactor);
+      ACE_NEW (impl,
+               ACE_WFMO_Reactor);
 #endif /* ACE_WIN32 */
     }
   else if (opt_select_reactor)
-    {
-      ACE_NEW (impl, ACE_Select_Reactor);
-    }
+    ACE_NEW (impl,
+             ACE_Select_Reactor);
+
   ACE_Reactor *reactor = 0;
-  ACE_NEW (reactor, ACE_Reactor (impl));
+  ACE_NEW (reactor,
+           ACE_Reactor (impl));
   ACE_Reactor::instance (reactor);
 }
 
-// Print stats
+// Print stats.
+
 void
 print_results (ACE_Profile_Timer::ACE_Elapsed_Time &et)
 {
-  const ASYS_TCHAR *reactor_type = 0;
+  const ACE_TCHAR *reactor_type = 0;
+
   if (opt_wfmo_reactor)
-    reactor_type = ASYS_TEXT ("WFMO_Reactor");
+    reactor_type = ACE_TEXT ("WFMO_Reactor");
   else if (opt_select_reactor)
-    reactor_type = ASYS_TEXT ("Select_Reactor");
+    reactor_type = ACE_TEXT ("Select_Reactor");
   else
-    reactor_type = ASYS_TEXT ("Platform's default Reactor");
+    reactor_type = ACE_TEXT ("Platform's default Reactor");
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\n\tReactor_Performance Test statistics:\n\n")));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tReactor Type: %s\n"), reactor_type));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tConnections: %d\n"), opt_nconnections));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tIteration per connection: %d\n"), opt_nloops));
-
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\n\tTiming results:\n")));
   ACE_DEBUG ((LM_DEBUG,
-              ASYS_TEXT ("\t\treal time = %f secs \n\t\tuser time = %f secs \n\t\tsystem time = %f secs\n\n"),
+              ACE_TEXT ("\n\tReactor_Performance Test statistics:\n\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\tReactor Type: %s\n"),
+              reactor_type));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\tConnections: %d\n"),
+              opt_nconnections));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\tIteration per connection: %d\n"),
+              opt_nloops));
+
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\n\tTiming results:\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\t\treal time = %f secs \n\t\tuser time = %f secs \n\t\tsystem time = %f secs\n\n"),
               et.real_time,
               et.user_time,
               et.system_time));
 }
 
 int
-main (int argc, ASYS_TCHAR *argv[])
+run_main (int argc, ACE_TCHAR *argv[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Reactor_Performance_Test"));
+  ACE_START_TEST (ACE_TEXT ("Reactor_Performance_Test"));
 
-  ACE_Get_Opt getopt (argc, argv, ASYS_TEXT ("swc:l:"), 1);
+  ACE_Get_Opt getopt (argc, argv, ACE_TEXT ("dswc:l:"), 1);
   for (int c; (c = getopt ()) != -1; )
     switch (c)
       {
@@ -284,14 +326,17 @@ main (int argc, ASYS_TCHAR *argv[])
         opt_wfmo_reactor = 1;
         break;
       case 'c':
-        opt_nconnections = ACE_OS::atoi (getopt.optarg);
+        opt_nconnections = ACE_OS::atoi (getopt.opt_arg ());
         break;
       case 'l':
-        opt_nloops = ACE_OS::atoi (getopt.optarg);
+        opt_nloops = ACE_OS::atoi (getopt.opt_arg ());
+        break;
+      case 'd':
+        opt_debug = 1;
         break;
       }
 
-  // Sets up the correct reactor (based on platform and options)
+  // Sets up the correct reactor (based on platform and options).
   create_reactor ();
 
   // Manage memory automagically.
@@ -301,7 +346,10 @@ main (int argc, ASYS_TCHAR *argv[])
   // If we are using other that the default implementation, we must
   // clean up.
   if (opt_select_reactor || opt_wfmo_reactor)
-    impl = auto_ptr<ACE_Reactor_Impl> (ACE_Reactor::instance ()->implementation ());
+    {
+      auto_ptr<ACE_Reactor_Impl> auto_impl (ACE_Reactor::instance ()->implementation ());
+      impl = auto_impl;
+    }
 
   Read_Handler::set_countdown (opt_nconnections);
 
@@ -310,11 +358,15 @@ main (int argc, ASYS_TCHAR *argv[])
   ACE_INET_Addr server_addr;
 
   // Bind acceptor to any port and then find out what the port was.
-  if (acceptor.open ((const ACE_INET_Addr &) ACE_Addr::sap_any) == -1
+  if (acceptor.open (ACE_sap_any_cast (const ACE_INET_Addr &)) == -1
       || acceptor.acceptor ().get_local_addr (server_addr) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, ASYS_TEXT ("(%t) %p\n"), ASYS_TEXT ("open")), -1);
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       ACE_TEXT ("(%t) %p\n"),
+                       ACE_TEXT ("open")),
+                      -1);
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%t) starting server at port %d\n"),
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%t) starting server at port %d\n"),
               server_addr.get_port_number ()));
 
   ACE_INET_Addr connection_addr (server_addr.get_port_number (),
@@ -324,11 +376,16 @@ main (int argc, ASYS_TCHAR *argv[])
       (ACE_THR_FUNC (client),
        (void *) &connection_addr,
        THR_NEW_LWP | THR_DETACHED) == -1)
-    ACE_ERROR ((LM_ERROR, ASYS_TEXT ("(%t) %p\n"), ASYS_TEXT ("thread create failed")));
+    ACE_ERROR ((LM_ERROR,
+                ACE_TEXT ("(%t) %p\n"),
+                ACE_TEXT ("thread create failed")));
+
+  ACE_Time_Value run_limit (opt_nloops / 10);
 
   ACE_Profile_Timer timer;
   timer.start ();
-  ACE_Reactor::instance()->run_event_loop ();
+  const int status =
+    ACE_Reactor::instance ()->run_reactor_event_loop (run_limit);
   timer.stop ();
 
   ACE_Profile_Timer::ACE_Elapsed_Time et;
@@ -337,57 +394,23 @@ main (int argc, ASYS_TCHAR *argv[])
   // Print results
   print_results (et);
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%t) waiting for the client thread...\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%t) waiting for the client thread...\n")));
 
   ACE_Thread_Manager::instance ()->wait ();
 
   ACE_END_TEST;
-  return 0;
+  return status;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Connector<Write_Handler, ACE_SOCK_CONNECTOR>;
-template class ACE_Acceptor<Read_Handler, ACE_SOCK_ACCEPTOR>;
-template class ACE_Svc_Handler<ACE_SOCK_STREAM, ACE_SYNCH>;
-template class auto_ptr<ACE_Reactor>;
-template class ACE_Auto_Basic_Ptr<ACE_Reactor>;
-template class auto_ptr<ACE_Reactor_Impl>;
-template class ACE_Auto_Basic_Ptr<ACE_Reactor_Impl>;
-template class ACE_Map_Manager<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Iterator_Base<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Iterator<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Reverse_Iterator<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>;
-template class ACE_Map_Entry<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*>;
-template class ACE_Svc_Tuple<Write_Handler>;
-template class ACE_Auto_Basic_Array_Ptr <Write_Handler *>;
-template class ACE_Auto_Basic_Array_Ptr <ACE_INET_Addr>;
-template class ACE_Auto_Array_Ptr <ACE_INET_Addr>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Connector<Write_Handler, ACE_SOCK_CONNECTOR>
-#pragma instantiate ACE_Acceptor<Read_Handler, ACE_SOCK_ACCEPTOR>
-#pragma instantiate ACE_Svc_Handler<ACE_SOCK_STREAM, ACE_SYNCH>
-#pragma instantiate auto_ptr<ACE_Reactor>
-#pragma instantiate ACE_Auto_Basic_Ptr<ACE_Reactor>
-#pragma instantiate auto_ptr<ACE_Reactor_Impl>
-#pragma instantiate ACE_Auto_Basic_Ptr<ACE_Reactor_Impl>
-#pragma instantiate ACE_Map_Manager<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Iterator_Base<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Iterator<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Reverse_Iterator<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*,ACE_SYNCH_RW_MUTEX>
-#pragma instantiate ACE_Map_Entry<ACE_HANDLE,ACE_Svc_Tuple<Write_Handler>*>
-#pragma instantiate ACE_Svc_Tuple<Write_Handler>
-#pragma instantiate ACE_Auto_Basic_Array_Ptr <Write_Handler *>
-#pragma instantiate ACE_Auto_Basic_Array_Ptr <ACE_INET_Addr>
-#pragma instantiate ACE_Auto_Array_Ptr <ACE_INET_Addr>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
 
 #else
 int
-main (int, ASYS_TCHAR *[])
+run_main (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Reactor_Performance_Test"));
+  ACE_START_TEST (ACE_TEXT ("Reactor_Performance_Test"));
 
-  ACE_ERROR ((LM_ERROR, ASYS_TEXT ("threads not supported on this platform\n")));
+  ACE_ERROR ((LM_INFO,
+              ACE_TEXT ("threads not supported on this platform\n")));
 
   ACE_END_TEST;
   return 0;

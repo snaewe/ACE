@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,32 +62,34 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_CONCRETE_TYPE_AST_CONCRETE_TYPE_HH
 #define _AST_CONCRETE_TYPE_AST_CONCRETE_TYPE_HH
 
-// Class for all concrete types
-//
-// This is useful to group together IDL types other than objects
+#include "ast_type.h"
 
-/*
-** DEPENDENCIES: ast_type.hh, ast_decl.hh, utl_scoped_name.hh, utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+// Class for all concrete types.
+// This is useful to group together IDL types other than objects.
 
-class	AST_ConcreteType : public virtual AST_Type
+class TAO_IDL_FE_Export AST_ConcreteType : public virtual AST_Type
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_ConcreteType();
-  AST_ConcreteType(AST_Decl::NodeType nt, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_ConcreteType() {}
+  // Constructor(s).
+  AST_ConcreteType (void);
 
-  // Narrowing
+  AST_ConcreteType (AST_Decl::NodeType nt,
+                    UTL_ScopedName *n);
+
+  // Destructor.
+  virtual ~AST_ConcreteType (void);
+  
+  // Cleanup.
+  virtual void destroy (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_ConcreteType, AST_Type);
   DEF_NARROW_FROM_DECL(AST_ConcreteType);
 };

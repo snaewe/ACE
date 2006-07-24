@@ -5,22 +5,23 @@
 //
 // = LIBRARY
 //    gateway
-// 
+//
 // = FILENAME
 //    Event_Channel.h
 //
 // = AUTHOR
-//    Doug Schmidt 
-// 
+//    Doug Schmidt <schmidt@cs.wustl.edu>
+//
 // ============================================================================
 
-#if !defined (ACE_EVENT_CHANNEL)
+#ifndef ACE_EVENT_CHANNEL
 #define ACE_EVENT_CHANNEL
 
 #include "Connection_Handler_Connector.h"
 #include "Connection_Handler_Acceptor.h"
 #include "Consumer_Dispatch_Set.h"
 #include "Event_Forwarding_Discriminator.h"
+#include "ace/svc_export.h"
 
 typedef ACE_Null_Mutex MAP_MUTEX;
 
@@ -47,8 +48,11 @@ public:
   // Close down the Channel.
 
   // = Proxy management methods.
-  int initiate_connection_connection (Connection_Handler *);
+  int initiate_connection_connection (Connection_Handler *, int sync_directly = 0);
   // Initiate the connection of the <Connection_Handler> to its peer.
+  // Second paratemer is used for thread connection-handler which will
+  // block the connecting procedure directly, need not care
+  // Options::blocking_semantics().
 
   int complete_connection_connection (Connection_Handler *);
   // Complete the initialization of the <Connection_Handler> once it's
@@ -56,6 +60,8 @@ public:
 
   int reinitiate_connection_connection (Connection_Handler *);
   // Reinitiate a connection asynchronously when the Peer fails.
+  int cancel_connection_connection (Connection_Handler *);
+  // Cancel a asynchronous connection.
 
   int bind_proxy (Connection_Handler *);
   // Bind the <Connection_Handler> to the <connection_map_>.
@@ -64,8 +70,8 @@ public:
                   Connection_Handler *&);
   // Locate the <Connection_Handler> with <connection_id>.
 
-  int subscribe (const Event_Key &event_addr, 
-		 Consumer_Dispatch_Set *cds);
+  int subscribe (const Event_Key &event_addr,
+                 Consumer_Dispatch_Set *cds);
   // Subscribe the <Consumer_Dispatch_Set> to receive events that
   // match <Event_Key>.
 
@@ -97,8 +103,8 @@ private:
   int compute_performance_statistics (void);
   // Perform timer-based performance profiling.
 
-  virtual int handle_timeout (const ACE_Time_Value &, 
-			      const void *arg);
+  virtual int handle_timeout (const ACE_Time_Value &,
+                              const void *arg);
   // Periodically callback to perform timer-based performance
   // profiling.
 
@@ -112,11 +118,11 @@ private:
   // Used to establish connections passively and create Consumers.
 
   // = Make life easier by defining typedefs.
-  typedef ACE_Map_Manager<CONNECTION_ID, Connection_Handler *, MAP_MUTEX> 
+  typedef ACE_Map_Manager<CONNECTION_ID, Connection_Handler *, MAP_MUTEX>
   CONNECTION_MAP;
-  typedef ACE_Map_Iterator<CONNECTION_ID, Connection_Handler *, MAP_MUTEX> 
+  typedef ACE_Map_Iterator<CONNECTION_ID, Connection_Handler *, MAP_MUTEX>
   CONNECTION_MAP_ITERATOR;
-  typedef ACE_Map_Entry<CONNECTION_ID, Connection_Handler *> 
+  typedef ACE_Map_Entry<CONNECTION_ID, Connection_Handler *>
   CONNECTION_MAP_ENTRY;
 
   CONNECTION_MAP connection_map_;

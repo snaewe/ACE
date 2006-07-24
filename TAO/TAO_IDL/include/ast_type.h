@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,40 +62,129 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_TYPE_AST_TYPE_HH
 #define _AST_TYPE_AST_TYPE_HH
 
+#include "ast_decl.h"
+
+#include "ace/Unbounded_Queue.h"
+
 // Class for all IDL types
 //
 // This is useful wherever any IDL type defining construct can appear
-// such as the base type for a typedef or array
+// such as the base type for a typedef or array.
 
-/*
-** DEPENDENCIES: ast_decl.hh, utl_scoped_name.hh, utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
-
-#include	"idl_fwd.h"
-#include	"idl_narrow.h"
-#include	"ast_decl.h"
-
-
-class	AST_Type : public virtual AST_Decl
+class TAO_IDL_FE_Export AST_Type : public virtual AST_Decl
 {
 public:
-  // Operations
+  enum SIZE_TYPE
+  {
+    SIZE_UNKNOWN,
+    FIXED,
+    VARIABLE
+  };
+  // Indicates if we are fixed size or variable. Most useful for structs,
+  // unions, and arrays.
 
-  // Constructor(s)
-  AST_Type();
-  AST_Type(AST_Decl::NodeType nt, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Type() {}
+  // Operations.
 
-  // Narrowing
+  AST_Type (void);
+
+  AST_Type (AST_Decl::NodeType nt,
+            UTL_ScopedName *n);
+
+  virtual ~AST_Type (void);
+
+  virtual bool in_recursion (ACE_Unbounded_Queue<AST_Type *> &list);
+  // Determine if we are involved in some kind of limited recursion.
+  // Most types cannot be involved except structs and unions.
+  // If the parameter is 0, we are trying to determine this for ourselves.
+
+  // To be overridden by the subclasses interface, struct, union, and
+  // the corresponding forward declaration classes.
+  virtual bool is_defined (void);
+
+  virtual void size_type (SIZE_TYPE);
+  // Set the size type.
+
+  virtual SIZE_TYPE size_type (void);
+  // Return our size type.
+
+  // Accessors/mutators for the private members.
+
+  bool has_constructor (void);
+  // Accessor for protected member.
+
+  void has_constructor (bool value);
+  // Mutator for protected member.
+
+  bool ifr_added (void);
+  void ifr_added (bool val);
+
+  bool ifr_fwd_added (void);
+  void ifr_fwd_added (bool val);
+
+  const char *nested_type_name (AST_Decl *d,
+                                const char *suffix = 0,
+                                const char *prefix = 0);
+  // Type name of a node used when generating declarations.
+
+  AST_Type *unaliased_type (void);
+  // Utility function to make sure we are using the unaliased type.
+
+  virtual bool legal_for_primary_key (void) const;
+  // Recursively called on valuetype to check for legal use as
+  // a primary key. Overridden for valuetype, struct, sequence,
+  // union, array, typedef, and interface.
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Type, AST_Decl);
   DEF_NARROW_FROM_DECL(AST_Type);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+  // Cleanup.
+  virtual void destroy (void);
+
+protected:
+  virtual int compute_size_type (void);
+  // Determine our size type and set it if it is unknown.
+
+  const char *nested_name (const char *local_name,
+                           const char *full_name,
+                           AST_Decl *use_scope,
+                           const char *suffix,
+                           const char *prefix);
+  // Type name of a node used when generating declarations.
+
+  bool match_names (AST_Type *t, ACE_Unbounded_Queue<AST_Type *> &list);
+
+protected:
+  // Has the full definition been added to the Interface Repository?
+  // Used for types which can have members and can be forward declared.
+  bool ifr_added_;
+
+  // Has this node been forward declared in this IDL file?
+  bool ifr_fwd_added_;
+
+  SIZE_TYPE size_type_;
+  // Whether we are fixed or variable size (by default fixed).
+
+  bool has_constructor_;
+  // Attribute that helps a union determine whether a member
+  // should be included by value or by reference.
+
+  char *nested_type_name_;
+  // For the corresponding method.
+
+  long in_recursion_;
+  // Storage once the value has been computed.
+
+  mutable bool recursing_in_legal_pk_;
+  // Node-specific flag to abort recursion in legal_for_primary_key().
 };
 
 #endif           // _AST_TYPE_AST_TYPE_HH

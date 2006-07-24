@@ -4,15 +4,15 @@
 // The following configuration file is designed to work for SunOS 5.4
 // platforms using the Centerline 2.x C++ compiler.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
 
 #define ACE_HAS_TEMPLATE_SPECIALIZATION
 
 // Platform supports pread() and pwrite()
 #define ACE_HAS_P_READ_WRITE
 
-// Optimize ACE_Handle_Set for select().
 #define ACE_HAS_HANDLE_SET_OPTIMIZED_FOR_SELECT
 
 #define ACE_HAS_XPG4_MULTIBYTE_CHAR
@@ -21,7 +21,7 @@
 #define ACE_HAS_SYSV_IPC
 
 // Sun has the wrong prototype for sendmsg.
-#define ACE_HAS_BROKEN_SENDMSG
+#define ACE_HAS_NONCONST_SENDMSG
 
 // The SunOS 5.x version of rand_r is inconsistent with the header files...
 #define ACE_HAS_BROKEN_RANDR
@@ -36,10 +36,10 @@
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-#define ACE_HAS_SYSCALL_H
+#define ACE_HAS_SYS_SYSCALL_H
 
-// Platform has terminal ioctl flags like TCGETS and TCSETS.
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS 
 
 // Compiler/platform correctly calls init()/fini() for shared libraries.
 #define ACE_HAS_AUTOMATIC_INIT_FINI
@@ -56,15 +56,11 @@
 // Platform supports IP multicast
 #define ACE_HAS_IP_MULTICAST
 
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
-
 // Platform contains <poll.h>.
 #define ACE_HAS_POLL
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Platform supports the /proc file system.
 #define ACE_HAS_PROC_FS
@@ -80,7 +76,7 @@
 #define ACE_HAS_UCONTEXT_T
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler supports the ssize_t typedef.
 #define ACE_HAS_SSIZE_T
@@ -99,12 +95,6 @@
 
 // Compiler/platform supports SVR4 dynamic linking semantics.
 #define ACE_HAS_SVR4_DYNAMIC_LINKING
-
-// Andreas Ueltschi tells me this is a good thing...
-#define ACE_HAS_SVR5_GETTIMEOFDAY
-
-// Compiler/platform supports poll().
-#define ACE_HAS_SVR4_POLL
 
 // Compiler/platform supports SVR4 signal typedef.
 #define ACE_HAS_SVR4_SIGNAL_T
@@ -158,18 +148,10 @@
 
 #define ACE_NEEDS_DEV_IO_CONVERSION
 
-// 10 millisecond fudge factor to account for Solaris timers...
-#if !defined (ACE_TIMER_SKEW)
-#define ACE_TIMER_SKEW 1000 * 10
-#endif /* ACE_TIMER_SKEW */
-
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
 // Defines the page size of the system.
 #define ACE_PAGE_SIZE 4096
 #define ACE_HAS_IDTYPE_T
+#define ACE_HAS_DIRENT
 
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

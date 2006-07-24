@@ -9,20 +9,20 @@
 //    Naming_Service.h
 //
 // = DESCRIPTION
-//      This class implements the functionality of a Naming_Service.
+//      This class implements the functionality of a Naming_Service in
+//      a stand-alone process.
 //
 // = AUTHORS
 //    Nagarajan Surendran (naga@cs.wustl.edu)
-//
+//    Marina Spivak <marina@cs.wustl.edu>
 // ============================================================================
 
-#if !defined (_NAMING_SERVICE_H)
-#define _NAMING_SERVICE_H
+#ifndef TAO_NAMING_SERVICE_H
+#define TAO_NAMING_SERVICE_H
 
-#include "tao/TAO.h"
-#include "orbsvcs/Naming/Naming_Utils.h"
+#include "orbsvcs/Naming/Naming_Server.h"
 
-class Naming_Service
+class TAO_Naming_Service
 {
   // = TITLE
   //   Defines a class that encapsulates the implementation of the
@@ -30,38 +30,47 @@ class Naming_Service
   //
   // = DESCRIPTION
   //   This class makes use of the <TAO_Naming_Server> and
-  //   <TAO_ORB_Manager> class to implement the COS <Naming_Service>.
+  //   <TAO_ORB_Manager> class to implement the COS Naming Service.
 public:
-  Naming_Service (void);
+  TAO_Naming_Service (void);
   // Default Constructor.
 
-  Naming_Service (int argc, char *argv[]);
+  TAO_Naming_Service (int argc, ACE_TCHAR* argv[]);
   // Constructor taking the command-line arguments.
 
-  int init (int argc, char *argv[]);
+  virtual int init (int argc, ACE_TCHAR* argv[]);
   // Initialize the Naming Service with the arguments.
 
-  int run (CORBA_Environment& env);
-  // Run the Naming_Service.
+  virtual int fini (void);
+  // The opposite of init().
 
-  ~Naming_Service (void);
+  int run (ACE_ENV_SINGLE_ARG_DECL_WITH_DEFAULTS);
+  // Run the TAO_Naming_Service.
+
+  void shutdown (ACE_ENV_SINGLE_ARG_DECL_WITH_DEFAULTS);
+  // Shut down the TAO_Naming_Service; you must still call fini().
+
+  virtual ~TAO_Naming_Service (void);
   // Destructor.
-	
-private:
-  int parse_args (int argc, char *argv[]);
-  // parses the arguments.
 
-  TAO_ORB_Manager orb_manager_;
-  // The ORB manager.
+protected:
+
+  int parse_args (int &argc, ACE_TCHAR* argv[]);
+  // Parse the command line arguments to find
+  // the timeout period.
+
+  CORBA::ORB_var orb_;
+  // The ORB.
+
+  //  PortableServer::POA_var root_poa_;
+  // The Root POA.
 
   TAO_Naming_Server my_naming_server_;
   // Naming Server instance.
 
-  FILE *ior_output_file_;
-  // File to output the Naming Service IOR.
-
-  const char *pid_file_name_;
-  // File to output the process id.
+  long time_;
+  // After how long the server should stop listening to requests (in
+  // seconds).
 };
 
-#endif /* _NAMING_SERVICE_H */
+#endif /* TAO_NAMING_SERVICE_H */

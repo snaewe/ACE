@@ -1,7 +1,33 @@
 // $Id$
 
-// Test out the mechanisms provided by the ACE_Process_Manager.
+// ============================================================================
+//
+// = LIBRARY
+//    examples/Threads/
+//
+// = FILENAME
+//    process_manager.cpp
+//
+// = DESCRIPTION
+//   Test out the mechanisms provided by the ACE_Process_Manager.
+//   Using the global ACE_Process_Manager::instance(), we first spawn
+//   some processes (re-invoke this program, and plain-old-fork on
+//   systems that support it), and try the wait() functions.
+//
+//   Then, we register the Process_Manager with
+//   ACE_Reactor::instance() and spawn more processes, counting on the
+//   autoreap to clean up.
+//
+//   Specific-pid and generic exit-handler functions are also tested.
+//
+// = AUTHOR
+//    Douglas C. Schmidt <schmidt@cs.wustl.edu> and
+//    Dave Madden <dhm@mersenne.com>
+//
+// ============================================================================
 
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Service_Config.h"
 #include "ace/Thread_Manager.h"
 #include "ace/Process_Manager.h"
@@ -9,162 +35,262 @@
 
 ACE_RCSID(Threads, process_manager, "$Id$")
 
-#if !defined (ACE_WIN32) && defined (ACE_HAS_THREADS)
-
-// Global process manager.
-static ACE_Process_Manager proc_mgr;
-
-void *
-sig_handler (void *)
+class ExitHandler : public ACE_Event_Handler
 {
-  ACE_Sig_Set sigset;
+public:
+  ExitHandler (const char *name);
 
-  // Register a dummy signal handler so that our disposition isn't
-  // SIG_IGN (which is the default).
-  ACE_Sig_Action sa ((ACE_SignalHandler) sig_handler, SIGCHLD);
-  ACE_UNUSED_ARG (sa);
+  virtual ~ExitHandler (void);
+  virtual int handle_exit (ACE_Process *proc);
+  virtual int handle_timeout (const ACE_Time_Value &tv,
+                              const void *arg = 0);
+  virtual int handle_close (ACE_HANDLE handle,
+                            ACE_Reactor_Mask close_mask);
+  // Called when object is removed from the <ACE_Reactor>.
+private:
+  const char *name_;
+};
 
-  // Register signal handlers.
-  sigset.sig_add (SIGINT);
-  sigset.sig_add (SIGCHLD);
-
-  for (;;)
-    {
-      int signum = ACE_OS::sigwait (sigset);
-
-      ACE_DEBUG ((LM_DEBUG, 
-		  "(%P|%t) received signal %S\n",
-		  signum));
-
-      switch (signum)
-	{
-	case SIGINT:
-	  // Shutdown using <ACE_OS::exit>.
-	  ACE_DEBUG ((LM_DEBUG, 
-		      "(%P|%t) shutting down %n%a\n", 1));
-	  /* NOTREACHED */
-	case SIGCHLD:
-	  
-	  for (;;)
-	    {
-	      pid_t pid = proc_mgr.reap ();
-	      
-	      if (pid == -1) // No more children to reap.
-		break;
-
-	      ACE_DEBUG ((LM_DEBUG, "(%P|%t) reaped pid %d\n", pid));
-	    }
-	  
-	  /* NOTREACHED */
-	case -1:
-	  ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "sigwait"), 0);
-	  /* NOTREACHED */
-	default:
-	  ACE_ERROR_RETURN ((LM_ERROR, 
-			     "(%P|%t) signal %S unexpected\n", signum), 0);
-	  /* NOTREACHED */
-	}
-    }
+ExitHandler::ExitHandler (const char *name)
+  : ACE_Event_Handler (),
+    name_ (name)
+{
 }
+
+ExitHandler::~ExitHandler (void)
+{
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) ExitHandler \"%s\" destroyed\n",
+              name_));
+}
+
+int
+ExitHandler::handle_exit (ACE_Process *proc)
+{
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) ExitHandler \"%s\" handle_exit for pid %d status %d\n",
+              name_,
+              proc->getpid (),
+              proc->exit_code ()));
+  return 0;
+}
+
+int
+ExitHandler::handle_timeout(const ACE_Time_Value &,
+                            const void *)
+{
+  static int tick_tock = 0;
+
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) \"%s\" %s\n",
+              name_,
+              ACE_ODD (tick_tock) ? "Tock" : "Tick"));
+  tick_tock++;
+  return 0;
+}
+
+int
+ExitHandler::handle_close (ACE_HANDLE,
+                           ACE_Reactor_Mask)
+{
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) ExitHandler \"%s\" handle_close\n",
+              name_));
+  delete this;
+  return 0;
+}
+
+// Spin furiously <iterations> times, pausing every 100 cycles to
+// print a message and sleep for a few seconds.
 
 static void
 worker (size_t iterations)
 {
-  for (size_t i = 0; i < iterations; i++)
-    if ((i % 100) == 0)
+  for (size_t i = 0;
+       i <= iterations;
+       i++)
+    if (i && (i % 100) == 0)
       {
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) sleeping\n"));
-	ACE_OS::sleep (5);
+        ACE_DEBUG ((LM_DEBUG,
+                    "(%P|%t@%T) worker spinning furiously... (%u)\n",
+                    i));
+        ACE_OS::sleep (1);
       }
+
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) worker finished\n"));
 }
 
-extern "C" void
-exithook (void)
-{
-  ACE_DEBUG ((LM_DEBUG, "(%P|%t) later...\n"));
-}
-
-static int n_iterations = 100000;
+static int n_iterations = 500;
 static int child = 0;
+static int exit_code = 0;
 
 // Parse the command-line arguments and set options.
 static void
-parse_args (int argc, char *argv[])
+parse_args (int argc, ACE_TCHAR *argv[])
 {
-  ACE_Get_Opt get_opt (argc, argv, "i:cu");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT("i:e:cu"));
 
-  int c; 
+  int c;
 
   while ((c = get_opt ()) != -1)
     switch (c)
-    {
-    case 'i':
-      n_iterations = ACE_OS::atoi (get_opt.optarg);
-      break;
-    case 'c':
-      child = 1;
-      break;
-    case 'u':
-    default:
-      ACE_DEBUG ((LM_DEBUG, "usage:\n"
-		  "-p <processes>\n"
-		  "-i <iterations>\n"));
-      break;
-  }
+      {
+      case 'i':
+        n_iterations = ACE_OS::atoi (get_opt.opt_arg ());
+        break;
+      case 'e':
+        exit_code = ACE_OS::atoi (get_opt.opt_arg ());
+        break;
+      case 'c':
+        child = 1;
+        break;
+      case 'u':
+      default:
+        ACE_DEBUG ((LM_DEBUG, "usage:\n"
+                    "-p <processes>\n"
+                    "-i <iterations>\n"));
+        break;
+      }
+}
+
+// Use ACE_Process_Manager::instance() to spawn another copy of this
+// process.
+
+static pid_t
+respawn_self (const ACE_TCHAR *myname,
+              int iter,
+              int exit_code)
+{
+  ACE_Process_Options options;
+  options.command_line ("%s -c -i %d -e %d",
+                        myname,
+                        iter,
+                        exit_code);
+  return ACE_Process_Manager::instance ()->spawn (options);
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   ACE_Service_Config daemon;
 
   daemon.open (argv[0]);
 
-  atexit (exithook);
-
   parse_args (argc, argv);
-
-  ACE_Sig_Set sigset (1); // Block all signals.
-
-  if (ACE_OS::thr_sigsetmask (SIG_BLOCK, sigset, 0) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "thr_sigsetmask"), 1);
-  else if (ACE_Thread_Manager::instance ()->spawn ((ACE_THR_FUNC) sig_handler, 0, THR_DETACHED) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "spawn"), 1);
 
   if (child)
     {
       worker (n_iterations);
-      return 0;
+
+      ACE_OS::exit (exit_code);
     }
 
-  ACE_Process_Options options;
-  options.command_line ("%s -c", argv[0]);
-  pid_t pid = proc_mgr.spawn (options);
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) Process_Manager test.  Expect output from"
+              "2 or 3 processes...\n"));
 
-  if (pid == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "(%P|%t) %p\n", "start_n"), 1);
-  else
+  ACE_Process_Manager::instance ()->register_handler
+    (new ExitHandler ("default"));
+
+  pid_t pid1 = respawn_self (argv[0],
+                             n_iterations,
+                             111);
+  pid_t pid2 = respawn_self (argv[0],
+                             n_iterations + 500,
+                             222);
+
+#if !defined (ACE_WIN32)
+  pid_t pid3 = ACE_OS::fork ();
+
+  if (!pid3)
     {
-      // Give the child a chance to start running.
-      ACE_OS::sleep (1);
-
-      // Shutdown the child.
-
-      if (proc_mgr.terminate (pid) == -1)
-	ACE_ERROR_RETURN ((LM_DEBUG, "(%P|%t) %p\n", "terminate"), 1);
-
-      // Perform a barrier wait until all the processes and threads
-      // have shut down.
-      proc_mgr.wait ();
-	  ACE_Thread_Manager::instance ()->wait ();
+      worker (n_iterations);
+      return 999;
     }
+#endif /* ACE_WIN32 */
+
+  ACE_Process_Manager::instance ()->register_handler (new ExitHandler ("specific"),
+                                                      pid2);
+
+  if (pid1 == ACE_INVALID_PID || pid2 == ACE_INVALID_PID)
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       "(%P|%t) %p\n",
+                       "start_n"),
+                      1);
+
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) Test parent waiting (synchronously, "
+              "up to 6 seconds) for children...\n"));
+
+  int result =
+    ACE_Process_Manager::instance ()->wait (ACE_Time_Value (6));
+
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) Test parent: %d processes left\n",
+              result));
+
+  if (result > 0)
+    {
+      ACE_DEBUG ((LM_DEBUG,
+                  "(%P|%t@%T) Test parent waiting (synchronously, "
+                  "indefinitely) for remaining children...\n"));
+      result =
+        ACE_Process_Manager::instance ()->wait ();
+      ACE_DEBUG ((LM_DEBUG,
+                  "(%P|%t@%T) Test parent finished waiting: %d\n",
+                  result));
+    }
+
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) Test parent: try auto-reap functions\n"));
+
+  ACE_Process_Manager::instance ()->open (ACE_Process_Manager::DEFAULT_SIZE,
+                                          ACE_Reactor::instance ());
+
+  pid1 = respawn_self (argv[0],
+                       n_iterations + 200,
+                       333 );
+  pid2 = respawn_self (argv[0],
+                       n_iterations + 500,
+                       444);
+
+#if !defined (ACE_WIN32)
+  pid3 = ACE_OS::fork ();
+
+  if (!pid3)
+    {
+      worker (n_iterations);
+      return 888;
+    }
+#endif /* ACE_WIN32 */
+
+  ExitHandler *main_thread_work = 0;
+  ACE_NEW_RETURN (main_thread_work,
+                  ExitHandler ("main thread worker"),
+                  1);
+
+  ACE_Reactor::instance ()->schedule_timer (main_thread_work,
+                                            0,
+                                            ACE_Time_Value (2),
+                                            ACE_Time_Value (1, 500000));
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) Test parent: expect several Processes "
+              "to be auto-detected over the next 30 seconds.\n"
+              "The main thread will do some other work, too.\n" ));
+
+  ACE_Time_Value briefly (30);
+
+  result = ACE_Reactor::run_event_loop (briefly);
+
+  ACE_DEBUG ((LM_DEBUG,
+              "(%P|%t@%T) Test parent: finished (%d) %d.%d.  Close"
+              "Process_Manager...\n",
+              result,
+              briefly.sec (),
+              briefly.usec ()));
+
+  ACE_Process_Manager::instance ()->close ();
 
   return 0;
 }
-#else
-int 
-main (int, char *[])
-{
-  ACE_ERROR_RETURN ((LM_ERROR, "process manager not supported on this platform\n"), -1);
-}
-#endif /* !ACE_WIN32 && ACE_HAS_THREADS */

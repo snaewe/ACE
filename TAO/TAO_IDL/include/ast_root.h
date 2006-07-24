@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,46 +62,52 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_ROOT_AST_ROOT_HH
 #define _AST_ROOT_AST_ROOT_HH
 
-// Representation of root of AST
+#include "ast_module.h"
 
-/*
-** DEPENDENCIES: ast_module.hh, utl_scoped_name.hh, utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+// Representation of root of AST.
 
-class	AST_Root : public virtual AST_Module
+class TAO_IDL_FE_Export AST_Root : public virtual AST_Module
 {
 public:
-  // Operations
+  AST_Root (void);
 
-  // Constructor(s)
-  AST_Root();
-  AST_Root(UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Root() {}
+  AST_Root (UTL_ScopedName *n);
 
-  // Narrowing
+  virtual ~AST_Root (void);
+  
+  virtual unsigned long nmembers (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Root, AST_Module);
   DEF_NARROW_FROM_DECL(AST_Root);
   DEF_NARROW_FROM_SCOPE(AST_Root);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+  // Cleanup.
+  virtual void destroy ();
+  
+  // Final cleanup.
+  void fini (void);
 
 private:
   friend class FE_Declarator;
-  friend int tao_yyparse();
-  // Add protocol
+  friend int tao_yyparse (void);
 
-  virtual AST_Sequence		*fe_add_sequence(AST_Sequence		*s);
-  virtual AST_String		*fe_add_string(AST_String		*s);
-  virtual AST_Array		*fe_add_array(AST_Array			*a);
+  // Add protocol.
 
+  virtual AST_Sequence *fe_add_sequence (AST_Sequence *s);
+  virtual AST_String *fe_add_string (AST_String *s);
+  virtual AST_Array *fe_add_array (AST_Array *a);
 };
 
 #endif           // _AST_ROOT_AST_ROOT_HH

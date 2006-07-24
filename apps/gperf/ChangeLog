@@ -1,31 +1,683 @@
+Tue Mar 14 21:08:12 UTC 2006  jiang,shanshan <shanshan.jiang@vanderbilt.edu>
+
+        * apps/gperf/src/Gen_Perf.cpp
+        * apps/gperf/src/Key_List.cpp
+        * apps/gperf/src/List_Node.cpp
+        * apps/gperf/src/Options.cpp
+          Updated these files to solve the warnings when setting up "VC level 4 warnings"
+          on Windows. These warnings include "unreachable code", "assignment within
+          conditional expression", "conversion from some type to another type, possible
+          loss of data", "local variable may be used without having been initialized" and
+          so on.
+          Thanks to Lukas Gruetzmacher <gruetzmacher at ais-dresden dot de> for 
+          motivating the fix to these "VC level 4 warnings".
+
+Wed Jan  4 22:55:24 UTC 2006  J.T. Conklin  <jtc@acorntoolworks.com>
+
+         * ChangeLog:
+
+          Untabify.
+          Delete-trailing-whitespace.
+
+          Added "Local Variables" section defining "add-log-time-format"
+          to a really ugly lambda expression that formats changelog
+          timestamps in UTC and works with both GNU Emacs and XEmacs.
+
+Mon Oct  3 13:52:12 UTC 2005  Johnny Willemsen  <jwillemsen@remedy.nl>
+
+        * src/Key_List.cpp:
+          Fixed might be unitialized warning in Cygwin build
+
+Thu Jun  9 18:34:12 UTC 2005  Johnny Willemsen  <jwillemsen@remedy.nl>
+
+        * src/Key_List.cpp:
+          Only generate the base pointer when it is used. Fixes bugzilla 2099.
+          Thanks to Frank Pilhofer <fp@mc.com>
+
+Sat Apr 30 10:56:12 UTC 2005  Johnny Willemsen  <jwillemsen@remedy.nl>
+
+        * src/Key_List.cpp:
+          Use option.key_name() instead of opname_, the key name is passed
+          as -K on the commandline. Thanks to Frank Pilhofer <fp@mc.com>
+
+Fri Apr 29 09:08:39 2005  Douglas C. Schmidt  <schmidt@cs.wustl.edu>
+
+	* src/Key_List.cpp (output_binary_search_function): Added a
+
+	  do {/* null */} while (&base == 0);
+
+	  to silence warnings on some compilers.  Thanks to Frank Pilhofer
+ 	  <fp@mc.com>.
+
+Fri Aug  5 15:30:00 UTC 2004  Simon Massey  <simon.massey@prismtechnologies.com>
+
+        * apps/gperf/tests/gperf_test.mpb
+        * apps/gperf/tests/tests.mpc
+
+          gperf is not built on cross compiled targets, thus tests will not run!
+          Therefore added the dependancy to the build of these test.
+
+Fri Apr 23 21:18:17 2004  Ossama Othman  <ossama@dre.vanderbilt.edu>
+
+	* src/Options.h (operator !=):
+	* src/Options.cpp (operator !=):
+
+	  Changed return type to bool, as is the norm in modern C++.
+
+Tue Jan 20 17:13:29 2004  Steve Huston  <shuston@riverace.com>
+
+	* version.texi: Something in the autoconf build thought it wise to
+	  update the date in this file. It matches the last modification
+	  date of gperf.texi.
+
+Thu Jun 19 14:52:05 UTC 2003  Don Hinton  <dhinton@dresystems.com>
+
+        * tests/test-1.exp:
+        * tests/test-2.exp:
+        * tests/test-3.exp:
+        * tests/test-4.exp:
+        * tests/test-5.exp:
+          Added (int) casts to expected results to match the new output.
+
+Tue Jun 17 11:38:36 2003  Douglas C. Schmidt  <schmidt@macarena.cs.wustl.edu>
+
+	* src/Key_List.cpp (output_lookup_array):
+	* src/Gen_Perf.cpp (run):
+	* src/Key_List.cpp (already_determined):
+	* src/List_Node.cpp (List_Node): Added casts to prevent GCC 3.3
+	  from complaining about stupid stuff...  Thanks to Bala for
+ 	  reporting this.
+
+Sun Jul 28 17:04:54 2002  Douglas C. Schmidt  <schmidt@ace.cs.wustl.edu>
+
+	* src/gperf.cpp (main): Only generate the timestamps if the
+	  DEBUGGING option ('-d') is enabled.  Thanks to Kier Schmitt
+ 	  <SchmittKC@kpt.nuwc.navy.mil> for this suggestion.
+
+Tue Feb 26 23:15:47 2002  Ossama Othman  <ossama@uci.edu>
+
+	* gperf.texi:
+
+	  Added missing "@dircategory" entry.  It is required for proper
+	  installation when using `install-info'.
+
+	  Use "@direntry" instead of "{START,END}-INFO-DIR-ENTRY"
+	  directly.
+
+	* gperf.info:
+
+	  Regenerated this file.
+
+Mon Jan 14 14:43:53 2002  Carlos O'Ryan  <coryan@uci.edu>
+
+	* tests/Makefile:
+	  Re-generate dependencies.
+
+Mon Dec 24 12:47:27 2001  Carlos O'Ryan  <coryan@uci.edu>
+
+	* src/Options.cpp:
+	  Add temporary fix until something better shows up, at least it
+	  compiles this way!
+
+Sat Sep 22 09:06:10 2001  Douglas C. Schmidt  <schmidt@macarena.cs.wustl.edu>
+
+	* src/Makefile: Removed the rules.lib.GNU file since it didn't
+	  seem to be needed and was causing problems for MinGW.  Thanks to
+ 	  Jeff McNiel <JMcNiel@datacrit.com> for reporting this.
+
+Wed Sep 19 02:29:37 2001  Carlos O'Ryan  <coryan@uci.edu>
+
+        * tests/Makefile:
+          Another minor problem in the generated Makefile, i.e. the script
+          continues to break for filenames that contain a '+' sign in them.
+
+Wed Sep 12 16:06:46 2001  Krishnakumar B  <kitty@cs.wustl.edu>
+
+        * tests/Makefile:
+
+          Added missing dependency in runtests and entry in realclean for
+          taoout. This fixes a long standing nagging problem.
+
+Sat Sep  8 22:40:21 2001  Krishnakumar B  <kitty@cs.wustl.edu>
+
+        * src/Key_List.cpp (output_lookup_array):
+
+          Removed a compilation warning on 64-bit Linux.
+
+Sun Jul 29 12:17:55 2001  Douglas C. Schmidt  <schmidt@ace.cs.wustl.edu>
+
+        * The following changes fix a bug reported by Karl Proese
+          <karl.proese@mchp.siemens.de> and Jeff Parsons.
+
+        * tests: Patched the *.exp files to include the new WORDLIST_SIZE
+          macro.
+
+        * src/Key_List.cpp: Generate a new const/enum that defines the
+          size of the wordlist array.  This is now used to fix a nasty bug
+          where MAX_HASH_VALUE was used instead of WORDLIST_SIZE.
+
+        * src/Key_List.cpp (output_lookup_array): Reformatted the
+          debugging output to make it easier to tell what's going on.
+
+        * tests/tao.exp: Updated this file based on the expected output of
+          the new test example.
+
+        * tests/tao.gperf: Updated this to use a different set of keys since
+          they exercise the range of screwy inputs better than the earlier
+          contents of this file.  In particular, this should detect
+          certain nasty bugs that were plaguing GPERF earlier for keyword
+          sets with a large number of duplicates.
+
+        * src/Key_List.cpp (read_keys): Clarified the debugging message
+          to indicate the key links are *static*.
+
+        * src/Options.cpp (parse_args): Fixed a stupid typo...
+
+Sun Jul  1 08:33:56 2001  Douglas C. Schmidt  <schmidt@tango.doc.wustl.edu>
+
+        * tests/Makefile: For some strange reason there was a BIN2 macro
+          but no BIN macro, which caused problems...
+
+        * tests: Added support to check for the condition that caused
+          TAO's IDL compiler to break on keylists that have a large number
+          of duplicates!
+
+        * src/Key_List.cpp (output_lookup_function): Fixed a tiny mistake
+          where "slot < MAX_HASH_VALUE" should have been "slot <=
+          MAX_HASH_VALUE".  Thanks to Vsevolod Novikov
+          <novikov@df.nnov.rfnet.ru> and Jeff Parsons
+          <parsons@cs.wustl.edu> for helping to track this down.
+
+Sat Jun  2 13:30:30 2001  Douglas C. Schmidt  <schmidt@tango.doc.wustl.edu>
+
+        * src/Makefile (INSTALL): Fixed several minor problems with the
+          Makefile so that this will build correctly on mingw.  Thanks to
+          Cristian Ferretti <cristian_ferretti@yahoo.com> for pointing
+          this out.
+
+Fri Mar 30 11:30:54 2001  Carlos O'Ryan  <coryan@uci.edu>
+
+        * tests/Makefile:
+          And we need to patch dependencies yet another time.
+
+Wed Jan 24 13:44:53 2001  Carlos O'Ryan  <coryan@uci.edu>
+
+        * tests/Makefile:
+          And I got nailed by the same problem again:
+          Just doing 'make depend' generates invalid dependencies for some
+          reason, had to manually patch them.
+
+Mon Oct 16 10:34:06 2000  Carlos O'Ryan  <coryan@uci.edu>
+
+        * tests/Makefile:
+          Just doing 'make depend' generates invalid dependencies for some
+          reason, had to manually patch them.
+
+Fri Apr 21 20:33:11 2000  Carlos O'Ryan  <coryan@uci.edu>
+
+        * tests/Makefile:
+          Add dependencies for the runtest rule, otherwise parallel builds
+          fail.
+
+Thu Apr 20 09:04:27 2000  Carlos O'Ryan  <coryan@uci.edu>
+
+        * tests/Makefile:
+          Just running 'make depend' on this file introduces an spurious
+          'c++' string in the middle of the dependencies.  Have no time to
+          figure out why.
+
+Wed Mar  8 17:26:22 2000  Ossama Othman  <ossama@uci.edu>
+
+        * src/Key_List.cpp (Key_List, ~Key_List, output_types):
+
+          Fixed memory leaks related to lack of deallocation of variables
+          that were initialized with static strings, and then
+          reinitialized with strings that were dynamically allocated.
+          [Bug 334]
+
+Tue Feb 22 18:25:02 2000  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp,
+          src/Bool_Array.cpp,
+          src/Gen_Perf.cpp,
+          src/Hash_Table.cpp,
+          src/Options.h,
+          src/Options.cpp: Renamed the DEBUG enum to DEBUGGING enum
+          to avoid problems with -DDEBUG is enabled.  Thanks to
+          Tobin Bergen-Hill <tbhill@dctd.saic.com> for reporting this.
+
+Sat Nov 13 18:43:53 1999  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp: The code for output_lookup_function() was
+          not being called if option[GLOBAL] was set.  Thanks to Eugene
+          Surovegin <ebs@glasnet.ru> for reporting the bug and the fix.
+
+Tue Aug 31 14:47:06 1999  Pradeep Gore  <pradeep@flamenco.cs.wustl.edu>
+
+        * Makefile:
+          Fix for Bug#:250 - The Makefile now uses ACE's build commands.
+          This also gets rid of the build warning on egcs when compiling
+          with repo=1. Thanks to David, Ossama, Bala and Yamuna.
+
+Thu Jul  1 09:31:32 1999  Carlos O'Ryan  <coryan@cs.wustl.edu>
+
+        * Makefile:
+          If we are cross compiling we shouldn't compile gperf, it is not
+          going to help anyway, because we could not run it.
+
+Sun Jun 27 20:40:30 1999  Douglas C. Schmidt  <schmidt@ace.cs.wustl.edu>
+
+        * src/Key_List.cpp: Added some initializers to keep EGCS from
+          complaining.
+
+Wed Jun 23 07:24:58 1999  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp (output_hash_function): Use conditional
+          compilation rather than a runtime check to test if
+          ACE_STANDARD_CHARACTER_SET_SIZE == ACE_EBCDIC_SIZE.  This
+          suppresses a warning on DEC UNIX.  Thanks to David Levine for
+          reporting this.
+
+Fri Jun 18 16:54:43 1999  Irfan Pyarali  <irfan@cs.wustl.edu>
+
+        * apps/gperf/src/Key_List.cpp (output_lookup_array): Prefixed
+          debug message with "GPERF".
+
+Thu Jun 17 18:04:30 1999  Douglas C. Schmidt  <schmidt@mambo.cs.wustl.edu>
+
+        * tests/test-[1-5].exp: Fixed all the tests to account for the new
+          EBCDIC output.
+
+Thu Jun 17 17:25:00 1999  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp (output_hash_function): Generate an asso_values
+          table that will have the appropriate values for both EBCDIC or
+          ASCII, depending on the platform.
+
+        * src/Key_List.cpp (output_hash_function),
+          src/Gen_Perf.cpp (Gen_Perf),
+          src/Vectors.h: Replaced the use of ALPHA_SIZE with
+          ACE_STANDARD_CHARACTER_SET_SIZE, which works correctly for
+          EBCDIC platforms, as well as ASCII ones.  Thanks to
+          Jim Rogers  <jrogers@viasoft.com> for this suggestion.
+
+Wed Jun 16 19:08:01 1999  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Key_List.cpp: Fixed the key_word table generation so that it
+          generates the "default fill" string for the null entries in the
+          table. Thanks to Irfan and Naga for helping in this.
+
+Sun Jun  6 15:47:23 1999  Douglas C. Schmidt  <schmidt@danzon.cs.wustl.edu>
+
+        * src/Key_List.cpp (output_switch): Make sure to generate "const
+          char *resword;" rather than "char *resword" since otherwise C++
+          compilers correctly complain.
+
+        * tests: Fixed a bunch of warnings related to misuses of "const
+          char *".
+
+Sun Jun  6 10:30:09 1999  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests/test-4.exp: Fixed another use of "index".  Thanks to David
+          Levine for reporting this.
+
+Sat Jun  5 23:17:39 1999  Douglas C. Schmidt  <schmidt@danzon.cs.wustl.edu>
+
+        * Replaced all uses of "index" with "slot" to avoid problems with
+          broken C++ compilers that define a macro called "index".
+
+Tue May  4 14:24:27 1999  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Options.cpp (parse_args): Removed %a flag from -v option and
+          used ACE_OS::exit (0) instead.
+
+Mon Apr 26 15:42:54 1999  Ossama Othman  <othman@cs.wustl.edu>
+
+        * tests/test-{1,2,3,4,5}.exp: Forgot to update the expected test
+          output to reflect the version string update listed below.
+
+Mon Apr 26 10:42:08 1999  Ossama Othman  <othman@cs.wustl.edu>
+
+        * src/Version.cpp (version_string): Updated version string to "2.8
+          (ACE version)" since 2.7 is used by the old Cygnus maintained
+          gperf.
+
+        * src/*.{h,cpp}: Updated copyright/distribution information to GPL
+          v2 style notice.
+
+Sun Apr 25 16:16:12 1999  Ossama Othman  <othman@cs.wustl.edu>
+
+        * mdate-sh: Added this file to the CVS repository.  It will be
+          used once the auto{conf,make} integrations are in place.
+
+Sun Apr 25 16:13:40 1999  Ossama Othman  <othman@cs.wustl.edu>
+
+        * COPYING: Updated to GPL version 2.
+
+Sat Apr 24 18:18:35 1999  Ossama Othman  <othman@cs.wustl.edu>
+
+        * gperf.1:
+        * gperf.info:
+        * gperf.texi: Added missing quote, cosmetic fix, regenerated
+          gperf.info.
+
+        * src/Key_List.cpp
+        * src/Options.h:
+        * src/Options.cpp: Merged Cygnus patch that allows the user to
+          specify a default fill expression/value in the keyword table.
+          Updated help message with new `-F' option.  Made some cosmetic
+          fixes to the help message, too.
+
+        * tests/test.cpp: Minor spelling correction in comment
+
+        * tests/test-6.exp: Updated with new expected gperf output.
+
+Mon Nov  9 23:37:09 1998  Vishal Kachroo <vishal@cs.wustl.edu>
+
+        * src/Key_List.cpp: Fixed the problem with Binary and Linear
+          Search code.
+
+Sat Oct 10 18:40:56 1998  Vishal Kachroo  <vishal@merengue.cs.wustl.edu>
+
+        * tests/test-6.exp (Usage): copied the output of gperf -h option
+          into test-6.exp. This test was failing because it didn't have
+          the -b option previously. Thanks to David for reporting the
+          failure of tests.
+
+        * src/Options.cpp : Changed the option case 'h' to include the
+          following line " -b/t Code for Linear Search".
+
+Fri Oct  9 01:06:56 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Options.cpp :
+        * src/Key_List.cpp (output_linear_search_function): Changed option
+          -z to -b for generating linear search. Removed <len> parameter
+          from the lookup code. We dont need <len> in the generated code
+          in the case of linear/binary search options.
+
+Thu Oct  8 17:40:19 1998  Vishal Kachroo  <vishal@merengue.cs.wustl.edu>
+
+        * src/Gen_Perf.cpp (run): added the linear search changes.
+        * src/Gen_Perf.h        : added the linear search changes.
+        * src/Options.cpp       : added the linear search changes.
+        * src/Options.h         : added the linear search changes.
+        * src/Key_List.cpp      : added the linear search changes.
+        * src/Key_List.h        : added the linear search changes.
+
+
+Wed Oct  7 01:20:35 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * tests/test-6.exp:
+          Updated thif file to the current help message. Thanks to Hans
+          for reporting this.
+
+Tue Oct  6 11:51:47 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Key_List.cpp (Key_List): Fixed g++ warnings.
+
+Tue Oct  6 02:48:37 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        Thanks to Vishal the following things have been done to get Binary
+        Search code generated from GPERF.
+
+        * src/Options.cpp (parse_args): Added the -B option for the binary
+          search.
+
+        * src/Options.h (enum Option_Type): Added the BINARYSEARCH in the
+          enumeration.
+
+        * src/Key_List.cpp : Added the function
+          output_binary_search_function(void). Changed the output function
+          to include the Binary Search option.  Used option[BINARYSEARCH]
+          to distinguish the binary search case from the hashing case.
+
+        * src/Key_List.h : Added the prototype for
+          output_binary_search_function.  Also added the key_sort variable
+          to enable sorting based on key values.
+
+Mon Oct  5 18:24:15 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Gen_Perf: Created a new function that allows us to split the
+          binary search and perfect hash logic apart.  Thanks to Vishal
+          and Alex for reporting this.
+
+        * src/Key_List.cpp (dump): Fixed the unsigned problems with line
+          1502 YET again...  Thanks to David/Darrell for reporting this.
+
+Sun Oct  4 20:42:56 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src: Fixed yet another problem with switching from array-based
+          lookups to switch-based lookups.  Thanks to Carlos for reporting
+          this.
+
+Sat Oct  3 19:36:52 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Options.h:
+        * src/Options.cpp:
+        * src/Key_List.h:
+        * src/Key_List.cpp: Reverted all the changes done for Binary
+          Search.
+
+Sat Oct  3 17:51:10 1998  Carlos O'Ryan  <coryan@cs.wustl.edu>
+
+        * tests/test-6.exp: Added the new -B option.
+
+Sat Oct  3 13:47:40 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Key_List.cpp (output_binary_search_function): Added a new
+          line after binary search code.
+
+Sat Oct  3 10:11:15 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Options.cpp (parse_args): Changed the option for binary
+          search to '-B'
+
+Fri Oct  2 21:38:54 1998  Vishal Kachroo  <vishal@merengue.cs.wustl.edu>
+
+        * src/Options.cpp (parse_args): Added the -b option for the binary
+          search.
+
+        * src/Options.h (enum Option_Type): Added the BINARYSEARCH in the
+          enumeration.
+
+        * src/Key_List.cpp : Added the function
+          output_binary_search_function (void). Changed the output
+          function to include the Binary Search option.  Used
+          option[BINARYSEARCH] to distinguish the binary search case from
+          the hashing case.
+
+        * src/Key_List.h : Added the prototype for
+          output_binary_search_function.  Also added the key_sort variable
+          to enable sorting based on key values.
+
+Thu Oct  1 12:40:59 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
+
+        * src/Options.cpp (parse_args): Comments for Vishal to incorporate
+          Binary Seach on to GPERF.
+
+Wed Sep 30 16:55:53 1998  Carlos O'Ryan  <coryan@cs.wustl.edu>
+
+        * tests/Makefile: Updated dependencies, added a realclean target
+          to remove the output from the tests.
+
+Wed Sep 30 12:41:29 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp (dump): Fixed another signed/unsigned int
+          mismatch.  Thanks to David Levine for reporting this.
+
+Mon Sep 28 13:18:05 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests: Updated all the test-*.exp files to reflect the latest
+          "unsigned" changes.
+
+        * src/Key_List.cpp (output_hash_function): Fixed another use of
+          int to be unsigned int.
+
+        * tests/test.cpp: Fixed the signature of in_word_set() to be
+          consistent with the new gperf.  Thanks to David Levine and
+          Carlos O'Ryan for this fix.
+
+Sun Sep 27 00:04:18 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp (dump): Reverted back to using int for
+          keyword_width to keep certain compilers happy.  Thanks to David
+          Levine for reporting this.
+
+        * src/Key_List: MAke sure that we don't generate the lookup table
+          twice if we're forced to change to the switch format.
+
+        * src/Key_List: Replaced the use of "int" with "unsigned int" for
+          parameters and hash values.
+
+        * src/Key_List: Fixed the code so that if we change over to using
+          the switch statement then we use the already generated keyword
+          table appropriately.  This prevents unnecessary warnings from
+          some C++ compilers.  Thanks to David Levine for reporting this.
+
+        * src/Key_List.cpp (output): If it's not possible to use the
+          lookup_array implementation of -D (e.g., because there aren't
+          enough empty slots in the lookup_array), then default to using
+          -S1 option...  This fixes a nasty bug that's been in gperf for
+          years....
+
+        * src/Key_List.cpp: (output_lookup_array): Added a "return 0" to
+          make the C++ compiler happy.  Thanks to David for noticing this.
+
+        * tests/c++-res.exp: Added a new test for C++ keywords.
+
+        * tests/corba.gperf: Added a proper test for CORBA keywords.
+
+Sat Sep 26 15:32:56 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Hash_Table.cpp (find): Fixed a bug in the increment
+          computation that arose if the -n option was given.
+
+        * src: Removed all set_ and get_ prefixes to be more consistent
+          with ACE programming guidelines.
+
+        * src: GPERF now Purifies cleanly.
+
+        * src/Gen_Perf: Cleaned up the code so that if errors occur they
+          get handled properly.
+
+        * src/List_Node: Added a destructor to remove the memory when
+          we're done.
+
+        * src: Continued to tidy up the source code so that it is better
+          designed and Purifies cleanly on shutdown.
+
+        * src/Makefile: Removed the need for libGperf.{a,so}.
+
+        * src/Key_List: Changed read_keys() to return a value so that we
+          can check for errors.
+
+Fri Sep 25 08:54:41 1998  David L. Levine  <levine@cs.wustl.edu>
+
+        * src/Key_List.cpp (Key_List ctor): reordered initializers to
+          match declaration order.
+
+Thu Sep 24 18:20:36 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List: Changed char_set field to keysig to be consistent
+          with the paper.
+
+        * src/Hash_Table: Renamed operator() to find().  What the heck was
+          I thinking in '92?!
+
+        * src/gperf.cpp (main): Removed the LARGE_STACK_ARRAYS option.
+          This was annoying...
+
+Tue Sep 22 21:30:59 1998  David L. Levine  <levine@cs.wustl.edu>
+
+        * tests/corba.exp: added this file, it hadn't been checked in.
+
+Tue Sep 22 18:02:01 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests/Makefile: Added a new test for CORBA keywords.
+
+        * tests: Added a new test for the type of input that is causing
+          problems with TAO's IDL compiler.
+
+        * src/Key_List.cpp (output_lookup_array): Changed the assertion
+          from assert (i != 0) to assert (i >= 0) since I think that's
+          correct... (ah, so THAT's why comments are important thinks the
+          '92 Doug... ;-)).
+
+        * src/Options: Improved the comments for the '-h' option to
+          reflect current reality...
+
+Thu Sep 17 11:42:53 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * src/Key_List.cpp (output_lookup_array): Put 'signed' keyword
+          before 'char lookup' to avoid problems on platforms where char
+          is defined as unsigned.  Thanks to Margherita Vittone Wiersma
+          <vittone@fndaub.fnal.gov> for reporting this.
+
+Wed Sep 16 19:08:13 1998  David L. Levine  <levine@cs.wustl.edu>
+
+        * Makefile: don't run build/run tests on CROSS-COMPILE platforms.
+          Thanks to Raja Ati <rati@montereynets.com> for reporting this
+          problem.
+
+Wed Sep 16 18:18:41 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests/Makefile: Changed CFLAGS to CCFLAGS to make aCC happy on
+          HP/UX.  Thanks to John Mulhern for reporting this.
+
+Tue Sep 15 18:14:08 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests/test-6.exp (Usage): Fixed the usage so diff should no
+          longer complain...  Thanks to David for reporting this.
+
+Tue Sep 15 21:54:07 1998  David L. Levine  <levine@cs.wustl.edu>
+
+        * tests/Makefile: filter timestamps from test output so that
+          diffs will pass.
+
+Tue Sep 15 18:14:08 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests: Updated the expected output to look for 2.7 vs 2.6
+          of gperf.
+
+Thu Sep 10 16:50:21 1998  Carlos O'Ryan  <coryan@cs.wustl.edu>
+
+        * tests/Makefile:
+          The test programs were not linking against ACE.
+
+Tue Sep  8 12:45:53 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * tests/test.cpp: Added #include "ace/OS.h" so that the ACE_RCSID
+          macro is defined.  Thanks to Arturo Montes
+          <mitosys@colomsat.net.co> for reporting this.
+
 Sat Aug 22 08:44:15 1998  Alexander Babu Arulanthu  <alex@cs.wustl.edu>
 
-	* src/Options.cpp : Fixed the typo (-V instead of -v) under 'case
-	  h' print string.  
+        * src/Options.cpp : Fixed the typo (-V instead of -v) under 'case
+          h' print string.
 
 Fri Aug 21 11:57:57 1998  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
 
-	* src/Key_List.cpp (set_output_types): Make sure that we leave an
- 	  extra space between the struct tag and the wordlist so the
- 	  compiler doesn't complain.  Thanks to Andy Gokhale for reporting
- 	  this.
+        * src/Key_List.cpp (set_output_types): Make sure that we leave an
+          extra space between the struct tag and the wordlist so the
+          compiler doesn't complain.  Thanks to Andy Gokhale for reporting
+          this.
 
-	* src/gperf.cpp: Modified the main() program so that it doesn't
- 	  print the starting time until AFTER we've parsed the arguments.
- 
-	* src/Version.cpp: Updated the version to 2.7 to reflect the
-	  new changes.
+        * src/gperf.cpp: Modified the main() program so that it doesn't
+          print the starting time until AFTER we've parsed the arguments.
 
-	* src/Options.cpp (operator): Added a new -V option, which just
- 	  exits with a value of 0.  This is useful for checking if gperf
- 	  exists in the search path.  We use the feature in TAO.
+        * src/Version.cpp: Updated the version to 2.7 to reflect the
+          new changes.
 
-	* src: Removed the globally overloaded new operator.  This was a
- 	  portability pain and didn't really improve performance very
- 	  much.
+        * src/Options.cpp (operator): Added a new -V option, which just
+          exits with a value of 0.  This is useful for checking if gperf
+          exists in the search path.  We use the feature in TAO.
 
-	* src/Options.cpp (operator): Fixed '%e' to be '%r' to come up to
- 	  speed with ACE changes.
+        * src: Removed the globally overloaded new operator.  This was a
+          portability pain and didn't really improve performance very
+          much.
+
+        * src/Options.cpp (operator): Fixed '%e' to be '%r' to come up to
+          speed with ACE changes.
 
 Sat Aug 15 07:59:58 1998  David L. Levine  <levine@cs.wustl.edu>
 
@@ -1446,3 +2098,9 @@ Thu Jan  5 22:46:34 1989  Doug Schmidt  (schmidt at siam.ics.uci.edu)
         * Added a check in Key_List::Output for the special case where
           the keys used are 1,$.  It is possible to generate more
           efficient C code in this case.
+	
+Local Variables:
+mode: change-log
+add-log-time-format: (lambda () (progn (setq tz (getenv "TZ")) (set-time-zone-rule "UTC") (setq time (format-time-string "%a %b %e %H:%M:%S %Z %Y" (current-time))) (set-time-zone-rule tz) time))
+indent-tabs-mode: nil
+End:

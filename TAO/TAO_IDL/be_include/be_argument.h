@@ -19,29 +19,34 @@
 //
 // ============================================================================
 
-#if !defined (BE_ARGUMENT_H)
+#ifndef BE_ARGUMENT_H
 #define BE_ARGUMENT_H
 
-/*
- * BE_Argument
- */
+#include "be_decl.h"
+#include "ast_argument.h"
+
+class AST_Type;
+class be_visitor;
+
 class be_argument : public virtual AST_Argument,
                     public virtual be_decl
 {
 public:
-  // =Operations
-
+  // Default constructor.
   be_argument (void);
-  // default constructor
 
-  be_argument (AST_Argument::Direction d, AST_Type *ft, UTL_ScopedName *n,
-               UTL_StrList *p);
-  // constructor
+  // Constructor.
+  be_argument (AST_Argument::Direction d,
+               AST_Type *ft,
+               UTL_ScopedName *n);
 
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
-  // Narrowing
+  // Narrowing.
   DEF_NARROW_METHODS2 (be_argument, AST_Argument, be_decl);
   DEF_NARROW_FROM_DECL (be_argument);
 };

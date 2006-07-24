@@ -19,31 +19,41 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_module.h"
+#include "be_visitor.h"
 
-ACE_RCSID(be, be_module, "$Id$")
+ACE_RCSID (be, 
+           be_module, 
+           "$Id$")
 
-/*
- * BE_Module
- */
 be_module::be_module (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    UTL_Scope (),
+    be_scope (),
+    be_decl ()
 {
 }
 
-be_module::be_module (UTL_ScopedName *n, UTL_StrList *p)
-  : AST_Decl (AST_Decl::NT_module, n, p),
-    UTL_Scope (AST_Decl::NT_module)
+be_module::be_module (UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_module,
+              n),
+    UTL_Scope (AST_Decl::NT_module),
+    AST_Module (n),
+    be_scope (AST_Decl::NT_module),
+    be_decl (AST_Decl::NT_module,
+             n)
 {
 }
 
-// compute the size type of the node in question
-int
-be_module::compute_size_type (void)
+void
+be_module::destroy (void)
 {
-  // our size does not matter
-  return 0;
+  // Call the destroy methods of our base classes.
+  this->be_scope::destroy ();
+  this->be_decl::destroy ();
+  this->AST_Module::destroy ();
 }
 
 int

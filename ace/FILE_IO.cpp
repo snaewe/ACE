@@ -1,25 +1,32 @@
-// FILE_IO.cpp
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/FILE_IO.h"
 
-#if defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/FILE_IO.i"
-#endif
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_sys_stat.h"
+#include "ace/OS_Memory.h"
+#include "ace/Truncate.h"
+
+#if !defined (__ACE_INLINE__)
+#include "ace/FILE_IO.inl"
+#endif /* __ACE_INLINE__ */
 
 ACE_RCSID(ace, FILE_IO, "$Id$")
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_ALLOC_HOOK_DEFINE(ACE_FILE_IO)
 
 void
 ACE_FILE_IO::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_FILE_IO::dump");
 
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
   this->addr_.dump ();
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
 // Simple-minded do nothing constructor.
@@ -38,24 +45,28 @@ ssize_t
 ACE_FILE_IO::send (size_t n, ...) const
 {
   ACE_TRACE ("ACE_FILE_IO::send");
-  va_list argp;  
-  size_t  total_tuples = n / 2;
-  iovec *iovp;
+  va_list argp;
+  int total_tuples = ACE_Utils::Truncate (n / 2);
+  iovec *iovp = 0;
 #if defined (ACE_HAS_ALLOCA)
   iovp = (iovec *) alloca (total_tuples * sizeof (iovec));
 #else
-  ACE_NEW_RETURN (iovp, iovec[total_tuples], -1);
+  ACE_NEW_RETURN (iovp,
+                  iovec[total_tuples],
+                  -1);
 #endif /* !defined (ACE_HAS_ALLOCA) */
 
   va_start (argp, n);
 
-  for (size_t i = 0; i < total_tuples; i++)
+  for (int i = 0; i < total_tuples; i++)
     {
       iovp[i].iov_base = va_arg (argp, char *);
       iovp[i].iov_len  = va_arg (argp, int);
     }
 
-  ssize_t result = ACE_OS::writev (this->get_handle (), iovp, total_tuples);
+  ssize_t result = ACE_OS::writev (this->get_handle (),
+                                   iovp,
+                                   total_tuples);
 #if !defined (ACE_HAS_ALLOCA)
   delete [] iovp;
 #endif /* !defined (ACE_HAS_ALLOCA) */
@@ -73,24 +84,28 @@ ssize_t
 ACE_FILE_IO::recv (size_t n, ...) const
 {
   ACE_TRACE ("ACE_FILE_IO::recv");
-  va_list argp;  
-  size_t total_tuples = n / 2;
-  iovec *iovp;
+  va_list argp;
+  int total_tuples = ACE_Utils::Truncate (n / 2);
+  iovec *iovp = 0;
 #if defined (ACE_HAS_ALLOCA)
   iovp = (iovec *) alloca (total_tuples * sizeof (iovec));
 #else
-  ACE_NEW_RETURN (iovp, iovec[total_tuples], -1);
+  ACE_NEW_RETURN (iovp,
+                  iovec[total_tuples],
+                  -1);
 #endif /* !defined (ACE_HAS_ALLOCA) */
 
   va_start (argp, n);
 
-  for (size_t i = 0; i < total_tuples; i++)
+  for (int i = 0; i < total_tuples; i++)
     {
       iovp[i].iov_base = va_arg (argp, char *);
       iovp[i].iov_len  = va_arg (argp, int);
     }
 
-  ssize_t result = ACE_OS::readv (this->get_handle (), iovp, total_tuples);
+  ssize_t const result = ACE_OS::readv (this->get_handle (),
+                                        iovp,
+                                        total_tuples);
 #if !defined (ACE_HAS_ALLOCA)
   delete [] iovp;
 #endif /* !defined (ACE_HAS_ALLOCA) */
@@ -98,33 +113,30 @@ ACE_FILE_IO::recv (size_t n, ...) const
   return result;
 }
 
-// Return the local endpoint address.
+// Allows a client to read from a file without having to provide a
+// buffer to read.  This method determines how much data is in the
+// file, allocates a buffer of this size, reads in the data, and
+// returns the number of bytes read.
 
-int 
-ACE_FILE_IO::get_local_addr (ACE_Addr &addr) const
+ssize_t
+ACE_FILE_IO::recvv (iovec *io_vec)
 {
-  ACE_TRACE ("ACE_FILE_IO::get_local_addr");
+  ACE_TRACE ("ACE_FILE_IO::recvv");
 
-  // Perform the downcast since <addr> had better be an
-  // <ACE_FILE_Addr>.
-  ACE_FILE_Addr *file_addr = ACE_dynamic_cast (ACE_FILE_Addr *, &addr);
+  io_vec->iov_base = 0;
+  size_t const length = static_cast <size_t> (ACE_OS::filesize (this->get_handle ()));
 
-  if (file_addr == 0)
-    return -1;
-  else
+  if (length > 0)
     {
-      *file_addr = this->addr_;
-      return 0;
+      ACE_NEW_RETURN (io_vec->iov_base,
+                      char[length],
+                      -1);
+      io_vec->iov_len = this->recv_n (io_vec->iov_base,
+                                      length);
+      return io_vec->iov_len;
     }
+  else
+    return length;
 }
 
-// Return the address of the remotely connected peer (if there is
-// one).
-
-int 
-ACE_FILE_IO::get_remote_addr (ACE_Addr &addr) const
-{
-  ACE_TRACE ("ACE_FILE_IO::get_remote_addr");
-
-  return this->get_local_addr (addr);
-}
+ACE_END_VERSIONED_NAMESPACE_DECL

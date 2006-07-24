@@ -1,6 +1,6 @@
-/* Special definitions for autoheader 
-	Copyright (C) 1995 Silicon Graphics, Inc.
-$Header$
+/* $Id$ */
+/* Special definitions for autoheader
+        Copyright (C) 1995 Silicon Graphics, Inc.
 */
 
 /* Define to the name of the distribution.  */

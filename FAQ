@@ -409,28 +409,12 @@ that, but I don't think it would be all that difficult.
 ----------------------------------------
 13. 
 
-> 	Is the non CORBA version still aroung? I think I still need it from the
-> follow error, or is something else?
+> 	Is the Orbix (aka CORBA) version still around?
 
-Aha, there are two ways to get around this problem:
+Nope, IONA does not support Orbix-2.X nor Orbix-3.0 anymore (the
+versions of Orbix that the ACE code was based upon).  Plus we didn't
+maintain this code for ages, so it probably was broken too.
 
-1. Set your ORBIX_ROOT environment variable to the location of the
-   Orbix release (e.g., /opt/Orbix).  Naturally, this only works
-   if you've got Orbix installed on your machine.
-
-2. If you don't have Orbix, then to get rid of that problem all you
-   need to do is change the symbolic links on the 
-
-./include/config.h
-./include/makeinclude/platform_macros.GNU
-
-files to 
-
-./include/config-sunos5-sunc++-4.x
-./include/makeinclude/platform_sunos5_sunc++.GNU
-
-rather than the *-orbix* versions, which they point to by default.
-And then recompile ACE.
 ----------------------------------------
 14. 
 > We are using your ACE software and ran into a problem which may or may not
@@ -1344,7 +1328,7 @@ UNIX system calls directly (regardless of whether you use ACE or not).
    	to maintain software.  Sockets and TLI are *incredibly*
    	error-prone and tedious to use, in addition to being
    	non-portable.  I've got a paper that discusses this in detail
-	at URL http://www.cs.wustl.edu/~schmidt/COOTS-95.ps.gz.
+	at URL http://www.cs.wustl.edu/~schmidt/PDF/COOTS-95.pdf
 	
 3. Incorporation with higher-level patterns and programming methods -- 
 
@@ -1600,7 +1584,7 @@ plus many more.
 You can find out more info about the ACE/CORBA integration and the
 performance issues associated with it in the following paper:
 
-http://www.cs.wustl.edu/~schmidt/COOTS-96.ps.gz
+http://www.cs.wustl.edu/~schmidt/PDF/COOTS-96.pdf
 
 ----------------------------------------
 
@@ -1655,10 +1639,10 @@ design:
 	1. $ACE_ROOT/apps/Gateway/Gateway/Channel.cpp --
 	   This Gateway application example shows the C++ code.
 
-	2. http://www.cs.wustl.edu/~schmidt/TAPOS-95.ps.gz --
+	2. http://www.cs.wustl.edu/~schmidt/PDF/TAPOS-00.pdf --
 	   This paper describes the underlying patterns.
 
-	3. http://www.cs.wustl.edu/~schmidt/OONP-tutorial4.ps.gz 
+	3. http://www.cs.wustl.edu/~schmidt/PDF/OONP-tutorial4.pdf
 	   -- This tutorial explains the source code and 
 	   the patterns.
 

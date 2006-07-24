@@ -1,65 +1,77 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    TAO/orbsvcs/Concurrency_Service
-//
-// = FILENAME
-//    Concurrency_Utils.h
-//
-// = DESCRIPTION
-//      This class implements a Concurrency Server wrapper class which
-//      holds a number of lock sets.  The server must run in the
-//      thread per request concurrency model in order to let the
-//      clients block on the semaphores.
-//
-// = AUTHORS
-//    Torben Worm <tworm@cs.wustl.edu>
-//
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Concurrency_Utils.h
+ *
+ *  $Id$
+ *
+ *    This class implements a Concurrency Server wrapper class which
+ *    holds a number of lock sets.  The server must run in the
+ *    thread per request concurrency model in order to let the
+ *    clients block on the semaphores.
+ *
+ *
+ *  @author Torben Worm <tworm@cs.wustl.edu>
+ */
+//=============================================================================
 
-#if !defined (_CONCURRENCY_SERVER_H)
+
+#ifndef _CONCURRENCY_SERVER_H
 #define _CONCURRENCY_SERVER_H
 
-#include "tao/corba.h"
-#include "orbsvcs/CosConcurrencyControlC.h"
-#include "CC_LockSetFactory.h"
+#include /**/ "ace/pre.h"
 
-class TAO_ORBSVCS_Export TAO_Concurrency_Server
+#include "orbsvcs/CosConcurrencyControlC.h"
+#include "orbsvcs/Concurrency/CC_LockSetFactory.h"
+#include "orbsvcs/Concurrency/concurrency_serv_export.h"
+
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class TAO_Concurrency_Server
+ *
+ * @brief Defines a wrapper class for the implementation of the
+ * concurrency server.
+ *
+ * This class takes an orb and Poa reference and activates the
+ * concurrency service lock set factory object under them.
+ */
+class TAO_Concurrency_Serv_Export TAO_Concurrency_Server
 {
-  // = TITLE
-  //    Defines a wrapper class for the implementation of the
-  //    concurrency server.
-  //
-  // = DESCRIPTION
-  //    This class takes an orb and Poa reference and activates the
-  //    concurrency service lock set factory object under them.
 public:
   // = Initialization and termination methods.
+  ///Default constructor.
   TAO_Concurrency_Server (void);
-  //Default constructor.
 
-  TAO_Concurrency_Server (CORBA::ORB_var &orb,
-			  PortableServer::POA_var &poa);
-  // Takes the POA under which to register the Concurrency Service
-  // implementation object.
+  /// Takes the POA under which to register the Concurrency Service
+  /// implementation object.
+  TAO_Concurrency_Server (CORBA::ORB_ptr orb,
+                          PortableServer::POA_ptr poa);
 
+  /// Destructor.
   ~TAO_Concurrency_Server (void);
-  // Destructor.
 
-  int init (CORBA::ORB_var &orb,
-            PortableServer::POA_var &poa);
-  // Initialize the concurrency server under the given ORB and POA.
+  /// Initialize the concurrency server under the given ORB and POA.
+  CORBA::Object_ptr init (CORBA::ORB_ptr orb,
+                          PortableServer::POA_ptr poa);
 
-  CC_LockSetFactory *GetLockSetFactory(void);
-  // Get the lock set factory.
+  /// Cleanup resources.
+  int fini (void);
+
+  /// Get the lock set factory.
+  CC_LockSetFactory *GetLockSetFactory (void);
 
 private:
+  /// This is the lock set factory activated under the POA.
   CC_LockSetFactory lock_set_factory_;
-  // This is the lock set factory activated under the POA.
+
+  /// The POA which the lock set factory servant was registered.
+  PortableServer::POA_var poa_;
 };
 
-#endif /* _CONCURRENCY_SERVER_H */
+TAO_END_VERSIONED_NAMESPACE_DECL
 
+#include /**/ "ace/post.h"
+#endif /* _CONCURRENCY_SERVER_H */

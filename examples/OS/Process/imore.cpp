@@ -22,27 +22,31 @@
 //
 // ============================================================================
 
-#include "ace/OS.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_errno.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_NS_fcntl.h"
 #include "ace/FIFO_Recv.h"
 #include "ace/FIFO_Send.h"
 #include "ace/Pipe.h"
 #include "ace/Get_Opt.h"
+#include "ace/Log_Msg.h"
 #include "ace/Process.h"
 #include "ace/Signal.h"
 
 ACE_RCSID(Process, imore, "$Id$")
 
 #if defined (ACE_WIN32)
-static const char * executable = "MORE.COM";
-static char *rendezvous_dir = "c:/temp";
-static char *rendezvous_pfx = "imore";
+static const ACE_TCHAR *executable = ACE_TEXT("MORE.COM");
+static const ACE_TCHAR *rendezvous_dir = ACE_TEXT("c:/temp");
+static const ACE_TCHAR *rendezvous_pfx = ACE_TEXT("imore");
 #else
 static const char * executable = "more"; // I like less better.
-static char *rendezvous_dir = "/tmp";
-static char *rendezvous_pfx = "imore";
+static const ACE_TCHAR *rendezvous_dir = ACE_TEXT("/tmp");
+static const ACE_TCHAR *rendezvous_pfx = ACE_TEXT("imore");
 #endif /* ACE_WIN32 */
 
-static char *fname = 0;		// File you want to view.
+static ACE_TCHAR *fname = 0;   // File you want to view.
 static int use_named_pipe = 0;	// Do we want to use named pipe?
 
 static void
@@ -54,9 +58,9 @@ usage (void)
 }
 
 static int
-parse_args (int argc, char **argv)
+parse_args (int argc, ACE_TCHAR **argv)
 {
-  ACE_Get_Opt get_opt (argc, argv, "un");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT("un"));
   int c;
 
   while ((c = get_opt ()) != -1)
@@ -79,13 +83,13 @@ parse_args (int argc, char **argv)
       }
     }
 
-  if (get_opt.optind >= argc)	// Do you forget to give me a filename to "more?"
+  if (get_opt.opt_ind () >= argc)	// Do you forget to give me a filename to "more?"
     {
       usage ();
       return -1;
     }
   else
-    fname = argv[get_opt.optind]; // Alright.
+    fname = argv[get_opt.opt_ind ()]; // Alright.
 
   return 0;
 }
@@ -94,8 +98,8 @@ static int
 setup_named_pipes (ACE_Process_Options &opt)
 {
   // Create a unique temporary name for named pipe.
-  char *rendezvous = ACE_OS::tempnam (rendezvous_dir,
-                                      rendezvous_pfx);
+  ACE_TCHAR *rendezvous = ACE_OS::tempnam (rendezvous_dir,
+                                           rendezvous_pfx);
 
   // Out of memory?
   if (rendezvous == NULL)
@@ -189,7 +193,7 @@ print_file (ACE_HANDLE infd)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   // Ignore SIGPIPE signal on Unix platforms in case
   // child process (more) terminates before we finish
@@ -253,7 +257,7 @@ main (int argc, char *argv[])
 #endif /* ! ACE_WIN32 */
 
   // Wait till we are done.
-  int status;
+  ACE_exitcode status;
   new_process.wait (&status);
   ACE_DEBUG ((LM_DEBUG, "Process exit with status %d\n", status));
 

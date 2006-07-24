@@ -1,6 +1,7 @@
 // $Id$
 
 #include "ace/WFMO_Reactor.h"
+#include "ace/Log_Msg.h"
 
 #include "Logging_Acceptor.h"
 #include "Logging_Handler.h"
@@ -31,21 +32,22 @@ Logging_Acceptor::Logging_Acceptor (void)
 int
 Logging_Acceptor::handle_close (ACE_HANDLE, ACE_Reactor_Mask)
 {
-  return this->peer_acceptor_.close ();
+  this->peer_acceptor_.close ();
+  // Note, this object MUST be allocated dynamically!
+  delete this;
+  return 0;
 }
 
 Logging_Acceptor::~Logging_Acceptor (void)
 {
-  this->handle_close (ACE_INVALID_HANDLE, 
-		      ACE_Event_Handler::ACCEPT_MASK);
 }
 
 // Returns underlying device descriptor.
 
 ACE_HANDLE
 Logging_Acceptor::get_handle (void) const
-{ 
-  return this->peer_acceptor_.get_handle (); 
+{
+  return this->peer_acceptor_.get_handle ();
 }
 
 // Accepts connections from client and registers new object with the
@@ -55,7 +57,7 @@ int
 Logging_Acceptor::handle_input (ACE_HANDLE)
 {
   Logging_Handler *svc_handler;
-  
+
   ACE_NEW_RETURN (svc_handler, Logging_Handler, -1);
 
   // Accept the connection from a client client daemon.

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,57 +62,131 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_STRUCTURE_AST_STRUCTURE_HH
 #define _AST_STRUCTURE_AST_STRUCTURE_HH
 
 // Representation of structure:
 //
-// NOTE: add(AST_ConcreteType *) is defined here because a structure
+// NOTE: add (AST_ConcreteType *) is defined here because a structure
 // can contain locally defined types in addition to fields.
 //
-// NOTE: add(AST_EnumValue *) is defined here because enums can
+// NOTE: add (AST_EnumValue *) is defined here because enums can
 // be defined manifest locally; the constants defined in these
 // enums are inserted in the enclosing scope. It is unlikely that
 // a BE writer will need to overload this function in AST_Structure.
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, utl_scope.hh, utl_scoped_name.hh,
-**		 utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+#include "ast_concrete_type.h"
+#include "utl_scope.h"
+#include "ace/Unbounded_Queue.h"
 
-class	AST_Structure : public virtual AST_ConcreteType,
-			public virtual UTL_Scope
+class TAO_IDL_FE_Export AST_Structure : public virtual AST_ConcreteType,
+                                        public virtual UTL_Scope
 {
 public:
-  // Operations
+  AST_Structure (void);
 
-  // Constructor(s)
-  AST_Structure();
-  AST_Structure(UTL_ScopedName *n, UTL_StrList *p);
-  AST_Structure(AST_Decl::NodeType nt, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Structure() {}
+  AST_Structure (UTL_ScopedName *n,
+                 bool local,
+                 bool abstract);
 
-  // Narrowing
+  AST_Structure (AST_Decl::NodeType nt,
+                 UTL_ScopedName *n,
+                 bool local,
+                 bool abstract);
+
+  virtual ~AST_Structure (void);
+
+  // This serves for both structs and unions.
+  static void fwd_redefinition_helper (AST_Structure *&i,
+                                       UTL_Scope *s);
+
+  // Overridden for unions.
+  virtual void redefine (AST_Structure *from);
+
+  // Narrowing.
   DEF_NARROW_METHODS2(AST_Structure, AST_ConcreteType, UTL_Scope);
   DEF_NARROW_FROM_DECL(AST_Structure);
   DEF_NARROW_FROM_SCOPE(AST_Structure);
 
-  // AST Dumping
-  virtual void		dump(ostream &o);
+  virtual int member_count (void);
+  // Return the count of members.
+
+  virtual size_t nfields (void) const;
+  // Return the count of actual fields.
+
+  virtual int field (AST_Field **&result,
+                     size_t slot) const;
+  // Get an individual field node.
+
+  virtual bool is_local (void);
+  // Overwrite the is_local method.
+
+  virtual bool in_recursion (ACE_Unbounded_Queue<AST_Type *> &list);
+  // Are we or the node represented by node involved in recursion.
+
+  virtual int contains_wstring (void);
+  // Do we contain a wstring at some nesting level?
+
+  // Is this struct or union defined? This predicate returns FALSE when a
+  // forward declaration is not defined yet, and TRUE in
+  // all other cases.
+  virtual bool is_defined (void);
+
+  // Recursively called on valuetype to check for legal use as
+  // a primary key. Overridden for valuetype, struct, sequence,
+  // union, array, typedef, and interface.
+  virtual bool legal_for_primary_key (void) const;
+  
+  // Accessors for the member.
+  AST_StructureFwd *fwd_decl (void) const;
+  void fwd_decl (AST_StructureFwd *node);
+
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Cleanup function.
+  virtual void destroy (void);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+protected:
+  friend int tao_yyparse (void);
+  // Scope Management Protocol.
+
+  virtual AST_Union *fe_add_union (AST_Union *u);
+
+  virtual AST_Structure *fe_add_structure (AST_Structure *s);
+
+  virtual AST_Field *fe_add_field (AST_Field *f);
+
+  virtual AST_Enum *fe_add_enum (AST_Enum *e);
+
+  virtual AST_EnumVal *fe_add_enum_val (AST_EnumVal *v);
+
+  virtual int compute_size_type (void);
+  // Compute the size type if it is unknown.
+
+protected:
+  ACE_Unbounded_Queue<AST_Field *> fields_;
+  // Container for this struct's field nodes. Excludes nodes included
+  // in member_count, i.e., enum values of an enum declared inside
+  // the struct.
 
 private:
-  friend int tao_yyparse();
-  // Scope Management Protocol
+  int compute_member_count (void);
+  // Count the number of members.
 
-  virtual AST_Union	*fe_add_union(AST_Union		*u);
-  virtual AST_Structure	*fe_add_structure(AST_Structure	*s);
-  virtual AST_Field	*fe_add_field(AST_Field		*f);
-  virtual AST_Enum	*fe_add_enum(AST_Enum		*e);
-  virtual AST_EnumVal	*fe_add_enum_val(AST_EnumVal	*v);
+  int member_count_;
+  // Number of members.
+
+  int local_struct_;
+  // We also need to determine whether we contain any local type.
+  
+  AST_StructureFwd *fwd_decl_;
+  // The forward declaration we may have been created from.
 };
 
 #endif           // _AST_STRUCTURE_AST_STRUCTURE_HH

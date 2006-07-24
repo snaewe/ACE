@@ -20,7 +20,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_STRUCTURE_STRUCTURE_CI_H_)
+#ifndef _BE_VISITOR_STRUCTURE_STRUCTURE_CI_H_
 #define _BE_VISITOR_STRUCTURE_STRUCTURE_CI_H_
 
 class be_visitor_structure_ci : public be_visitor_structure
@@ -42,7 +42,6 @@ public:
 
   virtual int visit_structure (be_structure *node);
   // visit structure. We provide code for this method in the derived class
-
 };
 
 #endif /* _BE_VISITOR_STRUCTURE_STRUCTURE_CI_H_ */

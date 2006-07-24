@@ -1,14 +1,20 @@
-// IO_SAP.cpp
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/IO_SAP.h"
 
-#if defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/IO_SAP.i"
-#endif /* ACE_LACKS_INLINE_FUNCTIONS */
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_NS_errno.h"
+#include "ace/OS_NS_fcntl.h"
+#include "ace/os_include/os_signal.h"
+
+#if !defined (__ACE_INLINE__)
+#include "ace/IO_SAP.inl"
+#endif /* __ACE_INLINE__ */
 
 ACE_RCSID(ace, IO_SAP, "$Id$")
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_ALLOC_HOOK_DEFINE(ACE_IO_SAP)
 
@@ -24,12 +30,14 @@ ACE_IO_SAP::ACE_IO_SAP (void)
 void
 ACE_IO_SAP::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_IO_SAP::dump");
 
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("handle_ = %d"), this->handle_));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\npid_ = %d"), this->pid_));
+  ACE_DEBUG ((LM_DEBUG, ACE_LIB_TEXT ("handle_ = %d"), this->handle_));
+  ACE_DEBUG ((LM_DEBUG, ACE_LIB_TEXT ("\npid_ = %d"), this->pid_));
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
 // Cache for the process ID.
@@ -42,8 +50,6 @@ ACE_IO_SAP::enable (int value) const
   /* First-time in initialization. */
   if (ACE_IO_SAP::pid_ == 0)
     ACE_IO_SAP::pid_ = ACE_OS::getpid ();
-
-#if !defined(ACE_WIN32) && !defined (VXWORKS)
 
   switch (value)
     {
@@ -83,9 +89,6 @@ ACE_IO_SAP::enable (int value) const
     default:
       return -1;
     }
-#else
-  ACE_UNUSED_ARG (value);
-#endif /* !ACE_WIN32 */
 
   return 0;
 }
@@ -95,7 +98,6 @@ ACE_IO_SAP::disable (int value) const
 {
   ACE_TRACE ("ACE_IO_SAP::disable");
 
-#if !defined(ACE_WIN32) && !defined (VXWORKS)
   switch (value)
     {
 #if defined (SIGURG)
@@ -128,15 +130,13 @@ ACE_IO_SAP::disable (int value) const
 #endif /* SIGIO <== */
     case ACE_NONBLOCK:
       if (ACE::clr_flags (this->handle_,
-                          ACE_NONBLOCK) == -1)
+                                     ACE_NONBLOCK) == -1)
         return -1;
       break;
     default:
       return -1;
     }
   return 0;
-#else
-  ACE_UNUSED_ARG (value);
-  ACE_NOTSUP_RETURN (-1);
-#endif /* !ACE_WIN32 */
 }
+
+ACE_END_VERSIONED_NAMESPACE_DECL

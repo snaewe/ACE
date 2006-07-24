@@ -19,63 +19,49 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_enum_val.h"
+#include "be_visitor.h"
 
-ACE_RCSID(be, be_enum_val, "$Id$")
+ACE_RCSID (be, 
+           be_enum_val, 
+           "$Id$")
 
 be_enum_val::be_enum_val (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Constant (),
+    AST_EnumVal (),
+    be_decl ()
 {
 }
 
-be_enum_val::be_enum_val (unsigned long v, UTL_ScopedName *n, UTL_StrList *p)
-  : AST_Constant (AST_Expression::EV_ulong,
+be_enum_val::be_enum_val (unsigned long v,
+                          UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_enum_val,
+              n),
+    AST_Constant (AST_Expression::EV_ulong,
                   AST_Decl::NT_enum_val,
-                  new AST_Expression(v),
-                  n,
-                  p),
-    AST_Decl (AST_Decl::NT_enum_val, n, p)
+                  new AST_Expression (v),
+                  n),
+    AST_EnumVal (v,
+                 n),
+    be_decl (AST_Decl::NT_enum_val,
+             n)
 {
-}
-
-int
-be_enum_val::gen_encapsulation (void)
-{
-  TAO_OutStream *cs; // output stream
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
-  long i, arrlen;
-  long *arr;  // an array holding string names converted to array of longs
-
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
-
-  // generate name
-  *cs << (ACE_OS::strlen (this->local_name ()->get_string ())+1) << ", ";
-  (void)this->tc_name2long(this->local_name ()->get_string (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
-    {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
-    }
-  *cs << " // name = " << this->local_name () << "\n";
-  return 0;
-}
-
-long
-be_enum_val::tc_encap_len (void)
-{
-  if (this->encap_len_ == -1) // not computed yet
-    {
-      this->encap_len_ = this->name_encap_len (); // for name
-    }
-
-  return this->encap_len_;
 }
 
 int
 be_enum_val::accept (be_visitor *visitor)
 {
   return visitor->visit_enum_val (this);
+}
+
+void
+be_enum_val::destroy (void)
+{
+  this->AST_EnumVal::destroy ();
+  this->be_decl::destroy ();
 }
 
 // Narrowing

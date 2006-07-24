@@ -19,81 +19,54 @@
 //
 // ============================================================================
 
-#if !defined (BE_UNION_H)
+#ifndef BE_UNION_H
 #define BE_UNION_H
 
-/*
- * BE_Union
- */
+#include "be_type.h"
+#include "be_scope.h"
+#include "ast_union.h"
+
+class AST_ConcreteType;
+class be_visitor;
+
 class be_union : public virtual AST_Union,
                  public virtual be_scope,
                  public virtual be_type
 {
 public:
-  // =Operations
-
   be_union (void);
-  // default constructor
+  // Default constructor.
 
-  be_union(AST_ConcreteType *dt, UTL_ScopedName *n, UTL_StrList *p);
-  // constructor
+  be_union (AST_ConcreteType *dt,
+            UTL_ScopedName *n,
+            bool local,
+            bool abstract);
+  // Constructor.
 
-  virtual int gen_var_defn (void);
-  // generate the _var class definition
+  virtual void redefine (AST_Structure *from);
+  // Catch BE-specific member values before delegating to the base class.
 
-  virtual int gen_var_impl (void);
-  // generate the implementation for the _var class
+  virtual bool has_duplicate_case_labels (void);
+  // Do we have at least one member with multiple case labels?
 
-  virtual int gen_out_defn (void);
-  // generate the _out class definition
+  virtual void destroy (void);
+  // Cleanup function.
 
-  virtual int gen_out_impl (void);
-  // generate the _out implementation
-
-  virtual int gen_typecode (void);
-  // generate the typecode
-
-  virtual int gen_encapsulation (void);
-  // encapsulation for parameters
-
-  virtual long tc_size (void);
-  // return typecode size
-
-  virtual long tc_encap_len (void);
-  // return length of encapsulation
-
-  virtual int member_count (void);
-  // return the count of members
-
-  virtual int default_index (void);
-  // return the default index used
-
-  // Visiting
   virtual int accept (be_visitor *visitor);
+  // Visiting.
 
-  // Narrowing
+  bool gen_empty_default_label (void);
+  // Decides whether a default switch case label in the generated copy
+  // constructor, assignment operator, etc. is needed.
+
+  unsigned long nlabels (void);
+  // Returns total number of labels, useful when the union has
+  // multiple case labels.
+
+  // Narrowing.
   DEF_NARROW_METHODS3 (be_union, AST_Union, be_scope, be_type);
   DEF_NARROW_FROM_DECL(be_union);
   DEF_NARROW_FROM_SCOPE(be_union);
-
-protected:
-  virtual int compute_size_type (void);
-  // compute the size type if it is unknown
-
-private:
-  //=helper
-
-  int compute_member_count (void);
-  // count the number of members
-
-  int compute_default_index (void);
-  // count the default index
-
-  int member_count_;
-  // number of members
-
-  int default_index_;
-  // default label index (zero based indexing)
 };
 
 #endif

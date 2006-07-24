@@ -1,47 +1,63 @@
-// Dynamic_Service.cpp
 // $Id$
 
-#if !defined (ACE_DYNAMIC_SERVICE_C)
-#define ACE_DYNAMIC_SERVICE_C
+#ifndef ACE_DYNAMIC_SERVICE_CPP
+#define ACE_DYNAMIC_SERVICE_CPP
 
-#define ACE_BUILD_DLL
-#include "ace/Service_Config.h"
-#include "ace/Service_Repository.h"
 #include "ace/Dynamic_Service.h"
 
-ACE_RCSID(ace, Dynamic_Service, "$Id$")
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
-template <class SERVICE> void
-ACE_Dynamic_Service<SERVICE>::dump (void) const
+#include "ace/Service_Object.h"
+
+#if !defined (__ACE_INLINE__)
+#include "ace/Dynamic_Service.inl"
+#endif /* __ACE_INLINE__ */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+
+template <class TYPE> TYPE *
+ACE_Dynamic_Service<TYPE>::instance (const ACE_TCHAR *name)
 {
-  ACE_TRACE ("ACE_Dynamic_Service<SERVICE>::dump");
-
-  ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("\n")));
-  ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+  ACE_Service_Object * svc_obj =
+    static_cast<ACE_Service_Object *>
+    (ACE_Dynamic_Service_Base::instance (name,false));
+  return dynamic_cast<TYPE *> (svc_obj);
 }
 
-// Get the instance using <name>.
-
-template <class SERVICE> SERVICE *
-ACE_Dynamic_Service<SERVICE>::instance (const char *name)
+template <class TYPE> TYPE *
+ACE_Dynamic_Service<TYPE>::instance (const ACE_TCHAR *name,
+                                     bool no_global)
 {
-  ACE_TRACE ("ACE_Dynamic_Service::instance");
-  const ACE_Service_Type *svc_rec;
-
-  if (ACE_Service_Repository::instance ()->find (name,
-                                                 &svc_rec) == -1)
-    return 0;
-
-  const ACE_Service_Type_Impl *type = svc_rec->type ();
-
-  if (type == 0)
-    return 0;
-  else
-    {
-      void *obj = type->object ();
-      return ACE_reinterpret_cast (SERVICE *, obj);
-    }
+  ACE_Service_Object * svc_obj =
+    static_cast<ACE_Service_Object *>
+    (ACE_Dynamic_Service_Base::instance (name,no_global));
+  return dynamic_cast<TYPE *> (svc_obj);
 }
 
-#endif /* ACE_DYNAMIC_SERVICE_C */
+template <class TYPE> TYPE *
+ACE_Dynamic_Service<TYPE>::instance (const ACE_Service_Gestalt* conf,
+                                     const ACE_TCHAR *name)
+{
+  ACE_Service_Object * svc_obj =
+    static_cast<ACE_Service_Object *>
+    (ACE_Dynamic_Service_Base::instance (conf, name,false));
+  return dynamic_cast<TYPE *> (svc_obj);
+}
+
+template <class TYPE> TYPE *
+ACE_Dynamic_Service<TYPE>::instance (const ACE_Service_Gestalt* conf,
+                                     const ACE_TCHAR *name,
+                                     bool no_global)
+{
+  ACE_Service_Object * svc_obj =
+    static_cast<ACE_Service_Object *>
+    (ACE_Dynamic_Service_Base::instance (conf, name,no_global));
+  return dynamic_cast<TYPE *> (svc_obj);
+}
+
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#endif /* ACE_DYNAMIC_SERVICE_CPP */

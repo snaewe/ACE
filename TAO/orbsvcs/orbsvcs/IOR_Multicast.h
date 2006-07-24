@@ -1,79 +1,102 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 
 // ============================================================================
 //
 // = LIBRARY
-//    TAO/orbsvcs/bin/Naming_Service
+//    TAO/orbsvcs/orbsvcs
 //
 // = FILENAME
-//    svr.h
+//    IOR_Multicast.h
 //
-// = DESCRIPTION 
-//    Defines a class that listens to a multicast address for client requests 
+// = DESCRIPTION
+//    Defines a class that listens to a multicast address for client requests
 //    for ior of a bootstrappable service.
-//    
+//
 // = AUTHORS
 //      Sergio Flores-Gaitan
 //
 // ============================================================================
 
-#if !defined (TAO_IOR_MULTICAST_H)
+#ifndef TAO_IOR_MULTICAST_H
 #define TAO_IOR_MULTICAST_H
+#include /**/ "ace/pre.h"
 
-#include "tao/corba.h"
-#include "orbsvcs/orbsvcs_export.h"
+#include "orbsvcs/svc_utils_export.h"
+#include "tao/ORB.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/INET_Addr.h"
 #include "ace/SOCK_Dgram_Mcast.h"
 #include "ace/Reactor.h"
+#include "ace/SString.h"
 
-class TAO_ORBSVCS_Export TAO_IOR_Multicast : public ACE_Event_Handler
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+class TAO_Svc_Utils_Export TAO_IOR_Multicast : public ACE_Event_Handler
 {
-  // @@ Naga, can you please add the standard comments to this class and
-  // make sure that all the comments for each method go underneath the
-  // method name?
+  // = TITLE
+  //     Event Handler that services multicast requests for IOR of a
+  //     bootstrappable service.
+  //
+  // = DESCRIPTION
+  //     This class uses the ACE_SOCK_Dgram_Mcast class and should be
+  //     registered with a reactor and should be initialized with the
+  //     ior of the  service to be multicasted.
 public:
-
   TAO_IOR_Multicast (void);
-  // Default constructor  
+  // Constructor.
 
-  TAO_IOR_Multicast (char * ior,
+  TAO_IOR_Multicast (const char *ior,
                      u_short port,
                      const char *mcast_addr,
                      TAO_Service_ID service_id);
+  // Constructor taking the ior of the service.
 
-  int init (char* ior,
+  int init (const char *ior,
             u_short port,
-            const char* mcast_addr,
+            const char *mcast_addr,
             TAO_Service_ID service_id);
-  
-  // destructor
-  ~TAO_IOR_Multicast (void);
+  // Initialization method.
 
-  // call back when input is received on the handle.
-  virtual int handle_input (ACE_HANDLE fd);
-  
-  // callback when a timeout has occurred.
+  int init (const char *ior,
+            const char *mcast_addr,
+            TAO_Service_ID service_id);
+  // Initialization method. Takes in "address:port" string as a
+  // parameter.
+
+  virtual ~TAO_IOR_Multicast (void);
+  // Destructor.
+
+  virtual int handle_input (ACE_HANDLE n);
+  // Callback when input is received on the handle.
+
   virtual int handle_timeout (const ACE_Time_Value &tv,
-			      const void *arg);
+                              const void *arg);
+  // Callback when a timeout has occurred.
 
-  // returns the internal handle used to receive multicast
   virtual ACE_HANDLE get_handle (void) const;
+  // Returns the internal handle used to receive multicast.
 
 private:
-  char buf_[BUFSIZ];
-  // temporary buffer
+  int common_init (const char *ior,
+                   TAO_Service_ID service_id);
+  // Factor common functionality from the two init functions.
 
   TAO_Service_ID service_id_;
-  // Service id that we're waiting for. 
-  
+  // Service id that we're waiting for.
+
   ACE_SOCK_Dgram_Mcast mcast_dgram_;
   // multicast endpoint of communication
 
   ACE_INET_Addr mcast_addr_;
   // multicast address
 
-  char * ior_;
+  ACE_CString ior_;
   // object reference to send in response to the multicast
 
   ACE_INET_Addr response_addr_;
@@ -81,10 +104,11 @@ private:
 
   ACE_SOCK_Dgram response_;
   // socket for response to the multicast
+
+  ACE_CString mcast_nic_;
 };
 
-#endif /* NAMING_SERVICE_H */
+TAO_END_VERSIONED_NAMESPACE_DECL
 
-
-
-
+#include /**/ "ace/post.h"
+#endif /* TAO_IOR_MULTICAST_H */

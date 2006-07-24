@@ -1,20 +1,27 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+//
 // $Id$
 
 #include "ace/Event_Handler.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Reactor.h"
 #include "ace/Naming_Context.h"
+#include "ace/svc_export.h"
 
-class Dump_Restore : public ACE_Event_Handler
+class ACE_Svc_Export Dump_Restore : public ACE_Event_Handler
 {
 public:
   enum Operation_Type
     {
-      BIND, 
-      UNBIND, 
+      BIND,
+      UNBIND,
       REBIND
     };
-  Dump_Restore (int argc, char *argv[]);
+  Dump_Restore (int argc, ACE_TCHAR *argv[]);
   // Initialize name options and naming context
 
   ~Dump_Restore (void);
@@ -25,7 +32,7 @@ public:
   void dump (void);
 
 private:
-  char hostname_[MAXHOSTNAMELEN + 1];
+  ACE_TCHAR hostname_[MAXHOSTNAMELEN + 1];
   // Cache the hostname and port number for remote case
 
   void display_menu (void);
@@ -37,7 +44,8 @@ private:
   int set_node_local (void);
   // Set options to use NODE_LOCAL naming context.
 
-  int set_host (char* hostname, int port);
+  int set_host (const ACE_TCHAR *hostname,
+                int port);
   // Set options to use NET_LOCAL naming context specifying host name
   // and port number.
 
@@ -47,12 +55,16 @@ private:
   int populate (Dump_Restore::Operation_Type op);
 
   int doit (Dump_Restore::Operation_Type op,
-	    char *name,
-	    char *value,
-	    char *type = "");
-  int bind (char* key, char* value, char* type = "");
-  int unbind (char* key);
-  int rebind (char* key, char* value, char* type = "");
+            const char *name,
+            const char *value,
+            const char *type = "");
+  int bind (const char *key,
+            const char *value,
+            const char *type = "");
+  int unbind (const char *key);
+  int rebind (const char *key,
+              const char *value,
+              const char *type = "");
 
   char filename_[MAXPATHLEN + 1];
   char dump_filename_[MAXPATHLEN + 1];

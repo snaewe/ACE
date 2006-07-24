@@ -7,12 +7,14 @@
 // will correctly serialize the intialization of the mutex and synch
 // objects.
 
-#include "ace/Malloc.h"
+#include "ace/Malloc_T.h"
+#include "ace/Shared_Memory_Pool.h"
 #include "ace/SV_Semaphore_Complex.h"
+#include "ace/OS_NS_unistd.h"
 
 ACE_RCSID(SV_Semaphores, Semaphores_2, "$Id$")
 
-#if defined (ACE_HAS_SYSV_IPC)
+#if defined (ACE_HAS_SYSV_IPC) && !defined(ACE_LACKS_SYSV_SHMEM)
 
 // Shared memory allocator (note that this chews up the
 // ACE_DEFAULT_SEM_KEY).
@@ -26,9 +28,13 @@ parent (char *shm)
 {
   char *s = shm;
 
+  // Both semaphores are initially created with a count of 0, i.e.,
+  // they are "locked."
   ACE_SV_Semaphore_Complex mutex (SEM_KEY_1, ACE_SV_Semaphore_Complex::ACE_CREATE, 0);
   ACE_SV_Semaphore_Complex synch (SEM_KEY_2, ACE_SV_Semaphore_Complex::ACE_CREATE, 0);
 
+  // This is a critical section, which is protected by the mutex
+  // semaphore.
   for (char c = 'a'; c <= 'z'; c++)
     *s++ = c;
 
@@ -51,9 +57,15 @@ parent (char *shm)
 static int
 child (char *shm)
 {
+  // Both semaphores are initially created with a count of 0, i.e.,
+  // they are "locked."
   ACE_SV_Semaphore_Complex mutex (SEM_KEY_1, ACE_SV_Semaphore_Complex::ACE_CREATE, 0);
   ACE_SV_Semaphore_Complex synch (SEM_KEY_2, ACE_SV_Semaphore_Complex::ACE_CREATE, 0);
 
+  // Perform "busy waiting" here until we acquire the semaphore.  This
+  // isn't really a good design -- it's just to illustrate that you
+  // can do non-blocking acquire() calls with the ACE System V
+  // semaphore wrappers.
   while (mutex.tryacquire () == -1)
     if (errno == EAGAIN)
       ACE_DEBUG ((LM_DEBUG, "spinning in child!\n"));
@@ -88,23 +100,11 @@ main (int, char *[])
     }
 }
 #else
-int main (int, char *[])
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR,
-              "SYSV IPC is not supported on this platform\n"));
+              "SYSV IPC, or SYSV SHMEM is not supported on this platform\n"));
   return 0;
 }
 #endif /* ACE_HAS_SYSV_IPC */
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Guard<ACE_SV_Semaphore_Simple>;
-template class ACE_Malloc<ACE_SHARED_MEMORY_POOL, ACE_SV_Semaphore_Simple>;
-template class ACE_Read_Guard<ACE_SV_Semaphore_Simple>;
-template class ACE_Write_Guard<ACE_SV_Semaphore_Simple>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Guard<ACE_SV_Semaphore_Simple>
-#pragma instantiate ACE_Malloc<ACE_SHARED_MEMORY_POOL, ACE_SV_Semaphore_Simple>
-#pragma instantiate ACE_Read_Guard<ACE_SV_Semaphore_Simple>
-#pragma instantiate ACE_Write_Guard<ACE_SV_Semaphore_Simple>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
 

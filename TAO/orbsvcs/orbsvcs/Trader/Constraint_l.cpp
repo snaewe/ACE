@@ -8,6 +8,7 @@
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
 
+#include "tao/orbconf.h"
 #include "ace/OS.h"
 
 /* cfront 1.2 defines "c_plusplus" instead of "__cplusplus" */
@@ -82,6 +83,8 @@
 
 /* Size of default input buffer. */
 #define YY_BUF_SIZE 16384
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
@@ -271,16 +274,17 @@ static void yy_fatal_error YY_PROTO(( yyconst char msg[] ));
 
 #define YY_NUM_RULES 31
 #define YY_END_OF_BUFFER 32
-static yyconst short int yy_accept[81] =
+static yyconst short int yy_accept[82] =
     {   0,
         0,    0,   32,   30,   31,   30,   30,   22,   23,   14,
        12,   13,   30,   15,   26,   16,   30,   18,   29,   29,
        29,   29,   29,   29,   29,   29,   29,   29,   29,   29,
-       11,   21,    0,   28,    0,   27,    0,   26,   17,   20,
-       19,   29,   29,   29,   29,   29,   29,   10,   29,   29,
-       29,    9,   29,   29,    0,    0,   29,   29,    8,   29,
-       29,    2,    1,    7,   29,   29,    0,   27,   29,   24,
-       29,   29,   29,    5,   25,    6,    3,   29,    4,    0
+       11,   21,    0,   28,    0,   26,   27,    0,   26,   17,
+       20,   19,   29,   29,   29,   29,   29,   29,   10,   29,
+       29,   29,    9,   29,   29,    0,    0,   29,   29,    8,
+       29,   29,    2,    1,    7,   29,   29,    0,   27,   29,
+       24,   29,   29,   29,    5,   25,    6,    3,   29,    4,
+        0
     } ;
 
 static yyconst int yy_ec[256] =
@@ -324,70 +328,70 @@ static yyconst int yy_meta[42] =
         1
     } ;
 
-static yyconst short int yy_base[83] =
+static yyconst short int yy_base[84] =
     {   0,
-        0,    0,  104,  105,  105,   89,   38,  105,  105,  105,
-      105,  105,   90,  105,   33,   87,   86,   85,    0,   82,
-       76,   62,   55,   62,   59,   17,   57,   55,   63,   57,
-      105,  105,   42,  105,   43,   36,   76,   40,  105,  105,
-      105,    0,   67,   62,   57,   52,   47,    0,   42,   47,
-       42,    0,   45,   40,   47,   47,   55,   58,    0,   38,
-       34,    0,    0,    0,   42,   38,   54,   52,   44,    0,
-       23,   22,   23,    0,    0,    0,    0,   24,    0,  105,
-       72,   51
+        0,    0,  107,  108,  108,   92,   38,  108,  108,  108,
+       93,   92,   91,  108,   33,   88,   87,   86,    0,   83,
+       77,   63,   56,   63,   60,   17,   58,   56,   64,   58,
+      108,  108,   42,  108,   43,   77,   36,   76,   40,  108,
+      108,  108,    0,   67,   62,   57,   52,   47,    0,   42,
+       47,   42,    0,   45,   40,   47,   47,   55,   58,    0,
+       38,   34,    0,    0,    0,   42,   38,   54,   52,   44,
+        0,   23,   22,   23,    0,    0,    0,    0,   24,    0,
+      108,   72,   51
     } ;
 
-static yyconst short int yy_def[83] =
+static yyconst short int yy_def[84] =
     {   0,
-       80,    1,   80,   80,   80,   80,   81,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   82,   82,
-       82,   82,   82,   82,   82,   82,   82,   82,   82,   82,
-       80,   80,   81,   80,   80,   80,   80,   80,   80,   80,
-       80,   82,   82,   82,   82,   82,   82,   82,   82,   82,
-       82,   82,   82,   82,   81,   80,   82,   82,   82,   82,
-       82,   82,   82,   82,   82,   82,   80,   80,   82,   82,
-       82,   82,   82,   82,   82,   82,   82,   82,   82,    0,
-       80,   80
+       81,    1,   81,   81,   81,   81,   82,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       81,   81,   82,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   82,   81,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   81,   81,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+        0,   81,   81
     } ;
 
-static yyconst short int yy_nxt[147] =
+static yyconst short int yy_nxt[150] =
     {   0,
         4,    5,    6,    7,    8,    9,   10,   11,   12,   13,
        14,   15,   16,   17,   18,   19,   19,   19,   20,   19,
        19,   19,   21,   19,    4,    4,   22,   19,   23,   24,
        19,   25,   26,   27,   28,   29,   19,   19,   30,   19,
-       31,   34,   37,   49,   38,   34,   55,   36,   50,   37,
-       34,   38,   42,   56,   67,   67,   79,   78,   68,   77,
-       76,   75,   35,   68,   56,   68,   35,   55,   74,   73,
-       72,   35,   33,   33,   71,   70,   69,   66,   65,   64,
-       63,   62,   61,   60,   59,   58,   57,   36,   54,   53,
-       52,   51,   48,   47,   46,   45,   44,   43,   41,   40,
+       31,   34,   38,   50,   39,   34,   56,   37,   51,   38,
+       34,   39,   43,   57,   68,   68,   80,   79,   69,   78,
+       77,   76,   35,   69,   57,   69,   35,   56,   75,   74,
+       73,   35,   33,   33,   72,   71,   70,   67,   66,   65,
+       64,   63,   62,   61,   60,   59,   58,   37,   36,   55,
+       54,   53,   52,   49,   48,   47,   46,   45,   44,   42,
 
-       39,   36,   32,   80,    3,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80
+       41,   40,   37,   36,   36,   32,   81,    3,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81
     } ;
 
-static yyconst short int yy_chk[147] =
+static yyconst short int yy_chk[150] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-        1,    7,   15,   26,   15,   33,   35,   36,   26,   38,
-       55,   38,   82,   36,   56,   56,   78,   73,   56,   72,
-       71,   69,    7,   68,   36,   67,   33,   35,   66,   65,
-       61,   55,   81,   81,   60,   58,   57,   54,   53,   51,
-       50,   49,   47,   46,   45,   44,   43,   37,   30,   29,
-       28,   27,   25,   24,   23,   22,   21,   20,   18,   17,
+        1,    7,   15,   26,   15,   33,   35,   37,   26,   39,
+       56,   39,   83,   37,   57,   57,   79,   74,   57,   73,
+       72,   70,    7,   69,   37,   68,   33,   35,   67,   66,
+       62,   56,   82,   82,   61,   59,   58,   55,   54,   52,
+       51,   50,   48,   47,   46,   45,   44,   38,   36,   30,
+       29,   28,   27,   25,   24,   23,   22,   21,   20,   18,
 
-       16,   13,    6,    3,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80,   80,   80,   80,   80,
-       80,   80,   80,   80,   80,   80
+       17,   16,   13,   12,   11,    6,    3,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       81,   81,   81,   81,   81,   81,   81,   81,   81
     } ;
 
 static yy_state_type yy_last_accepting_state;
@@ -401,9 +405,11 @@ static char *yy_last_accepting_cpos;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "Trader/constraint.l"
+
 #define INITIAL 0
-#line 2 "Trader/constraint.l"
+
+TAO_END_VERSIONED_NAMESPACE_DECL
+
 // $Id$
 // ========================================================================
 //
@@ -418,9 +424,11 @@ char *yytext;
 //
 // ========================================================================
 
-#include "Constraint_Interpreter.h"
-#include "Constraint_Nodes.h"
-#include "Constraint_Tokens.h"
+#include "orbsvcs/Trader/Constraint_Interpreter.h"
+#include "orbsvcs/Trader/Constraint_Nodes.h"
+#include "orbsvcs/Trader/Constraint_Tokens.h"
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
 
 static TAO_Literal_Constraint* extract_string(const char*);
 
@@ -431,7 +439,7 @@ static TAO_Literal_Constraint* extract_string(const char*);
 #endif /* TAO_CONSTRAINT_DEBUG */
 
 
-#line 448 "lex.yy.c"
+
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -486,6 +494,8 @@ static int yy_top_state YY_PROTO(( void ));
 #define YY_NO_POP_STATE 1
 #define YY_NO_TOP_STATE 1
 #endif
+
+TAO_END_VERSIONED_NAMESPACE_DECL
 
 #ifdef YY_MALLOC_DECL
 YY_MALLOC_DECL
@@ -578,16 +588,18 @@ YY_MALLOC_DECL
 #define YY_RULE_SETUP \
 	YY_USER_ACTION
 
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
 YY_DECL
 	{
 	register yy_state_type yy_current_state;
-	register char *yy_cp, *yy_bp;
+	register char *yy_cp = 0, *yy_bp = 0;
 	register int yy_act;
 
-#line 42 "Trader/constraint.l"
 
 
-#line 602 "lex.yy.c"
+
+
 
 	if ( yy_init )
 		{
@@ -638,13 +650,13 @@ yy_match:
 			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 				{
 				yy_current_state = (int) yy_def[yy_current_state];
-				if ( yy_current_state >= 81 )
+				if ( yy_current_state >= 82 )
 					yy_c = yy_meta[(unsigned int) yy_c];
 				}
 			yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 			++yy_cp;
 			}
-		while ( yy_base[yy_current_state] != 105 );
+		while ( yy_base[yy_current_state] != 108 );
 
 yy_find_action:
 		yy_act = yy_accept[yy_current_state];
@@ -672,149 +684,150 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 44 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_MIN; }
 	ACE_NOTREACHED (YY_BREAK)
 case 2:
 YY_RULE_SETUP
-#line 45 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_MAX; }
 	ACE_NOTREACHED (YY_BREAK)
 case 3:
 YY_RULE_SETUP
-#line 46 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_FIRST; }
 	ACE_NOTREACHED (YY_BREAK)
 case 4:
 YY_RULE_SETUP
-#line 47 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_RANDOM; }
 	ACE_NOTREACHED (YY_BREAK)
 case 5:
 YY_RULE_SETUP
-#line 48 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_WITH; }
 	ACE_NOTREACHED (YY_BREAK)
 case 6:
 YY_RULE_SETUP
-#line 49 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_EXIST; }
 	ACE_NOTREACHED (YY_BREAK)
 case 7:
 YY_RULE_SETUP
-#line 50 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_NOT; }
 	ACE_NOTREACHED (YY_BREAK)
 case 8:
 YY_RULE_SETUP
-#line 51 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_AND; }
 	ACE_NOTREACHED (YY_BREAK)
 case 9:
 YY_RULE_SETUP
-#line 52 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_OR; }
 	ACE_NOTREACHED (YY_BREAK)
 case 10:
 YY_RULE_SETUP
-#line 53 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_IN; }
 	ACE_NOTREACHED (YY_BREAK)
 case 11:
 YY_RULE_SETUP
-#line 54 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_TWIDDLE; }
 	ACE_NOTREACHED (YY_BREAK)
 case 12:
 YY_RULE_SETUP
-#line 55 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_PLUS; }
 	ACE_NOTREACHED (YY_BREAK)
 case 13:
 YY_RULE_SETUP
-#line 56 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_MINUS; }
 	ACE_NOTREACHED (YY_BREAK)
 case 14:
 YY_RULE_SETUP
-#line 57 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_MULT; }
 	ACE_NOTREACHED (YY_BREAK)
 case 15:
 YY_RULE_SETUP
-#line 58 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_DIV; }
 	ACE_NOTREACHED (YY_BREAK)
 case 16:
 YY_RULE_SETUP
-#line 59 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_LT; }
 	ACE_NOTREACHED (YY_BREAK)
 case 17:
 YY_RULE_SETUP
-#line 60 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_LE; }
 	ACE_NOTREACHED (YY_BREAK)
 case 18:
 YY_RULE_SETUP
-#line 61 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_GT; }
 	ACE_NOTREACHED (YY_BREAK)
 case 19:
 YY_RULE_SETUP
-#line 62 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_GE; }
 	ACE_NOTREACHED (YY_BREAK)
 case 20:
 YY_RULE_SETUP
-#line 63 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_EQ; }
 	ACE_NOTREACHED (YY_BREAK)
 case 21:
 YY_RULE_SETUP
-#line 64 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_NE; }
 	ACE_NOTREACHED (YY_BREAK)
 case 22:
 YY_RULE_SETUP
-#line 65 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_LPAREN; }
 	ACE_NOTREACHED (YY_BREAK)
 case 23:
 YY_RULE_SETUP
-#line 66 "Trader/constraint.l"
+
 { TAO_YY_LEX_DEBUG; return TAO_RPAREN; }
 	ACE_NOTREACHED (YY_BREAK)
 case 24:
 YY_RULE_SETUP
-#line 67 "Trader/constraint.l"
+
 { 
 		  yylval.constraint_ = 
-		    new TAO_Literal_Constraint(CORBA::B_TRUE);
+		    new TAO_Literal_Constraint(true);
 		  TAO_YY_LEX_DEBUG; return TAO_BOOLEAN;
 		}
 	ACE_NOTREACHED (YY_BREAK)
 case 25:
 YY_RULE_SETUP
-#line 72 "Trader/constraint.l"
+
 { 
 		  yylval.constraint_ = 
-		    new TAO_Literal_Constraint(CORBA::B_FALSE);
+		    new TAO_Literal_Constraint(false);
 		  TAO_YY_LEX_DEBUG; return TAO_BOOLEAN;
 		}
 	ACE_NOTREACHED (YY_BREAK)
 case 26:
 YY_RULE_SETUP
-#line 77 "Trader/constraint.l"
+
 { 
 		  yylval.constraint_ = 
-		    new TAO_Literal_Constraint((CORBA::Long)atoi(yytext));
+		    new TAO_Literal_Constraint((yytext[0] == '-' ?
+                    (CORBA::Long)atoi(yytext) : (CORBA::ULong)atoi(yytext)));
 		  TAO_YY_LEX_DEBUG; return TAO_NUMBER; 
 		}
 	ACE_NOTREACHED (YY_BREAK)
 case 27:
 YY_RULE_SETUP
-#line 82 "Trader/constraint.l"
+
 { 
 		  yylval.constraint_ = 
 		    new TAO_Literal_Constraint((CORBA::Double)atof(yytext));
@@ -823,7 +836,7 @@ YY_RULE_SETUP
 	ACE_NOTREACHED (YY_BREAK)
 case 28:
 YY_RULE_SETUP
-#line 87 "Trader/constraint.l"
+
 { 
 		  yylval.constraint_ = extract_string(yytext);
 		  TAO_YY_LEX_DEBUG; return TAO_STRING; 
@@ -831,7 +844,7 @@ YY_RULE_SETUP
 	ACE_NOTREACHED (YY_BREAK)
 case 29:
 YY_RULE_SETUP
-#line 91 "Trader/constraint.l"
+
 { 
 		  yylval.constraint_ = 
 		    new TAO_Property_Constraint(yytext);
@@ -840,17 +853,17 @@ YY_RULE_SETUP
 	ACE_NOTREACHED (YY_BREAK)
 case 30:
 YY_RULE_SETUP
-#line 96 "Trader/constraint.l"
+
 { 
                   TAO_YY_LEX_DEBUG; return TAO_UNKNOWN;
                 }
 	ACE_NOTREACHED (YY_BREAK)
 case 31:
 YY_RULE_SETUP
-#line 99 "Trader/constraint.l"
+
 TAO_TRADER_ECHO;
 	YY_BREAK
-#line 865 "lex.yy.c"
+
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1142,7 +1155,7 @@ static yy_state_type yy_get_previous_state()
 		while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 			{
 			yy_current_state = (int) yy_def[yy_current_state];
-			if ( yy_current_state >= 81 )
+			if ( yy_current_state >= 82 )
 				yy_c = yy_meta[(unsigned int) yy_c];
 			}
 		yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
@@ -1177,11 +1190,11 @@ yy_state_type yy_current_state;
 	while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 		{
 		yy_current_state = (int) yy_def[yy_current_state];
-		if ( yy_current_state >= 81 )
+		if ( yy_current_state >= 82 )
 			yy_c = yy_meta[(unsigned int) yy_c];
 		}
 	yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
-	yy_is_jam = (yy_current_state == 80);
+	yy_is_jam = (yy_current_state == 81);
 
 	return yy_is_jam ? 0 : yy_current_state;
 	}
@@ -1430,7 +1443,17 @@ FILE *file;
 	b->yy_input_file = file;
 	b->yy_fill_buffer = 1;
 
+#if defined (ACE_HAS_WINCE)
+    // Mimic the behavior as WinCE does not have isatty().
+    if ((file != 0) && (file == fileno(file))) {
+        b->yy_is_interactive = 1;
+    }
+    else {
+        b->yy_is_interactive = 0;
+    }
+#else
 	b->yy_is_interactive = file ? (isatty( fileno(file) ) > 0) : 0;
+#endif  // ACE_HAS_WINCE
 
 	}
 
@@ -1724,7 +1747,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 99 "Trader/constraint.l"
+
 
 
 TAO_Literal_Constraint*
@@ -1763,3 +1786,5 @@ yywrap (void)
 {
   return 1;
 }
+
+TAO_END_VERSIONED_NAMESPACE_DECL

@@ -1,45 +1,59 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 
-/* Copyright (C) 1989 Free Software Foundation, Inc.
-   written by Douglas C. Schmidt (schmidt@ics.uci.edu)
+// Copyright (C) 1989 Free Software Foundation, Inc.
+// written by Douglas C. Schmidt (schmidt@cs.wustl.edu)
 
-This file is part of GNU GPERF.
+// This file is part of GNU GPERF.
 
-GNU GPERF is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation; either version 1, or (at your option) any
-later version.
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
 
-GNU GPERF is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with GNU GPERF; see the file COPYING.  If not, write to the Free
-Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111,
-USA.  */
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-#if !defined (VECTORS_H)
+#ifndef VECTORS_H
 #define VECTORS_H
 
-#include "ace/OS.h"
+#include "ace/config-all.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 #if defined (ACE_HAS_GPERF)
 
-static const int ALPHA_SIZE = 128;
+// Do not change these values wantonly since GPERF depends on them..
+#define ACE_ASCII_SIZE 128
+#define ACE_EBCDIC_SIZE 256
+
+#if 'a' < 'A'
+#define ACE_HAS_EBCDIC
+#define ACE_STANDARD_CHARACTER_SET_SIZE 256
+#else
+#define ACE_HAS_ASCII
+#define ACE_STANDARD_CHARACTER_SET_SIZE 128
+#endif /* 'a' < 'A' */
 
 class Vectors
 {
-  // = TITLE 
+  // = TITLE
   //   Static class data members that are shared between several
-  //   classes via inheritance.  
+  //   classes via inheritance.
 public:
-  static int occurrences[ALPHA_SIZE]; 
+  static int occurrences[ACE_STANDARD_CHARACTER_SET_SIZE];
   // Counts occurrences of each key set character.
 
-  static int asso_values[ALPHA_SIZE]; 
+  static int asso_values[ACE_STANDARD_CHARACTER_SET_SIZE];
   // Value associated with each character.
 };
 

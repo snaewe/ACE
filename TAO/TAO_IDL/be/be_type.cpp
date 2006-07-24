@@ -19,42 +19,56 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_type.h"
+#include "be_scope.h"
+#include "be_visitor.h"
+#include "be_codegen.h"
+#include "be_helper.h"
+#include "utl_identifier.h"
+#include "idl_defines.h"
+#include "nr_extern.h"
 
-ACE_RCSID(be, be_type, "$Id$")
-
-
-/*
- * BE_Type
- */
+ACE_RCSID (be,
+           be_type,
+           "$Id$")
 
 be_type::be_type (void)
-  : tc_name_ (0),
-    type_name_ (0),
-    nested_type_name_ (0)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    be_decl (),
+    tc_name_ (0),
+    common_varout_gen_ (false),
+    seen_in_sequence_ (false),
+    seen_in_operation_ (false)
 {
 }
 
-be_type::be_type (AST_Decl::NodeType nt, UTL_ScopedName *n, UTL_StrList *p)
-  : AST_Decl (nt, n, p),
+be_type::be_type (AST_Decl::NodeType nt,
+                  UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (nt,
+              n),
+    AST_Type (nt,
+              n),
+    be_decl (nt,
+             n),
     tc_name_ (0),
-    type_name_ (0),
-    nested_type_name_ (0)
+    common_varout_gen_ (false),
+    seen_in_sequence_ (false),
+    seen_in_operation_ (false)
 {
+  if (n != 0)
+    {
+      this->gen_fwd_helper_name ();
+    }
 }
 
 be_type::~be_type (void)
 {
-  if (this->nested_type_name_ != 0)
-    {
-      delete[] this->nested_type_name_;
-      this->nested_type_name_ = 0;
-    }
 }
 
-// compute the typecode name. The idea is to use the fully scoped name,
+// Compute the typecode name. The idea is to use the fully scoped name,
 // however, prepend a _tc_ to the last component. A slightly different approach
 // is required of the predefined types. Hence this method is overridden for
 // predefined types.
@@ -63,213 +77,260 @@ void
 be_type::compute_tc_name (void)
 {
   static char namebuf [NAMEBUFSIZE];
-  UTL_ScopedName *n;
+  UTL_ScopedName *n = this->name ();
 
-  this->tc_name_ = NULL;
-  ACE_OS::memset (namebuf, '\0', NAMEBUFSIZE);
-  n = this->name ();
-  while (n->tail () != NULL)
+  this->tc_name_ = 0;
+
+  ACE_OS::memset (namebuf,
+                  '\0',
+                  NAMEBUFSIZE);
+
+  while (n->tail () != 0)
     {
-      if (!this->tc_name_)
+      // Does not exist.
+      if (this->tc_name_ == 0)
         {
-          // does not exist
-          this->tc_name_ = new UTL_ScopedName (n->head (), NULL);
+          ACE_NEW (this->tc_name_,
+                   UTL_ScopedName (n->head ()->copy (),
+                                   0));
         }
       else
         {
-          this->tc_name_->nconc (new UTL_ScopedName (n->head (), NULL));
+          UTL_ScopedName *conc_name = 0;
+          ACE_NEW (conc_name,
+                   UTL_ScopedName (n->head ()->copy (),
+                                   0));
+
+          this->tc_name_->nconc (conc_name);
         }
+
       n = (UTL_ScopedName *)n->tail ();
     }
-  ACE_OS::sprintf (namebuf, "_tc_%s", n->last_component ()->get_string ());
-  if (!this->tc_name_)
+
+  ACE_OS::sprintf (namebuf,
+                   "_tc_%s",
+                   n->last_component ()->get_string ());
+
+  Identifier *id = 0;
+  ACE_NEW (id,
+           Identifier (namebuf));
+
+  // Does not exist.
+  if (this->tc_name_ == 0)
     {
-      // does not exist
-      this->tc_name_ = new UTL_ScopedName (new Identifier (ACE_OS::strdup
-                                                           (namebuf), 1, 0, I_FALSE), NULL);
+      ACE_NEW (this->tc_name_,
+               UTL_ScopedName (id,
+                               0));
     }
   else
     {
-      this->tc_name_->nconc (new UTL_ScopedName (new Identifier (ACE_OS::strdup
-                                                                 (namebuf), 1,
-                                                                 0, I_FALSE), NULL));
+      UTL_ScopedName *conc_name = 0;
+      ACE_NEW (conc_name,
+               UTL_ScopedName (id,
+                               0));
+
+      this->tc_name_->nconc (conc_name);
     }
-  return;
 }
 
-// retrieve typecode name
+// Retrieve typecode name.
 UTL_ScopedName *
 be_type::tc_name (void)
 {
-  if (!this->tc_name_)
-    compute_tc_name ();
+  // Compute and init the member.
+  if (this->tc_name_ == 0)
+    {
+      this->compute_tc_name ();
+    }
 
   return this->tc_name_;
 }
 
-// XXXASG - This code works. However, whether we should generate the
-// ACE_NESTED_CLASS macro or not should be based on an option to the
-// compiler. In this version, we choose to generate a relative path.
-
-// return the type name using the ACE_NESTED_CLASS macro
+// This works for the "special" names generated for smart proxy
+// classes. The form of these names is
+// scope'TAO_'+flat_name+'_Smart_Proxy_Base'.
+//
+// We can use the flat_name() method for the local_name parm but have
+// to construct the full name ourselves.
 const char *
-be_type::nested_type_name (be_decl *use_scope, const char *suffix)
+be_type::nested_sp_type_name (be_decl *use_scope,
+                              const char *suffix,
+                              const char *prefix)
 {
-  // some compilers do not like generating a fully scoped name for a type that
-  // was defined in the same enclosing scope in which it was defined. For such,
-  // we emit a macro defined in the ACE library.
-  //
+  // Our defining scope.
+  be_decl *fu_scope = 0;
 
-  // The tricky part here is that it is not enough to check if the
-  // typename we are using was defined in the current scope. But we
-  // need to ensure that it was not defined in any of our ancestor
-  // scopes as well. If that is the case, then we can generate a fully
-  // scoped name for that type, else we use the ACE_NESTED_CLASS macro
+  char fu_name [NAMEBUFSIZE];
+  char fl_name [NAMEBUFSIZE];
 
-  // thus we need some sort of relative name to be generated
+  ACE_OS::memset (fu_name,
+                  '\0',
+                  NAMEBUFSIZE);
 
-  if (this->nested_type_name_ == 0)
-    ACE_NEW_RETURN (this->nested_type_name_, char[NAMEBUFSIZE], 0);
+  ACE_OS::memset (fl_name,
+                  '\0',
+                  NAMEBUFSIZE);
 
-  be_decl *def_scope = 0;  // our defining scope
-  char // hold the fully scoped name
-    def_name [NAMEBUFSIZE],
-    use_name [NAMEBUFSIZE];
-  char // these point to the curr and next component in the scope
-    *def_curr = def_name,
-    *def_next,
-    *use_curr = use_name,
-    *use_next;
+  fu_scope = this->defined_in ()
+               ? be_scope::narrow_from_scope (this->defined_in ())->decl ()
+               : 0;
 
-  ACE_OS::memset (this->nested_type_name_, '\0', NAMEBUFSIZE);
-  ACE_OS::memset (def_name, '\0', NAMEBUFSIZE);
-  ACE_OS::memset (use_name, '\0', NAMEBUFSIZE);
+  ACE_OS::strcat (fu_name,
+                  fu_scope->full_name ());
 
-  // traverse every component of the def_scope and use_scope beginning at the
-  // root and proceeding towards the leaf trying to see if the components
-  // match. Continue until there is a match and keep accumulating the path
-  // traversed. This forms the first argument to the ACE_NESTED_CLASS
-  // macro. Whenever there is no match, the remaining components of the
-  // def_scope form the second argument
+  ACE_OS::strcat (fu_name,
+                  "::TAO_");
 
-  def_scope = ((this->defined_in ())?
-               (be_scope::narrow_from_scope (this->defined_in ())->decl ()):
-               0);
+  ACE_OS::strcat (fu_name,
+                  this->flat_name());
 
-  if (def_scope && def_scope->node_type () != AST_Decl::NT_root && use_scope)
-    // if both scopes exist and that we are not in the root scope
+  ACE_OS::strcat (fl_name,
+                  "TAO_");
+
+  ACE_OS::strcat (fl_name,
+                  this->flat_name());
+
+  return this->nested_name (fl_name,
+                            fu_name,
+                            use_scope,
+                            suffix,
+                            prefix);
+}
+
+void
+be_type::gen_fwd_helper_name (void)
+{
+  AST_Decl *parent = ScopeAsDecl (this->defined_in ());
+  Identifier *segment = 0;
+  char *tmp = 0;
+  this->fwd_helper_name_.clear (1);
+
+  if (parent != 0 && parent->node_type () != AST_Decl::NT_root)
     {
-      ACE_OS::strcpy (def_name, def_scope->fullname ());
-      ACE_OS::strcpy (use_name, use_scope->fullname ());
-
-      // find the first occurrence of a :: and advance the next pointers accordingly
-      def_next = ACE_OS::strstr (def_curr, "::");
-      use_next = ACE_OS::strstr (use_curr, "::");
-
-      if (def_next)
-        *def_next = 0;
-
-      if (use_next)
-        *use_next = 0;
-
-      if (!ACE_OS::strcmp (def_curr, use_curr))
+      for (UTL_IdListActiveIterator i (parent->name ());
+           !i.is_done ();
+           i.next ())
         {
-          // initial prefix matches i.e., they have a common root
-          // start by initializing the macro
+          segment = i.item ();
+          tmp = segment->get_string ();
 
-          //@@          ACE_OS::sprintf (this->nested_type_name_, "ACE_NESTED_CLASS (");
-          //@@          ACE_OS::strcat (this->nested_type_name_, def_curr); // initialize the first argument
-
-          def_curr = (def_next ? (def_next+2) : 0); // skip the ::
-          use_curr = (use_next ? (use_next+2) : 0); // skip the ::
-
-          while (def_curr && use_curr)
+          if (ACE_OS::strcmp (tmp, "") == 0)
             {
-              // find the first occurrence of a :: and advance the next pointers accordingly
-              def_next = ACE_OS::strstr (def_curr, "::");
-              use_next = ACE_OS::strstr (use_curr, "::");
-
-              if (def_next)
-                *def_next = 0;
-
-              if (use_next)
-                *use_next = 0;
-
-              if (!ACE_OS::strcmp (def_curr, use_curr))
-                {
-                  // they have same prefix, append to arg1
-                  //@@    ACE_OS::strcat (this->nested_type_name_, "::");
-                  //@@ ACE_OS::strcat (this->nested_type_name_, def_curr);
-                  def_curr = (def_next ? (def_next+2) : 0); // skip the ::
-                  use_curr = (use_next ? (use_next+2) : 0); // skip the ::
-                }
-              else
-                {
-                  // no match. This is the end of the first argument. Get out
-                  // of the loop as no more comparisons are necessary
-                  break;
-                }
+              continue;
             }
 
-          // start the 2nd argument of the macro
-          //@@          ACE_OS::strcat (this->nested_type_name_, ", ");
-
-          // copy the remaining def_name (if any left)
-          if (def_curr)
-            ACE_OS::strcat (this->nested_type_name_, def_curr);
-
-          // append our local name
-          ACE_OS::strcat (this->nested_type_name_, this->local_name ()->get_string ());
-          if (suffix)
-            ACE_OS::strcat (this->nested_type_name_, suffix);
-          //@@          ACE_OS::strcat (this->nested_type_name_, ")");
-          return this->nested_type_name_;
-        } // end of if the root prefixes match
+          this->fwd_helper_name_ += tmp;
+          this->fwd_helper_name_ += "::";
+        }
+    }
+  else
+    {
+      this->fwd_helper_name_= "";
     }
 
-  // otherwise just emit our fullname
-  ACE_OS::sprintf (this->nested_type_name_, this->fullname ());
-  if (suffix)
-    ACE_OS::strcat (this->nested_type_name_, suffix);
-
-  return this->nested_type_name_;
+  this->fwd_helper_name_ += "tao_";
+  this->fwd_helper_name_ += this->local_name ()->get_string ();
 }
 
-// *****************************
-// CODE GENERATION
-// *****************************
-
-// generate the _var definition for ourself
-int
-be_type::gen_var_defn (void)
+const char *
+be_type::fwd_helper_name (void) const
 {
-  return 0;
+  return this->fwd_helper_name_.fast_rep ();
 }
 
-// implementation of the _var class. All of these get generated in the inline
-// file
-int
-be_type::gen_var_impl (void)
+void
+be_type::fwd_helper_name (const char *name)
 {
-  return 0;
+  this->fwd_helper_name_ = name;
 }
 
-// generate the _out definition
-int
-be_type::gen_out_defn (void)
+void
+be_type::gen_common_varout (TAO_OutStream *os)
 {
-  return 0;
+  if (this->common_varout_gen_ == 1)
+    {
+      return;
+    }
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  AST_Type::SIZE_TYPE st = this->size_type ();
+
+  *os << be_nl << be_nl
+      << (this->node_type () == AST_Decl::NT_struct ? "struct "
+                                                    : "class ")
+      << this->local_name () << ";";
+
+  *os << be_nl << be_nl
+      << "typedef" << be_idt_nl
+      << (st == AST_Type::FIXED ? "TAO_Fixed_Var_T<"
+                                : "TAO_Var_Var_T<")
+      << be_idt << be_idt_nl
+      << this->local_name () << be_uidt_nl
+      << ">" << be_uidt_nl
+      << this->local_name () << "_var;" << be_uidt_nl << be_nl;
+
+  if (st == AST_Type::FIXED)
+    {
+      *os << "typedef" << be_idt_nl
+          << this->local_name () << " &" << be_nl
+          << this->local_name () << "_out;" << be_uidt;
+    }
+  else
+    {
+      *os << "typedef" << be_idt_nl
+          << "TAO_Out_T<" << be_idt << be_idt_nl
+          << this->local_name () << be_uidt_nl
+          << ">" << be_uidt_nl
+          << this->local_name () << "_out;" << be_uidt;
+    }
+
+  this->common_varout_gen_ = 1;
 }
 
-int
-be_type::gen_out_impl (void)
+bool
+be_type::seen_in_sequence (void) const
 {
-  return 0;
+  return this->seen_in_sequence_;
 }
 
-AST_Decl::NodeType be_type::base_node_type (void) const
+void
+be_type::seen_in_sequence (bool val)
 {
-  return ACE_const_cast(be_type*, this)->node_type ();
+  this->seen_in_sequence_ = val;
+}
+
+bool
+be_type::seen_in_operation (void) const
+{
+  return this->seen_in_operation_;
+}
+
+void
+be_type::seen_in_operation (bool val)
+{
+  this->seen_in_operation_ = val;
+}
+
+AST_Decl::NodeType
+be_type::base_node_type (void) const
+{
+  return const_cast<be_type*> (this)->node_type ();
+}
+
+// Cleanup method
+void
+be_type::destroy (void)
+{
+  if (this->tc_name_ != 0)
+    {
+      this->tc_name_->destroy ();
+      delete this->tc_name_;
+      this->tc_name_ = 0;
+    }
+
+  this->be_decl::destroy ();
 }
 
 int
@@ -278,6 +339,6 @@ be_type::accept (be_visitor *visitor)
   return visitor->visit_type (this);
 }
 
-// Narrowing
+// Narrowing.
 IMPL_NARROW_METHODS2 (be_type, AST_Type, be_decl)
 IMPL_NARROW_FROM_DECL (be_type)

@@ -1,80 +1,115 @@
-// This may look like C, but it's really -*- C++ -*-
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    TAO
-// 
-// = FILENAME
-//    principal.h
-//
-// = DESCRIPTION
-//    The CORBA_Principal pseudo-object implementation.
-//
-// = AUTHOR
-//     Copyright 1994-1995 by Sun Microsystems Inc.
-// 
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Principal.h
+ *
+ *  $Id$
+ *
+ *  The CORBA::Principal pseudo-object implementation.
+ *
+ *  @author  Copyright 1994-1995 by Sun Microsystems Inc.
+ *  @author  DOC group at Wash U and UCI.
+ */
+//=============================================================================
 
-#if !defined (TAO_PRINCIPAL_H)
-#  define TAO_PRINCIPAL_H
 
-class TAO_Export CORBA_Principal
+#ifndef TAO_PRINCIPAL_H
+#define TAO_PRINCIPAL_H
+
+#include /**/ "ace/pre.h"
+
+#include "tao/CORBA_methods.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "tao/OctetSeqC.h"
+#include "tao/Pseudo_VarOut_T.h"
+
+#include "ace/Thread_Mutex.h"
+#include "ace/Atomic_Op.h"
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+namespace CORBA
 {
-  // = TITLE
-  //    A "Principal" identifies an authenticated entity in the
-  //    network administration framework.  Identities are used to
-  //    control acccess (authorization) as well as in audit trails
-  //    (accountability).
-public:
-  // To applications, the identifier is an opaque ID.
+  class Principal;
+  typedef Principal *Principal_ptr;
 
-  //  CORBA::SEQUENCE <CORBA::Octet> id;
-  CORBA::OctetSeq id;
+  typedef TAO_Pseudo_Var_T<Principal> Principal_var;
+  typedef TAO_Pseudo_Out_T<Principal> Principal_out;
 
-  // @@ add "==", "<", ">" operators
+  /**
+   * @class Principal
+   *
+   * @brief A "Principal" identifies an authenticated entity in the
+   * network administration framework.
+   *
+   * Identities are used to control acccess (authorization) as well as
+   * in audit trails (accountability).
+   *
+   * @note This CORBA feature has been deprecated by the OMG.  Use the
+   *       CORBA Security Service instead.
+   */
+  class TAO_Export Principal
+  {
+  public:
+    // To applications, the identifier is an opaque ID.
 
-  // The pseudo object operations.
-  static CORBA_Principal* _duplicate (CORBA_Principal*);
-  static CORBA_Principal* _nil (void);
+    //  CORBA::SEQUENCE <CORBA::Octet> id;
+    CORBA::OctetSeq id;
 
-  // = Stuff required for memory management.
-  CORBA::ULong _incr_refcnt (void);
-  CORBA::ULong _decr_refcnt (void);
+    // @@ add "==", "<", ">" operators
 
-  CORBA_Principal (void);
+    // The pseudo object operations.
+    static Principal * _duplicate (Principal *);
+    static Principal * _nil (void);
 
-private:
-  ~CORBA_Principal (void);
+    // = Stuff required for memory management.
+    unsigned long _incr_refcnt (void);
+    unsigned long _decr_refcnt (void);
 
-  // = these are not provided
-  CORBA_Principal &operator = (const CORBA::Principal_ptr &);
-  CORBA_Principal (const CORBA::Principal_ptr &);
+    Principal (void);
 
-private:
-  CORBA::ULong refcount_;
-  // Number of outstanding references to this object.
+    // Useful for template programming.
+    typedef Principal_ptr _ptr_type;
+    typedef Principal_var _var_type;
 
-  ACE_SYNCH_MUTEX refcount_mutex_;
-  // Protect the reference count, this is OK because we do no
-  // duplicates or releases on the critical path.
+  protected:
 
-#if defined (__GNUG__)
-  // G++ (even 2.6.3) stupidly thinks instances can't be created.
-  // This de-warns.
-  friend class everyone_needs_a_friend;
-#endif /* __GNUG__ */
-};
+    /// Destructor
+    /**
+     * Protected destructor to enforce proper memory management
+     * through the reference counting mechanism.
+     */
+    ~Principal (void);
 
-extern TAO_Export CORBA_Boolean
-operator<< (TAO_OutputCDR&, CORBA_Principal*);
+  private:
 
-extern TAO_Export CORBA_Boolean
-operator>> (TAO_InputCDR&, CORBA_Principal*&);
+    // = Prevent copying
+    Principal &operator = (const CORBA::Principal_ptr &);
+    Principal (const CORBA::Principal_ptr &);
+
+  private:
+    /// Reference counter.
+    ACE_Atomic_Op<TAO_SYNCH_MUTEX, unsigned long> refcount_;
+  };
+}  // End CORBA namespace
+
+TAO_Export CORBA::Boolean
+operator<< (TAO_OutputCDR &, CORBA::Principal *);
+
+TAO_Export CORBA::Boolean
+operator>> (TAO_InputCDR &, CORBA::Principal *&);
+
+TAO_END_VERSIONED_NAMESPACE_DECL
 
 #if defined (__ACE_INLINE__)
 # include "tao/Principal.i"
 #endif /* __ACE_INLINE__ */
+
+#include /**/ "ace/post.h"
 
 #endif /* TAO_PRINCIPAL_H */

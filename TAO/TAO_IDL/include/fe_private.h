@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,24 +67,26 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _FE_FE_HH
 #define _FE_FE_HH
 
-// fe_private.hh - Defines data which is private to the FE but
-//		   which must be accessible throughout the FE
+#include "TAO_IDL_FE_Export.h"
 
-/*
-** DEPENDENCIES: NONE
-**
-** USE: Included from source files
-*/
+// Define an entry for the C++ keyword and its mapping.
+struct TAO_IDL_FE_Export TAO_IDL_CPP_Keyword_Entry
+{
+  const char *keyword_;
+  const char *mapping_;
+};
 
-/*
- * FE includes
- */
+class TAO_IDL_FE_Export TAO_IDL_CPP_Keyword_Table
+{
+  // = TITLE
+  //   Define a table that provides the lookup for the C++
+  //   keyword. The lookup uses a perfect hash function
+private:
+  unsigned int hash (const char *str, 
+                     unsigned int len);
+public:
+  const TAO_IDL_CPP_Keyword_Entry *lookup (const char *str, 
+                                           unsigned int len);
+};
 
-#include	"fe_interface_header.h"// class FE_InterfaceHeader
-#include	"fe_declarator.h"	// class FE_Declarator
-
-/*
- * FE Operations
- */
-
-#endif           // _FE_FE_HH
+#endif /* _FE_FE_HH */

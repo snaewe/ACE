@@ -19,7 +19,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_ARGUMENT_ARGLIST_H_)
+#ifndef _BE_VISITOR_ARGUMENT_ARGLIST_H_
 #define _BE_VISITOR_ARGUMENT_ARGLIST_H_
 
 class be_visitor_args_arglist : public be_visitor_args
@@ -62,6 +62,12 @@ public:
   virtual int visit_interface_fwd (be_interface_fwd *node);
   // visit interface forward
 
+  virtual int visit_component (be_component *node);
+  // visit component
+
+  virtual int visit_component_fwd (be_component_fwd *node);
+  // visit component forward
+
   virtual int visit_native (be_native *node);
   // visit native node
 
@@ -83,6 +89,26 @@ public:
   virtual int visit_typedef (be_typedef *node);
   // visit the typedef type
 
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit valuetype
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
+  // visit valuetype_fwd
+
+  virtual int visit_eventtype (be_eventtype *node);
+  // visit eventtype
+
+  virtual int visit_eventtype_fwd (be_eventtype_fwd *node);
+  // visit eventtype_fwd
+
+  virtual int visit_home (be_home *node);
+  // visit home
+
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit valuebox
+
+ private:
+  int emit_common (be_type *node);
 };
 
 #endif /* _BE_VISITOR_ARGUMENT_ARGLIST_H_ */

@@ -19,19 +19,24 @@
 //
 // ============================================================================
 
-#if !defined (TAO_BE_VISITOR_STRUCTURE_H)
+#ifndef TAO_BE_VISITOR_STRUCTURE_H
 #define TAO_BE_VISITOR_STRUCTURE_H
 
-#include "be_visitor.h"
-#include "be_visitor_scope.h"
+#include "be_union.h"
+#include "be_enum.h"
 
-// generic visitor
+#include "be_visitor_scope.h"
+#include "be_visitor_enum.h"
+#include "be_visitor_union.h"
 #include "be_visitor_structure/structure.h"
-// concrete visitors
 #include "be_visitor_structure/structure_ch.h"
 #include "be_visitor_structure/structure_ci.h"
 #include "be_visitor_structure/structure_cs.h"
 #include "be_visitor_structure/any_op_ch.h"
 #include "be_visitor_structure/any_op_cs.h"
+#include "be_visitor_structure/cdr_op_ch.h"
+#include "be_visitor_structure/cdr_op_cs.h"
+#include "be_visitor_structure/serializer_op_ch.h"
+#include "be_visitor_structure/serializer_op_cs.h"
 
 #endif // TAO_BE_VISITOR_STRUCTURE_H

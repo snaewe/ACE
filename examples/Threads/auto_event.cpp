@@ -7,8 +7,10 @@
 // by the writer. The writer thread calculates the value and signals
 // the reader when the calculation completes.
 
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Service_Config.h"
-#include "ace/Synch.h"
+#include "ace/Auto_Event.h"
 #include "ace/Singleton.h"
 #include "ace/Thread_Manager.h"
 
@@ -66,7 +68,7 @@ writer (void *arg)
 
   if (EVENT::instance ()->signal () == -1)
     {
-      ACE_ERROR ((LM_ERROR, "thread wait failed"));
+      ACE_ERROR ((LM_ERROR, "thread signal failed"));
       ACE_OS::exit (0);
     }
 
@@ -74,13 +76,13 @@ writer (void *arg)
 }
 
 int
-main (int argc, char **argv)
+ACE_TMAIN (int argc, ACE_TCHAR **argv)
 {
   // Shared data: set by writer, read by reader.
   int data;
 
   // Work time for writer.
-  work_time = argc == 2 ? atoi (argv[1]) : 5;
+  work_time = argc == 2 ? ACE_OS::atoi (argv[1]) : 5;
 
   // threads manager
   ACE_Thread_Manager& tm = *ACE_Thread_Manager::instance ();
@@ -102,19 +104,17 @@ main (int argc, char **argv)
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Singleton<ACE_Auto_Event, ACE_Thread_Mutex>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Singleton<ACE_Auto_Event, ACE_Thread_Mutex>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+#if defined (ACE_HAS_EXPLICIT_STATIC_TEMPLATE_MEMBER_INSTANTIATION)
+template ACE_Singleton<ACE_Auto_Event, ACE_Thread_Mutex> *
+  ACE_Singleton<ACE_Auto_Event, ACE_Thread_Mutex>::singleton_;
+#endif /* ACE_HAS_EXPLICIT_STATIC_TEMPLATE_MEMBER_INSTANTIATION */
 
 
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;
 }
 #endif /* ACE_HAS_THREADS */
-

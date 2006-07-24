@@ -12,15 +12,22 @@
 //
 // ============================================================================
 
-#if !defined (EC_MULTIPLE_H)
+#ifndef EC_MULTIPLE_H
 #define EC_MULTIPLE_H
 
 #include "ace/SString.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/High_Res_Timer.h"
+#include "ace/Condition_Thread_Mutex.h"
 #include "orbsvcs/RtecEventChannelAdminC.h"
 #include "orbsvcs/RtecEventCommS.h"
 #include "orbsvcs/Channel_Clients_T.h"
-#include "orbsvcs/Event/EC_Gateway.h"
+#include "orbsvcs/Event/EC_Gateway_Sched.h"
+#include "orbsvcs/CosNamingC.h"
 
 class Test_ECG;
 
@@ -40,28 +47,29 @@ public:
   Test_Supplier (Test_ECG* test, void* cookie);
 
   void open (const char* name,
-	     int event_a, int event_b,
-	     int message_count,
-	     const RtecScheduler::Period& rate,
-	     RtecEventChannelAdmin::EventChannel_ptr ec,
-	     CORBA::Environment& _env);
+             int event_a, int event_b,
+             int message_count,
+             const RtecScheduler::Period_t& rate,
+             RtecEventChannelAdmin::EventChannel_ptr ec
+             ACE_ENV_ARG_DECL);
   // This method connects the supplier to the EC.
 
-  void close (CORBA::Environment &_env);
+  void close (ACE_ENV_SINGLE_ARG_DECL);
   // Disconnect from the EC.
 
   void activate (const char* name,
-		 const RtecScheduler::Period& rate,
-		 RtecEventChannelAdmin::EventChannel_ptr ec,
-		 CORBA::Environment& _env);
+                 const RtecScheduler::Period_t& rate,
+                 RtecEventChannelAdmin::EventChannel_ptr ec
+                 ACE_ENV_ARG_DECL);
 
-  void push (const RtecEventComm::EventSet& events,
-	     CORBA::Environment &_env);
-  void disconnect_push_consumer (CORBA::Environment &);
+  void push (const RtecEventComm::EventSet& events
+             ACE_ENV_ARG_DECL);
+  void disconnect_push_consumer (ACE_ENV_SINGLE_ARG_DECL_NOT_USED);
   // Implement the callbacks for our consumer personality.
 
 
-  virtual void disconnect_push_supplier (CORBA::Environment &);
+  virtual void disconnect_push_supplier (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException));
   // The methods in the skeleton.
 
   RtecEventComm::EventSourceID supplier_id (void) const;
@@ -83,14 +91,14 @@ private:
   int message_count_;
   // The number of events sent by this supplier.
 
-  RtecEventChannelAdmin::ProxyPushConsumer_var consumer_proxy_; 
+  RtecEventChannelAdmin::ProxyPushConsumer_var consumer_proxy_;
   // We talk to the EC (as a supplier) using this proxy.
 
   ACE_PushConsumer_Adapter<Test_Supplier> consumer_;
   // We also connect to the EC as a consumer so we can receive the
   // timeout events.
 
-  RtecEventChannelAdmin::ProxyPushSupplier_var supplier_proxy_; 
+  RtecEventChannelAdmin::ProxyPushSupplier_var supplier_proxy_;
   // We talk to the EC (as a supplier) using this proxy.
 
 };
@@ -111,17 +119,19 @@ public:
   Test_Consumer (Test_ECG* test, void *cookie);
 
   void open (const char* name,
-	     int event_a, int event_b,
-	     RtecEventChannelAdmin::EventChannel_ptr ec,
-	     CORBA::Environment& _env);
+             int event_a, int event_b,
+             RtecEventChannelAdmin::EventChannel_ptr ec
+             ACE_ENV_ARG_DECL);
   // This method connects the consumer to the EC.
 
-  void close (CORBA::Environment &_env);
+  void close (ACE_ENV_SINGLE_ARG_DECL);
   // Disconnect from the EC.
 
-  virtual void push (const RtecEventComm::EventSet& events,
-		     CORBA::Environment &_env);
-  virtual void disconnect_push_consumer (CORBA::Environment &);
+  virtual void push (const RtecEventComm::EventSet& events
+                     ACE_ENV_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException));
+  virtual void disconnect_push_consumer (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException));
   // The skeleton methods.
 
 private:
@@ -174,55 +184,55 @@ public:
   // Execute the test.
 
   void push_supplier (void* supplier_cookie,
-		      RtecEventChannelAdmin::ProxyPushConsumer_ptr consumer,
-		      const RtecEventComm::EventSet &events,
-		      CORBA::Environment &);
+                      RtecEventChannelAdmin::ProxyPushConsumer_ptr consumer,
+                      const RtecEventComm::EventSet &events
+                      ACE_ENV_ARG_DECL_NOT_USED);
   // Callback method for suppliers, we push for them to their
   // consumers and take statistics on the way.
   // It is possible that we ignore the <consumer> parameter when
   // testing the short-circuit case.
 
   void push_consumer (void* consumer_cookie,
-		      ACE_hrtime_t arrival,
-		      const RtecEventComm::EventSet& events,
-		      CORBA::Environment&);
+                      ACE_hrtime_t arrival,
+                      const RtecEventComm::EventSet& events
+                      ACE_ENV_ARG_DECL_NOT_USED);
   // Callback method for consumers, if any of our consumers has
   // received events it will invoke this method.
 
   void shutdown_supplier (void* supplier_cookie,
-			  RtecEventComm::PushConsumer_ptr consumer,
-			  CORBA::Environment& _env);
+                          RtecEventComm::PushConsumer_ptr consumer
+                          ACE_ENV_ARG_DECL);
   // One of the suppliers has completed its work.
-			  
+
 private:
   RtecEventChannelAdmin::EventChannel_ptr
     get_ec (CosNaming::NamingContext_ptr naming_context,
-	    const char* ec_name,
-	    CORBA::Environment &_env);
+            const char* ec_name
+            ACE_ENV_ARG_DECL);
   // Helper routine to obtain an EC given its name.
 
-  void connect_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-			  CORBA::Environment &_env);
-  void disconnect_suppliers (CORBA::Environment &_env);
+  void connect_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec
+                          ACE_ENV_ARG_DECL);
+  void disconnect_suppliers (ACE_ENV_SINGLE_ARG_DECL);
   // Connect the suppliers.
 
-  void activate_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-			   CORBA::Environment &_env);
+  void activate_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec
+                           ACE_ENV_ARG_DECL);
   // Activate the suppliers, i.e. they start generating events.
 
   void connect_ecg (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-		    RtecEventChannelAdmin::EventChannel_ptr remote_ec,
-		    RtecScheduler::Scheduler_ptr remote_sch,
-		    CORBA::Environment &_env);
+                    RtecEventChannelAdmin::EventChannel_ptr remote_ec,
+                    RtecScheduler::Scheduler_ptr remote_sch
+                    ACE_ENV_ARG_DECL);
   // Connect the EC gateway, it builds the Subscriptions and the
   // Publications list.
 
-  void connect_consumers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-			  CORBA::Environment &_env);
-  void disconnect_consumers (CORBA::Environment &_env);
+  void connect_consumers (RtecEventChannelAdmin::EventChannel_ptr local_ec
+                          ACE_ENV_ARG_DECL);
+  void disconnect_consumers (ACE_ENV_SINGLE_ARG_DECL);
   // Connect and disconnect the consumers.
 
-  int shutdown (CORBA::Environment&);
+  int shutdown (ACE_ENV_SINGLE_ARG_DECL_NOT_USED);
   // Called when the main thread (i.e. not the scavenger thread) is
   // shutting down.
 
@@ -244,15 +254,15 @@ private:
 
   void shutdown_consumer (int id);
   // One of the consumers has completed its work.
-			  
+
 private:
-  char* lcl_name_;
+  const char* lcl_name_;
   // The name of the "local" EC.
 
-  char* rmt_name_;
+  const char* rmt_name_;
   // The name of the "remote" EC.
 
-  TAO_EC_Gateway_IIOP ecg_;
+  TAO_EC_Gateway_Sched ecg_;
   // The proxy used to connect both event channels.
 
   enum {
@@ -316,7 +326,7 @@ private:
 
   int lp_workload_;
   // The number of iterations of ACE::is_prime() to execute in low
-  // priority consumers. 
+  // priority consumers.
 
   int lp_interval_;
   // The low priority events are generated using this interval.
@@ -354,17 +364,17 @@ private:
   // Store the measurements for local and remote events..
 
   int ready_;
-  ACE_SYNCH_MUTEX ready_mtx_;
-  ACE_SYNCH_CONDITION ready_cnd_;
+  TAO_SYNCH_MUTEX ready_mtx_;
+  TAO_SYNCH_CONDITION ready_cnd_;
   // Before accepting any events the suppliers must wait for the test
   // to setup all the consumers.
   // The suppliers wait on the condition variable.
 
-  ACE_Atomic_Op<ACE_SYNCH_MUTEX,int> running_suppliers_;
+  ACE_Atomic_Op<TAO_SYNCH_MUTEX,int> running_suppliers_;
   // keep track of how many suppliers are still running so we shutdown
   // at the right moment.
 
-  ACE_Atomic_Op<ACE_SYNCH_MUTEX,int> running_consumers_;
+  ACE_Atomic_Op<TAO_SYNCH_MUTEX,int> running_consumers_;
   // keep track of how many consumers are still running so we shutdown
   // at the right moment.
 

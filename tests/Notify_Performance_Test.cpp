@@ -9,14 +9,13 @@
 //    Notify_Performance_Test.cpp
 //
 // = DESCRIPTION
-//
 //    This test is used to time the notification mechanisms of the
 //    ACE_Reactors. Both the WFMO_Reactor and Select_Reactor can be
 //    tested. The notify() mechanism can also be tested with or
 //    without data.
 //
 // = AUTHOR
-//    Irfan Pyarali
+//    Irfan Pyarali <irfan@cs.wustl.edu>
 //
 // ============================================================================
 
@@ -27,15 +26,11 @@
 #include "ace/Reactor.h"
 #include "ace/WFMO_Reactor.h"
 #include "ace/Select_Reactor.h"
+#include "ace/Dev_Poll_Reactor.h"
 #include "ace/Auto_Ptr.h"
-#include "ace/Synch.h"
+#include "ace/Atomic_Op.h"
 
 ACE_RCSID(tests, Notify_Performance_Test, "$Id$")
-
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
 
 #if defined (ACE_HAS_THREADS)
 
@@ -50,6 +45,9 @@ static int opt_wfmo_reactor = 0;
 
 // Use the Select_Reactor
 static int opt_select_reactor = 0;
+
+// Use the Dev_Poll_Reactor
+static int opt_dev_poll_reactor = 0;
 
 // Pass data through the notify call
 static int opt_pass_notify_data = 0;
@@ -71,11 +69,13 @@ Handler::handle_exception (ACE_HANDLE handle)
 }
 
 // Execute the client tests.
-void *
+
+static void *
 client (void *arg)
 {
   // Number of client (user) threads
-  static ACE_Atomic_Op<ACE_Thread_Mutex, long> thread_counter = opt_nthreads;
+  static ACE_Atomic_Op<ACE_Thread_Mutex, long> thread_counter;
+  thread_counter = opt_nthreads;
 
   // To pass or not to pass is the question
   Handler *handler = 0;
@@ -88,13 +88,14 @@ client (void *arg)
     ACE_Reactor::instance ()->notify (handler);
 
   if (--thread_counter == 0)
-    ACE_Reactor::end_event_loop ();
+    ACE_Reactor::instance()->end_reactor_event_loop ();
 
   return 0;
 }
 
 // Sets up the correct reactor (based on platform and options)
-void
+
+static void
 create_reactor (void)
 {
   ACE_Reactor_Impl *impl = 0;
@@ -109,63 +110,85 @@ create_reactor (void)
     {
       ACE_NEW (impl, ACE_Select_Reactor);
     }
+  else if (opt_dev_poll_reactor)
+    {
+#if defined (ACE_HAS_EVENT_POLL) || defined (ACE_HAS_DEV_POLL)
+      ACE_NEW (impl, ACE_Dev_Poll_Reactor);
+#endif /* ACE_HAS_EVENT_POLL || ACE_HAS_DEV_POLL */
+    }
   ACE_Reactor *reactor = 0;
   ACE_NEW (reactor, ACE_Reactor (impl));
   ACE_Reactor::instance (reactor);
 }
 
-void
+static void
 print_results (ACE_Profile_Timer::ACE_Elapsed_Time &et)
 {
-  ASYS_TCHAR *reactor_type = 0;
+  const ACE_TCHAR *reactor_type = 0;
   if (opt_wfmo_reactor)
-    reactor_type = ASYS_TEXT ("WFMO_Reactor");
+    reactor_type = ACE_TEXT ("WFMO_Reactor");
   else if (opt_select_reactor)
-    reactor_type = ASYS_TEXT ("Select_Reactor");
+    reactor_type = ACE_TEXT ("Select_Reactor");
+  else if (opt_dev_poll_reactor)
+    reactor_type = ACE_TEXT ("Dev_Poll_Reactor");
   else
-    reactor_type = ASYS_TEXT ("Platform's default Reactor");
+    reactor_type = ACE_TEXT ("Platform's default Reactor");
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\nNotify_Performance Test statistics:\n\n")));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tReactor Type: %s\n"), reactor_type));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tWorker threads (calling notify()): %d\n"), opt_nthreads));
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tIteration per thread: %d\n"), opt_nloops));
-  if (opt_pass_notify_data)
-    ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tData was passed in the notify() call\n")));
-  else
-    ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\tNo data was passed in the notify() call\n")));
-
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("\n\tTiming results notify() call:\n")));
   ACE_DEBUG ((LM_DEBUG,
-	      ASYS_TEXT ("\t\treal time = %f secs \n\t\tuser time = %f secs \n\t\tsystem time = %f secs\n\n"),
-	      et.real_time,
-	      et.user_time,
-	      et.system_time));
+              ACE_TEXT ("\nNotify_Performance Test statistics:\n\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\tReactor Type: %s\n"),
+              reactor_type));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\tWorker threads (calling notify()): %d\n"),
+              opt_nthreads));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\tIteration per thread: %d\n"),
+              opt_nloops));
+  if (opt_pass_notify_data)
+    ACE_DEBUG ((LM_DEBUG,
+                ACE_TEXT ("\tData was passed in the notify() call\n")));
+  else
+    ACE_DEBUG ((LM_DEBUG,
+                ACE_TEXT ("\tNo data was passed in the notify() call\n")));
+
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\n\tTiming results notify() call:\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("\t\treal time = %f secs \n\t\tuser time = %f secs \n\t\tsystem time = %f secs\n\n"),
+              et.real_time,
+              et.user_time,
+              et.system_time));
 }
 
 int
-main (int argc, ASYS_TCHAR *argv[])
+run_main (int argc, ACE_TCHAR *argv[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Notify_Performance_Test"));
+  ACE_START_TEST (ACE_TEXT ("Notify_Performance_Test"));
 
-  ACE_Get_Opt getopt (argc, argv, ASYS_TEXT ("swdc:l:"), 1);
+  ACE_Get_Opt getopt (argc, argv, ACE_TEXT ("pswdc:l:"));
+
   for (int c; (c = getopt ()) != -1; )
     switch (c)
       {
+      case 'p':
+        opt_dev_poll_reactor = 1;
+        break;
       case 's':
-	opt_select_reactor = 1;
-	break;
+        opt_select_reactor = 1;
+        break;
       case 'w':
-	opt_wfmo_reactor = 1;
-	break;
+        opt_wfmo_reactor = 1;
+        break;
       case 'c':
-	opt_nthreads = ACE_OS::atoi (getopt.optarg);
-	break;
+        opt_nthreads = ACE_OS::atoi (getopt.opt_arg ());
+        break;
       case 'l':
-	opt_nloops = ACE_OS::atoi (getopt.optarg);
-	break;
+        opt_nloops = ACE_OS::atoi (getopt.opt_arg ());
+        break;
       case 'd':
-	opt_pass_notify_data = 1;
-	break;
+        opt_pass_notify_data = 1;
+        break;
       }
 
   // Sets up the correct reactor (based on platform and options)
@@ -177,8 +200,11 @@ main (int argc, ASYS_TCHAR *argv[])
 
   // If we are using other that the default implementation, we must
   // clean up.
-  if (opt_select_reactor || opt_wfmo_reactor)
-    impl = auto_ptr <ACE_Reactor_Impl> (ACE_Reactor::instance ()->implementation ());
+  if (opt_select_reactor || opt_wfmo_reactor || opt_dev_poll_reactor)
+    {
+      auto_ptr<ACE_Reactor_Impl> auto_impl (ACE_Reactor::instance ()->implementation ());
+      impl = auto_impl;
+    }
 
   // Callback object
   Handler handler;
@@ -189,14 +215,14 @@ main (int argc, ASYS_TCHAR *argv[])
        ACE_THR_FUNC (client),
        (void *) &handler,
        THR_NEW_LWP | THR_DETACHED) == -1)
-    ACE_ERROR ((LM_ERROR, ASYS_TEXT ("(%P|%t) %p\n%a"), ASYS_TEXT ("thread create failed")));
+    ACE_ERROR ((LM_ERROR, ACE_TEXT ("(%P|%t) %p\n%a"), ACE_TEXT ("thread create failed")));
 
   // Timer business
   ACE_Profile_Timer timer;
   timer.start ();
 
   // Run event loop
-  ACE_Reactor::instance()->run_event_loop ();
+  ACE_Reactor::instance()->run_reactor_event_loop ();
 
   timer.stop ();
 
@@ -206,7 +232,8 @@ main (int argc, ASYS_TCHAR *argv[])
   // Print results
   print_results (et);
 
-  ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("(%P|%t) waiting for the worker threads...\n")));
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%P|%t) waiting for the worker threads...\n")));
 
   // Wait for all worker to get done.
   ACE_Thread_Manager::instance ()->wait ();
@@ -215,27 +242,14 @@ main (int argc, ASYS_TCHAR *argv[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class auto_ptr<ACE_Reactor>;
-template class ACE_Auto_Basic_Ptr<ACE_Reactor>;
-template class auto_ptr<ACE_Reactor_Impl>;
-template class ACE_Auto_Basic_Ptr<ACE_Reactor_Impl>;
-template class ACE_Atomic_Op<ACE_Thread_Mutex, long>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate auto_ptr<ACE_Reactor>
-#pragma instantiate ACE_Auto_Basic_Ptr<ACE_Reactor>
-#pragma instantiate auto_ptr<ACE_Reactor_Impl>
-#pragma instantiate ACE_Auto_Basic_Ptr<ACE_Reactor_Impl>
-#pragma instantiate ACE_Atomic_Op<ACE_Thread_Mutex, long>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
 #else
 int
-main (int, ASYS_TCHAR *[])
+run_main (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Notify_Performance_Test"));
+  ACE_START_TEST (ACE_TEXT ("Notify_Performance_Test"));
 
-  ACE_ERROR ((LM_ERROR, ASYS_TEXT ("threads not supported on this platform\n")));
+  ACE_ERROR ((LM_INFO,
+              ACE_TEXT ("threads not supported on this platform\n")));
 
   ACE_END_TEST;
   return 0;

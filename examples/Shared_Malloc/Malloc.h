@@ -1,10 +1,18 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (MY_MALLOC_H)
+#ifndef MY_MALLOC_H
 #define MY_MALLOC_H
 
-#include "ace/Malloc.h"
+#include "ace/config-all.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+class ACE_Allocator;
+ACE_END_VERSIONED_NAMESPACE_DECL
 
 class Malloc
   // = TITLE

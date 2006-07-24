@@ -5,9 +5,13 @@
 // single-threaded concurrent server.  This server program can be
 // driven by the oneway test mode of CPP-inclient.cpp.
 
+#include "ace/OS_main.h"
 #include "ace/SOCK_Acceptor.h"
 #include "ace/SOCK_Stream.h"
 #include "ace/INET_Addr.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_poll.h"
+#include "ace/OS_NS_stdio.h"
 
 ACE_RCSID(SOCK_SAP, CPP_inserver_poll, "$Id$")
 
@@ -50,7 +54,7 @@ static int
 init_buffer (size_t index)
 {
   ACE_INT32 len;
- 
+
  if (ACE::recv_n (poll_array[index].fd,
                   (void *) &len,
                   sizeof (ACE_INT32)) != sizeof (ACE_INT32))
@@ -85,7 +89,7 @@ handle_data (size_t &n_handles)
       if (ACE_BIT_ENABLED (poll_array[index].revents, POLLIN))
         {
           // First time in, we need to initialize the buffer.
-          if (buffer_array[index].buf_ == 0 
+          if (buffer_array[index].buf_ == 0
               && init_buffer (index) == -1)
             {
               ACE_ERROR ((LM_ERROR,
@@ -97,7 +101,7 @@ handle_data (size_t &n_handles)
           // Read data from client (terminate on error).
 
           ssize_t n = ACE::recv (poll_array[index].fd,
-                                 buffer_array[index].buf_, 
+                                 buffer_array[index].buf_,
                                  buffer_array[index].len_);
           // <recv> will not block in this case!
 
@@ -159,7 +163,7 @@ handle_connections (ACE_SOCK_Acceptor &peer_acceptor,
 }
 
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   u_short port = ACE_DEFAULT_SERVER_PORT + 1;
 
@@ -179,6 +183,8 @@ main (int, char *[])
 
   for (size_t n_handles = 1;;)
     {
+      ACE_ENDLESS_LOOP
+
       // Wait for client I/O events (handle interrupts).
       while (ACE_OS::poll (poll_array, n_handles) == -1
              && errno == EINTR)
@@ -193,9 +199,9 @@ main (int, char *[])
 }
 #else
 #include <stdio.h>
-int main (int, char *[])
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_OS::fprintf (stderr, "This feature is not supported\n");
   return 0;
 }
-#endif /* ACE_HAS_SVR4_POLL */
+#endif /* ACE_HAS_POLL */

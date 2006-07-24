@@ -3,13 +3,17 @@
 
 // Signal router.
 
-#if !defined (_EVENT_ANALYZER_H)
-#define _EVENT_ANALYZER_H     
+#ifndef _EVENT_ANALYZER_H
+#define _EVENT_ANALYZER_H
 
 #include "ace/Stream.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Module.h"
 #include "ace/Task.h"
-#include "ace/Synch.h"
 
 #if defined (ACE_HAS_THREADS)
 
@@ -21,9 +25,9 @@ public:
   virtual int put (ACE_Message_Block *msg, ACE_Time_Value * = 0);
 
   // Dynamic linking hooks.
-  virtual int init (int argc, char *argv[]);
+  virtual int init (int argc, ACE_TCHAR *argv[]);
   virtual int fini (void);
-  virtual int info (char **info_string, size_t length) const;
+  virtual int info (ACE_TCHAR **info_string, size_t length) const;
 
 private:
   virtual int control (ACE_Message_Block *);

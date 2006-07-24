@@ -1,31 +1,74 @@
-# $Id$
-# -*- perl -*-
 eval '(exit $?0)' && eval 'exec perl -S $0 ${1+"$@"}'
     & eval 'exec perl -S $0 $argv:q'
     if 0;
 
-unshift @INC, '../../../../../bin';
-require Process;
+# $Id$
+# -*- perl -*-
 
-$server_port = 0;
-$iorfile = "theior";
-$sleeptime = 3;
+$usage = "run_tests.pl [-n iterations] [-r, for thread-per-rate] [-t low priority threads]\n";
 
-$SV = Process::Create ("server".$Process::EXE_EXT, 
-                       " -ORBport ".$server_port.
-		       " -ORBobjrefstyle url".
-		       " -s -f $iorfile");
+use lib "../../../../../bin";
+use PerlACE::Run_Test;
 
-sleep $sleeptime;
+$iorfile = PerlACE::LocalFile ("mtcubit.ior");
+$iterations = 1000;
+$low_priority_threads = 1;
+$thread_per_rate = '';
 
-$status = system ("client".$Process::EXE_EXT.
-		  " -x -s -f $iorfile");
+####
+#### Process command line args.
+####
+while ($#ARGV >= $[  &&  $ARGV[0] =~ /^-/) {
+    if ($ARGV[0] eq '-n') {
+        if ($ARGV[1] =~ /^[\da-zA-Z]+$/) {
+            $iterations = $ARGV[1]; shift;
+        } else {
+            print STDERR "$0:  must provide argument for -n option\n";
+            die $usage;
+        }
+    } elsif ($ARGV[0] eq '-r') {
+        $thread_per_rate = '-r';
+    } elsif ($ARGV[0] eq '-t') {
+        if ($ARGV[1] =~ /^[\da-zA-Z]+$/) {
+            $low_priority_threads = $ARGV[1]; shift;
+        } else {
+            print STDERR "$0:  must provide argument for -n option\n";
+            die $usage;
+        }
+    } elsif ($ARGV[0] eq '-?') {
+        print "$usage";
+        exit;
+    } else {
+        print STDERR "$0:  unknown option $ARGV[0]\n";
+        die $usage;
+    }
+    shift;
+}
 
+$threads = $low_priority_threads + 1;
 
-# @@ TODO change to Wait() once the -x option works.
-$SV->Kill (); $SV->Wait ();
+# Make sure the file is gone, so we can wait on it.
+unlink $iorfile;
+
+$SV = new PerlACE::Process ("server", "$thread_per_rate -f $iorfile -t $threads");
+$CL = new PerlACE::Process ("client", "$thread_per_rate -f $iorfile -t $threads -n $iterations");
+
+$SV->Spawn ();
+
+if (PerlACE::waitforfile_timed ($iorfile, 10) == -1) {
+    print STDERR "ERROR: cannot find file <$iorfile>\n";
+    $SV->Kill ();
+    exit 1;
+}
+
+$client = $CL->SpawnWaitKill (180);
+$SV->Kill ();
 
 unlink $iorfile;
 
-# @@ Capture any errors from the server too.
-exit $status;
+if ($client != 0) {
+    print STDERR "ERROR: client returned $client\n";
+    exit 1;
+}
+
+exit 0;

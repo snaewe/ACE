@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,49 +62,57 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_UNION_LABEL_AST_UNION_LABEL_HH
 #define _AST_UNION_LABEL_AST_UNION_LABEL_HH
 
-// AST_UnionLabel.h
-//
-// Defines labels for unions
+#include "TAO_IDL_FE_Export.h"
+#include "ace/iosfwd.h"
 
-/*
-** DEPENDENCIES: ast_expression.hh
-**
-** USE: included from ast.hh
-*/
+class AST_Expression;
+class ast_visitor;
 
-class	AST_UnionLabel
+// Defines labels for unions.
+
+class TAO_IDL_FE_Export AST_UnionLabel
 {
 public:
-  // Define kind of label
-  enum UnionLabel {
-        UL_default		// Label is "default"
-      , UL_label		// Regular label
-  };
+  // Define kind of label.
+  enum UnionLabel
+    {
+        UL_default
+      , UL_label 
+    };
 
-  // Operations
+  AST_UnionLabel (void);
 
-  // Constructor(s)
-  AST_UnionLabel();
-  AST_UnionLabel(UnionLabel lk, AST_Expression *lv);
-  virtual ~AST_UnionLabel() {}
+  AST_UnionLabel (UnionLabel lk,
+                  AST_Expression *lv);
 
-  // Data Accessors
-  UnionLabel label_kind();
-  AST_Expression *label_val();
+  virtual ~AST_UnionLabel (void);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  UnionLabel label_kind (void);
+
+  AST_Expression *label_val (void);
+
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  UnionLabel			pd_label_kind;	// Label kind
-  AST_Expression		*pd_label_val;	// Label expression
+  // Data.
 
+  UnionLabel pd_label_kind;
+  // Label kind.
+
+  AST_Expression *pd_label_val;
+  // Label expression.
 };
 
 #endif           // _AST_UNION_LABEL_AST_UNION_LABEL_HH

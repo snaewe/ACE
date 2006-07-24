@@ -1,6 +1,6 @@
 # $Id$
 #
-# VxWorks 5.2-5.3.1 with Green Hills 1.8.8
+# VxWorks 5.3.1 and later with Green Hills 1.8.8 and later.
 
 #### Notes:
 #### 1) This file requires that your PATH be set to include the location
@@ -24,24 +24,34 @@
 ####
 #### Here's an example platform_macros.GNU file:
 ####
-#### WIND_BASE = /project/doc/wind
+#### WIND_BASE = /project/doc/pkg/wind
 #### WIND_HOST_TYPE = sun4-solaris2
 ####
-#### ifeq (,$(findstring /project/doc/wind/green,$PATH))
-####   PATH +=:/project/doc/wind/green
+#### ifeq (,$(findstring /project/doc/pkg/wind/green,$PATH))
+####   PATH +=:/project/doc/pkg/wind/green
 #### endif # PATH
 ####
 #### CPU = 86
-#### GHS = /project/doc/wind/green/vx$(CPU)
+#### GHSROOT = /project/doc/pkg/wind/green
 #### include $(ACE_ROOT)/include/makeinclude/platform_vxworks5.x_ghs.GNU
 
 VXWORKS = 1
 CROSS-COMPILE = 1
 
-debug = 1
+ifndef debug
+  debug = 1
+endif
+ifndef optimize
+  optimize = 1
+endif
+ifndef rtti
+  rtti = 1
+endif # rtti
 shared_libs =
 static_libs = 1
 
+# VxWorks doesn't have rwho
+rwho = 0
 
 #### CPU type
 ifndef CPU
@@ -52,31 +62,57 @@ endif # CPU
 ifeq ($(CPU),86)
   # With GHS' ax, ld386 complains that it can't read the
   # archive symbol table.
+  ifndef GHSROOT
+    GHSROOT = /project/doc/pkg/wind/green
+  endif
   ifndef GHS
-    GHS = /project/doc/wind/green/vx$(CPU)
+    GHS = $(GHSROOT)/vx$(CPU)
   endif # GHS
   AR = $(WIND_BASE)/host/$(WIND_HOST_TYPE)/bin/ar386
   ARFLAGS  = rsu
-  LIBS += $(GHS)/libedgnoe.a
+
+  #### For GHS 1.8.8:
+  #### LIBS += $(GHS)/libedgnoe.a
 else
 ifeq ($(CPU),ppc)
+  ifndef GHSROOT
+    GHSROOT = /appl/newgreen
+  endif
   ifndef GHS
-    GHS = /appl/newgreen/vx$(CPU)603
+    GHS = $(GHSROOT)/vx$(CPU)603
   endif # GHS
   AR = ax
   ARFLAGS  = cr
-  LIBS += $(GHS)/ghsbltin.o $(GHS)/ghsmath.o
+
+  #### For GHS 1.8.8:
+  #### LIBS += $(GHS)/ghsbltin.o $(GHS)/ghsmath.o
 endif # ppc
 endif # CPU
 
+#### For GHS 1.8.9:
+ifeq (1,$(exceptions))
+  LIBS += $(GHS)/libsce.a $(GHS)/libsedge.a $(GHS)/setup_eh.o
+else
+  LIBS += $(GHS)/libscnoe.a $(GHS)/libsedgnoe.a
+endif
+LIBS += $(GHS)/liblockinit_sc.o $(GHSROOT)/$(CPU)/libarch.a
 
 CC       = cxvx$(CPU)
 CXX      = $(CC)
-CCFLAGS  += $(CFLAGS) --no_rtti -tnone
+CCFLAGS  += $(CFLAGS) -tnone -Dghs -I$(GHSROOT)/vxworks/include -I$(WIND_BASE)/target/h
 DCFLAGS  += -g
+SOFLAGS  += -shared
 DLD      = $(CXX)
 LD       = $(CXX)
 LDFLAGS  = --no_auto_instantiation
 OCFLAGS  += -OL -OM
 PIC      =
-RANLIB   = @true
+
+ifeq (1, $(exceptions))
+   CCFLAGS += --stdle --exceptions
+   override rtti = 1
+endif # exceptions
+
+ifeq (0, $(rtti))
+  CCFLAGS += --no_rtti
+endif # rtti

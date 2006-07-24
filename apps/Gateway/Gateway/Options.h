@@ -10,14 +10,23 @@
 //    Options.h
 //
 // = AUTHOR
-//    Douglas C. Schmidt
+//    Douglas C. Schmidt <schmidt@cs.wustl.edu>
 //
 // ============================================================================
 
-#if !defined (OPTIONS_H)
+#ifndef OPTIONS_H
 #define OPTIONS_H
 
-#include "ace/Synch.h"
+#include "ace/config-all.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "ace/svc_export.h"
+#include "ace/Lock_Adapter_T.h"
+#include "ace/Synch_Traits.h"
+#include "ace/Thread_Mutex.h"
 
 class ACE_Svc_Export Options
 {
@@ -47,9 +56,11 @@ public:
   ~Options (void);
   // Termination.
 
-  int parse_args (int argc, char *argv[]);
+  int parse_args (int argc, ACE_TCHAR *argv[]);
   // Parse the arguments and set the options.
 
+  void print_usage(void);
+  // Print the gateway supported parameters.
   // = Accessor methods.
   int enabled (int option) const;
   // Determine if an option is enabled.
@@ -64,7 +75,7 @@ public:
   // Set the locking strategy used for serializing access to the
   // reference count in <ACE_Message_Block>.
 
-  int performance_window (void) const;
+  long performance_window (void) const;
   // Number of seconds after connection establishment to report
   // throughput.
 
@@ -95,14 +106,10 @@ public:
   // The connector port number, i.e., the one that we use to actively
   // establish connections with a gatewayd and create a Consumer.
 
-  const char *connector_host (void) const;
-  // Our connector port host, i.e., the host running the gatewayd
-  // process.
-
-  const char *connection_config_file (void) const;
+  const ACE_TCHAR *connection_config_file (void) const;
   // Name of the connection configuration file.
 
-  const char *consumer_config_file (void) const;
+  const ACE_TCHAR *consumer_config_file (void) const;
   // Name of the consumer map configuration file.
 
   long max_timeout (void) const;
@@ -136,7 +143,7 @@ private:
   // no locking strategy and we're using a REACTIVE concurrency
   // strategy.
 
-  int performance_window_;
+  long performance_window_;
   // Number of seconds after connection establishment to report
   // throughput.
 
@@ -179,10 +186,10 @@ private:
   CONNECTION_ID connection_id_;
   // The next available connection id.
 
-  char connection_config_file_[MAXPATHLEN + 1];
+  ACE_TCHAR connection_config_file_[MAXPATHLEN + 1];
   // Name of the connection configuration file.
 
-  char consumer_config_file_[MAXPATHLEN + 1];
+  ACE_TCHAR consumer_config_file_[MAXPATHLEN + 1];
   // Name of the consumer map configuration file.
 };
 

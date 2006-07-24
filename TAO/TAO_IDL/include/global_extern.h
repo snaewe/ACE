@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,14 +67,21 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _GLOBAL_EXTERN_GLOBAL_EXTERN_HH
 #define _GLOBAL_EXTERN_GLOBAL_EXTERN_HH
 
+#include "TAO_IDL_FE_Export.h"
+#include "idl_global.h"
+
+
+class AST_Decl;
+
 // global_extern.hh - Global data for the IDL compiler
 
-extern	IDL_GlobalData	*idl_global;	// Contains all "global" data
+extern TAO_IDL_FE_Export IDL_GlobalData *idl_global;
+// Contains all "global" data
 
 // Global functions for the IDL compiler
 
 // Return TRUE when the name of this AST_Decl can be reused in
 // a definition in this scope
-extern	idl_bool	can_be_redefined(AST_Decl *);
+extern bool can_be_redefined (AST_Decl *);
 
 #endif           // _GLOBAL_EXTERN_GLOBAL_EXTERN_HH

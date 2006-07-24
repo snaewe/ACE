@@ -2,15 +2,42 @@
 
 #define ACE_BUILD_SVC_DLL
 
-#include "ace/Get_Opt.h"
 #include "Event.h"
 #include "Options.h"
+#include "ace/Get_Opt.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_strings.h"
+#include "ace/os_include/os_fcntl.h"
 
 ACE_RCSID(Gateway, Options, "$Id$")
 
 // Static initialization.
 Options *Options::instance_ = 0;
 
+// Let's have a usage prompt.
+void
+Options::print_usage (void)
+{
+  ACE_DEBUG ((LM_INFO,
+    "gatewayd [-a {C|S}:acceptor-port] [-c {C|S}:connector-port]"
+    " [-C consumer_config_file] [-P connection_config_filename]"
+    " [-q socket_queue_size] [-t OUTPUT_MT|INPUT_MT] [-w time_out]"
+    " [-b] [-d] [-v] [-T]\n"
+    ""
+    "\t-a Become an Acceptor\n"
+    "\t-b Use blocking connection establishment\n"
+    "\t-c Become a Connector\n"
+    "\t-d debugging\n"
+    "\t-q Use a different socket queue size\n"
+    "\t-t Use a different threading strategy\n"
+    "\t-v Verbose mode\n"
+    "\t-w Time performance for a designated amount of time\n"
+    "\t-C Use a different proxy config filename\n"
+    "\t-P Use a different consumer config filename\n"
+    "\t-T Tracing\n"
+  ));
+}
 Options *
 Options::instance (void)
 {
@@ -35,8 +62,8 @@ Options::Options (void)
     max_queue_size_ (MAX_QUEUE_SIZE),
     connection_id_ (1)
 {
-  ACE_OS::strcpy (this->connection_config_file_, "connection_config");
-  ACE_OS::strcpy (this->consumer_config_file_, "consumer_config");
+  ACE_OS::strcpy (this->connection_config_file_, ACE_TEXT("connection_config"));
+  ACE_OS::strcpy (this->consumer_config_file_, ACE_TEXT("consumer_config"));
 }
 
 int
@@ -62,7 +89,7 @@ Options::locking_strategy (ACE_Lock_Adapter<ACE_SYNCH_MUTEX> *ls)
   this->locking_strategy_ = ls;
 }
 
-int
+long
 Options::performance_window (void) const
 {
   return this->performance_window_;
@@ -98,13 +125,13 @@ Options::threading_strategy (void) const
   return this->threading_strategy_;
 }
 
-const char *
+const ACE_TCHAR *
 Options::connection_config_file (void) const
 {
   return this->connection_config_file_;
 }
 
-const char *
+const ACE_TCHAR *
 Options::consumer_config_file (void) const
 {
   return this->consumer_config_file_;
@@ -143,12 +170,12 @@ Options::supplier_connector_port (void) const
 // Parse the "command-line" arguments and set the corresponding flags.
 
 int
-Options::parse_args (int argc, char *argv[])
+Options::parse_args (int argc, ACE_TCHAR *argv[])
 {
   // Assign defaults.
   ACE_Get_Opt get_opt (argc,
                        argv,
-                       "a:bC:c:dm:P:p:q:r:t:vw:",
+                       ACE_TEXT("a:bC:c:dm:P:p:q:r:t:vw:"),
                        0);
 
   for (int c; (c = get_opt ()) != EOF; )
@@ -159,10 +186,10 @@ Options::parse_args (int argc, char *argv[])
           {
             // Become an Acceptor.
 
-            for (char *flag = ACE_OS::strtok (get_opt.optarg, "|");
+            for (ACE_TCHAR *flag = ACE_OS::strtok (get_opt.opt_arg (), ACE_TEXT("|"));
                  flag != 0;
-                 flag = ACE_OS::strtok (0, "|"))
-              if (ACE_OS::strncasecmp (flag, "C", 1) == 0)
+                 flag = ACE_OS::strtok (0, ACE_TEXT("|")))
+              if (ACE_OS::strncasecmp (flag, ACE_TEXT("C"), 1) == 0)
                 {
                   ACE_SET_BITS (this->options_,
                                 Options::CONSUMER_ACCEPTOR);
@@ -170,7 +197,7 @@ Options::parse_args (int argc, char *argv[])
                     // Set the Consumer Acceptor port number.
                     this->consumer_acceptor_port_ = ACE_OS::atoi (flag + 2);
                 }
-              else if (ACE_OS::strncasecmp (flag, "S", 1) == 0)
+              else if (ACE_OS::strncasecmp (flag, ACE_TEXT("S"), 1) == 0)
                 {
                   ACE_SET_BITS (this->options_,
                                 Options::SUPPLIER_ACCEPTOR);
@@ -186,17 +213,18 @@ Options::parse_args (int argc, char *argv[])
           break;
         case 'C': // Use a different proxy config filename.
           ACE_OS::strncpy (this->consumer_config_file_,
-                           get_opt.optarg,
-                           sizeof this->consumer_config_file_);
+                           get_opt.opt_arg (),
+                           sizeof this->consumer_config_file_
+                             / sizeof (ACE_TCHAR));
           break;
         case 'c':
           {
             // Become a Connector.
 
-            for (char *flag = ACE_OS::strtok (get_opt.optarg, "|");
+            for (ACE_TCHAR *flag = ACE_OS::strtok (get_opt.opt_arg (), ACE_TEXT("|"));
                  flag != 0;
-                 flag = ACE_OS::strtok (0, "|"))
-              if (ACE_OS::strncasecmp (flag, "C", 1) == 0)
+                 flag = ACE_OS::strtok (0, ACE_TEXT("|")))
+              if (ACE_OS::strncasecmp (flag, ACE_TEXT("C"), 1) == 0)
                 {
                   ACE_SET_BITS (this->options_,
                                 Options::CONSUMER_CONNECTOR);
@@ -204,7 +232,7 @@ Options::parse_args (int argc, char *argv[])
                     // Set the Consumer Connector port number.
                     this->consumer_connector_port_ = ACE_OS::atoi (flag + 2);
                 }
-              else if (ACE_OS::strncasecmp (flag, "S", 1) == 0)
+              else if (ACE_OS::strncasecmp (flag, ACE_TEXT("S"), 1) == 0)
                 {
                   ACE_SET_BITS (this->options_,
                                 Options::SUPPLIER_CONNECTOR);
@@ -219,23 +247,23 @@ Options::parse_args (int argc, char *argv[])
           ACE_SET_BITS (this->options_,
                         Options::DEBUG);
           break;
-        case 'P': // Use a different consumer config filename.
+        case 'P': // Use a different connection config filename.
           ACE_OS::strncpy (this->connection_config_file_,
-                           get_opt.optarg,
+                           get_opt.opt_arg (),
                            sizeof this->connection_config_file_);
           break;
         case 'q': // Use a different socket queue size.
-          this->socket_queue_size_ = ACE_OS::atoi (get_opt.optarg);
+          this->socket_queue_size_ = ACE_OS::atoi (get_opt.opt_arg ());
           break;
         case 't': // Use a different threading strategy.
           {
-            for (char *flag = ACE_OS::strtok (get_opt.optarg, "|");
+            for (ACE_TCHAR *flag = ACE_OS::strtok (get_opt.opt_arg (), ACE_TEXT("|"));
                  flag != 0;
-                 flag = ACE_OS::strtok (0, "|"))
-              if (ACE_OS::strcmp (flag, "OUTPUT_MT") == 0)
+                 flag = ACE_OS::strtok (0, ACE_TEXT("|")))
+              if (ACE_OS::strcmp (flag, ACE_TEXT("OUTPUT_MT")) == 0)
                 ACE_SET_BITS (this->threading_strategy_,
                               Options::OUTPUT_MT);
-              else if (ACE_OS::strcmp (flag, "INPUT_MT") == 0)
+              else if (ACE_OS::strcmp (flag, ACE_TEXT("INPUT_MT")) == 0)
                 ACE_SET_BITS (this->threading_strategy_,
                               Options::INPUT_MT);
             break;
@@ -245,12 +273,13 @@ Options::parse_args (int argc, char *argv[])
                         Options::VERBOSE);
           break;
         case 'w': // Time performance for a designated amount of time.
-          this->performance_window_ = ACE_OS::atoi (get_opt.optarg);
+          this->performance_window_ = ACE_OS::atoi (get_opt.opt_arg ());
           // Use blocking connection semantics so that we get accurate
           // timings (since all connections start at once).
           this->blocking_semantics_ = 0;
           break;
         default:
+          this->print_usage(); // It's nice to have a usage prompt.
           break;
         }
     }

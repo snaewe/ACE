@@ -5,6 +5,8 @@
 #include "ace/Filecache.h"
 
 #include "HTTP_Server.h"
+#include "ace/OS_main.h"
+#include "ace/OS_NS_signal.h"
 
 ACE_RCSID(server, main, "$Id$")
 
@@ -41,7 +43,7 @@ main (int argc, char *argv[])
   ACE_OS::signal (SIGINT, (ACE_SignalHandler) handler);
   ACE_OS::signal (SIGUSR2, (ACE_SignalHandler) handler);
 
-  if (daemon.open (argc, argv) != 0)
+  if (daemon.open (argc, argv, ACE_DEFAULT_LOGGER_KEY, 0) != 0)
     ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "open"), 1);
 
   // The configured service creates threads, and the

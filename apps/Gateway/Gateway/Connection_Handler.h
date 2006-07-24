@@ -5,19 +5,24 @@
 //
 // = LIBRARY
 //    gateway
-// 
+//
 // = FILENAME
 //    Connection_Handler.h
 //
 // = AUTHOR
-//    Doug Schmidt 
-// 
+//    Doug Schmidt
+//
 // ============================================================================
 
-#if !defined (_CONNECTION_HANDLER)
+#ifndef _CONNECTION_HANDLER
 #define _CONNECTION_HANDLER
 
 #include "ace/Service_Config.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/SOCK_Connector.h"
 #include "ace/Svc_Handler.h"
 #include "Config_Files.h"
@@ -54,7 +59,7 @@ public:
     CONNECTING,    // During connection establishment.
     ESTABLISHED,   // Connection_Handler is established and active.
     DISCONNECTING, // Connection_Handler is in the process of connecting.
-    FAILED	   // Connection_Handler has failed.
+    FAILED         // Connection_Handler has failed.
   };
 
   // = Set/get the current state.
@@ -74,19 +79,19 @@ public:
   CONNECTION_ID connection_id (void) const;
 
   // = Set/get the current retry timeout delay.
-  void timeout (int);
-  int timeout (void);
+  void timeout (long);
+  long timeout (void);
 
   // = Set/get the maximum retry timeout delay.
-  void max_timeout (int);
-  int max_timeout (void) const;
+  void max_timeout (long);
+  long max_timeout (void) const;
 
   // = Set/get proxy role (i.e., 'S' for Supplier and 'C' for Consumer
   // (necessary for error checking).
   void connection_role (char);
   char connection_role (void) const;
 
-  // = Set/get the <Event_Channel> *. 
+  // = Set/get the <Event_Channel> *.
   void event_channel (Event_Channel *);
   Event_Channel *event_channel (void) const;
 
@@ -100,7 +105,7 @@ public:
   // Perform timer-based Connection_Handler reconnection.
 
   virtual int handle_close (ACE_HANDLE = ACE_INVALID_HANDLE,
-			    ACE_Reactor_Mask = ACE_Event_Handler::ALL_EVENTS_MASK);
+                            ACE_Reactor_Mask = ACE_Event_Handler::ALL_EVENTS_MASK);
   // Perform Connection_Handler termination.
 
 protected:
@@ -110,7 +115,7 @@ protected:
   ACE_INET_Addr local_addr_;
   // Address of us.
 
-  CONNECTION_ID connection_id_;  
+  CONNECTION_ID connection_id_;
   // The assigned connection ID of this entry.
 
   size_t total_bytes_;
@@ -119,10 +124,10 @@ protected:
   State state_;
   // The current state of the proxy.
 
-  int timeout_;
+  long timeout_;
   // Amount of time to wait between reconnection attempts.
 
-  int max_timeout_;
+  long max_timeout_;
   // Maximum amount of time to wait between reconnection attempts.
 
   char connection_role_;

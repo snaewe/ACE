@@ -6,16 +6,16 @@
 //
 // = LIBRARY
 //    jaws
-// 
+//
 // = FILENAME
 //    HTTP_Response.h
 //
 // = AUTHOR
 //    James Hu
-// 
+//
 // ============================================================================
 
-#if !defined (HTTP_RESPONSE_H)
+#ifndef HTTP_RESPONSE_H
 #define HTTP_RESPONSE_H
 
 class JAWS_IO;
@@ -33,7 +33,7 @@ class HTTP_Response
 {
 public:
   HTTP_Response (JAWS_IO &io,
-		 HTTP_Request &request);
+                 HTTP_Request &request);
   HTTP_Response (HTTP_Request &request, JAWS_IO &io);
   ~HTTP_Response (void);
 
@@ -41,7 +41,7 @@ public:
   // This is called by the handler to initiate a response.
 
   void error_response (int status,
-		       const char *log_message);
+                       const char *log_message);
   // This returns an error response for cases where there is a problem
   // with the request, logging the log_message.
 
@@ -66,8 +66,12 @@ private:
   HTTP_Request &request_;
   // The IO and Request objects associated with this re
 
+#if defined (ACE_JAWS_BASELINE)
   char *HTTP_HEADER;
-  char *HTTP_TRAILER;
+#else
+  const char *HTTP_HEADER;
+#endif
+  const char *HTTP_TRAILER;
   int HTTP_HEADER_LENGTH;
   int HTTP_TRAILER_LENGTH;
   // HTTP Headers and trailers.

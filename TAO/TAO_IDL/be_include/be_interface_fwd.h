@@ -7,11 +7,11 @@
 //    TAO IDL
 //
 // = FILENAME
-//    be_interface.h
+//    be_interface_fwd.h
 //
 // = DESCRIPTION
-//    Extension of class AST_Interface_Fwd that provides additional means for C++
-//    mapping of an interface.
+//    Extension of class AST_InterfaceFwd that provides additional
+//    means for C++ mapping of a forward declared interface.
 //
 // = AUTHOR
 //    Copyright 1994-1995 by Sun Microsystems, Inc.
@@ -20,53 +20,48 @@
 //
 // ============================================================================
 
-#if !defined (BE_INTERFACE_FWD_H)
+#ifndef BE_INTERFACE_FWD_H
 #define BE_INTERFACE_FWD_H
 
-/*
- * BE_InterfaceFwd
- */
+#include "be_type.h"
+#include "ast_interface_fwd.h"
+
+class AST_Interface;
+class be_visitor;
+
 class be_interface_fwd : public virtual AST_InterfaceFwd,
                          public virtual be_type
 {
   // =TITLE
-  //  be_interface_fwd
+  //   be_interface_fwd
+  //
   // =DESCRIPTION
-  //  Extensions to the AST_Interface_Fwd class
+  //   Extensions to the AST_InterfaceFwd class
 public:
-  // Operations
-
   be_interface_fwd (void);
-  // default constructor
+  // Default constructor.
 
-  be_interface_fwd (UTL_ScopedName *n, UTL_StrList *p);
-  // constructor
+  be_interface_fwd (AST_Interface *dummy,
+                    UTL_ScopedName *n);
+  // Constructor.
 
-  virtual int gen_var_defn (void);
-  // generate the _var class definition
+  virtual ~be_interface_fwd (void);
+  // Destructor.
 
-  virtual int gen_var_impl (void);
-  // generate the implementation for the _var class
+  virtual void seen_in_sequence (bool val);
+  virtual void seen_in_operation (bool val);
+  // Mutator overrides for be_type members. If we have been
+  // defined, we want the full definition to be set as well.
 
-  virtual int gen_out_defn (void);
-  // generate the _out class definition
+  virtual void destroy (void);
+  // Cleanup function.
 
-  virtual int gen_out_impl (void);
-  // generate the _out implementation
-
-  virtual int gen_typecode (void);
-  // generate the typecode
-
-  virtual long tc_size (void);
-  // return typecode size
-
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor* visitor);
 
-  // Narrowing
+  // Narrowing.
   DEF_NARROW_METHODS2 (be_interface_fwd, AST_InterfaceFwd, be_type);
   DEF_NARROW_FROM_DECL (be_interface_fwd);
-
 };
 
 #endif // if !defined

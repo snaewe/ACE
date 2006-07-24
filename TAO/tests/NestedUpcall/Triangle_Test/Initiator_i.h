@@ -10,7 +10,7 @@
 //    Initiator_i.h
 //
 // = DESCRIPTION
-//    This class implements the Initiator of the 
+//    This class implements the Initiator of the
 //    Nested Upcalls - Triangle test.
 //
 // = AUTHORS
@@ -18,7 +18,7 @@
 //
 // ============================================================================
 
-#if !defined (INITIATOR_IMPL_H)
+#ifndef INITIATOR_IMPL_H
 #  define INITIATOR_IMPL_H
 
 #include "Triangle_TestS.h"
@@ -28,14 +28,15 @@ class Initiator_i : public POA_Initiator
   // = TITLE
   //     Implement the <Initiator> IDL interface.
 public:
-  Initiator_i (Object_A_ptr object_A_ptr, 
+  Initiator_i (Object_A_ptr object_A_ptr,
                   Object_B_ptr object_B_ptr);
   // Constructor.
 
   virtual ~Initiator_i (void);
   // Destructor.
 
-  virtual void foo_object_B (CORBA::Environment &env);
+  virtual void foo_object_B (ACE_ENV_SINGLE_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException));
 
 private:
   Object_A_var object_A_var_;

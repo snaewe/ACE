@@ -4,8 +4,10 @@
 // ACE_LSOCK_Stream classes.  If the platform supports threads it uses
 // a thread-per-request concurrency model.
 
-#include "ace/LSOCK_Acceptor.h"                             
+#include "ace/LSOCK_Acceptor.h"
 #include "ace/Thread_Manager.h"
+#include "ace/OS_main.h"
+#include "ace/OS_NS_unistd.h"
 
 ACE_RCSID(SOCK_SAP, CPP_unserver, "$Id$")
 
@@ -28,17 +30,17 @@ server (void *arg)
   // Make sure we're not in non-blocking mode.
   if (new_stream.disable (ACE_NONBLOCK) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       "%p\n",
-                       "disable"),
+                       ACE_TEXT ("%p\n"),
+                       ACE_TEXT ("disable")),
                        0);
-                       
+
   if (new_stream.get_remote_addr (cli_addr) == -1)
     ACE_ERROR ((LM_ERROR,
-                "%p\n",
-                "get_remote_addr"));
+                ACE_TEXT ("%p\n"),
+                ACE_TEXT ("get_remote_addr")));
 
   ACE_DEBUG ((LM_DEBUG,
-              "(%P|%t) client connected from %s\n", 
+              ACE_TEXT ("(%P|%t) client connected from %C\n"),
               cli_addr.get_path_name ()));
 
   // Read data from client (terminate on error).
@@ -52,38 +54,38 @@ server (void *arg)
       if (r_bytes == -1)
         {
           ACE_ERROR ((LM_ERROR,
-                      "%p\n",
-                      "recv"));
+                      ACE_TEXT ("%p\n"),
+                      ACE_TEXT ("recv")));
           break;
 
         }
       else if (r_bytes == 0)
         {
           ACE_DEBUG ((LM_DEBUG,
-                      "(%P|%t) reached end of input, connection closed by client\n"));
+                      ACE_TEXT ("(%P|%t) reached end of input, connection closed by client\n")));
           break;
         }
       else if (verbose && ACE::write_n (ACE_STDOUT, buf, r_bytes) != r_bytes)
         ACE_ERROR ((LM_ERROR,
-                    "%p\n",
-                    "ACE::write_n"));
+                    ACE_TEXT ("%p\n"),
+                    ACE_TEXT ("ACE::write_n")));
       else if (new_stream.send_n (buf, r_bytes) != r_bytes)
         ACE_ERROR ((LM_ERROR,
-                    "%p\n",
-                    "send_n"));
+                    ACE_TEXT ("%p\n"),
+                    ACE_TEXT ("send_n")));
     }
 
   // Close new endpoint (listening endpoint stays open).
   if (new_stream.close () == -1)
     ACE_ERROR ((LM_ERROR,
-                "%p\n",
-                "close"));
+                ACE_TEXT ("%p\n"),
+                ACE_TEXT ("close")));
 
   return 0;
 }
 
 static int
-run_event_loop (const char rendezvous[])
+run_event_loop (const ACE_TCHAR rendezvous[])
 {
   ACE_LSOCK_Acceptor peer_acceptor;
 
@@ -96,22 +98,22 @@ run_event_loop (const char rendezvous[])
 
   if (peer_acceptor.open (server_addr) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       "%p\n",
-                       "open"),
+                       ACE_TEXT ("%p\n"),
+                       ACE_TEXT ("open")),
                       1);
   else if (peer_acceptor.get_local_addr (server_addr) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       "%p\n",
-                       "get_local_addr"),
+                       ACE_TEXT ("%p\n"),
+                       ACE_TEXT ("get_local_addr")),
                        -1);
 
   ACE_DEBUG ((LM_DEBUG,
-              "starting server %s\n", 
+              ACE_TEXT ("starting server %C\n"),
               server_addr.get_path_name ()));
 
   // Keep these guys out here to prevent excessive constructor
   // calls...
-  ACE_LSOCK_Stream new_stream;                                   
+  ACE_LSOCK_Stream new_stream;
 
   // Performs the iterative server activities.
 
@@ -120,39 +122,38 @@ run_event_loop (const char rendezvous[])
       ACE_Time_Value timeout (ACE_DEFAULT_TIMEOUT);
 
       if (peer_acceptor.accept (new_stream, 0, &timeout) == -1)
-	{
-	  ACE_ERROR ((LM_ERROR,
-                      "%p\n",
-                      "accept"));
-	  continue;
-	}          
+        {
+          ACE_ERROR ((LM_ERROR,
+                      ACE_TEXT ("%p\n"),
+                      ACE_TEXT ("accept")));
+          continue;
+        }
 
 #if defined (ACE_HAS_THREADS)
       if (ACE_Thread_Manager::instance ()->spawn ((ACE_THR_FUNC) server,
-                                                  (void *) new_stream.get_handle (),
+                                                  reinterpret_cast<void *> (new_stream.get_handle ()),
                                                   THR_DETACHED) == -1)
         ACE_ERROR_RETURN ((LM_ERROR,
-                           "(%P|%t) %p\n",
-                           "spawn"),
+                           ACE_TEXT ("(%P|%t) %p\n"),
+                           ACE_TEXT ("spawn")),
                           1);
 #else
-      server ((void *) new_stream.get_handle ());
+      server (reinterpret_cast<void *> (new_stream.get_handle ()));
 #endif /* ACE_HAS_THREADS */
-    }  
+    }
 
-  /* NOTREACHED */
-  return 0;
+  ACE_NOTREACHED (return 0;)
 }
 
-int 
-main (int argc, char *argv[])
-{                                                                
+int
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
+{
   return run_event_loop (argc > 1 ? argv[1] : ACE_DEFAULT_RENDEZVOUS);
 }
 #else
-int main (int, char *[])
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
-  ACE_ERROR_RETURN ((LM_ERROR, 
-		     "this platform does not support UNIX-domain sockets\n"), -1);
+  ACE_ERROR_RETURN ((LM_ERROR,
+                     "this platform does not support UNIX-domain sockets\n"), -1);
 }
 #endif /* ACE_LACKS_UNIX_DOMAIN_SOCKETS */

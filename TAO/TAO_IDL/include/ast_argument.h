@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,54 +62,61 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_ARGUMENT_AST_ARGUMENT_HH
 #define _AST_ARGUMENT_AST_ARGUMENT_HH
 
 // Representation of argument to operation:
-//
 // An argument is a field with a direction attached
 
-/*
-** DEPENDENCIES: ast_field.hh, utl_scoped_name.hh, ast_type.hh
-**		 utl_strlist.hh, ast_decl.hh
-**
-** USE: Included from ast.hh
-*/
-
-#include	"idl_fwd.h"
-#include	"idl_narrow.h"
-#include	"ast_field.h"
+#include "ast_field.h"
 
 
-class AST_Argument : public virtual AST_Field
+class TAO_IDL_FE_Export AST_Argument : public virtual AST_Field
 {
 public:
-  // Define enum with values denoting argument passing directions
-  enum Direction {dir_IN, dir_OUT, dir_INOUT};
+  // Define enum with values denoting argument passing directions.
+  enum Direction
+    {
+      dir_IN    = 0x01,
+      dir_OUT   = 0x02,
+      dir_INOUT = 0x04
+    };
 
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_Argument();
-  AST_Argument(Direction direction, AST_Type *ft, UTL_ScopedName *n,
-	       UTL_StrList *p);
-  virtual ~AST_Argument() {}
+  // Constructor(s).
+  AST_Argument (void);
 
-  // Data Accessors
-  Direction direction();
+  AST_Argument (Direction direction,
+                AST_Type *ft,
+                UTL_ScopedName *n);
+
+  // Destructor.
+  virtual ~AST_Argument (void);
+
+  // Data Accessors.
+  Direction direction (void);
 
   // Narrowing
   DEF_NARROW_METHODS1(AST_Argument, AST_Field);
   DEF_NARROW_FROM_DECL(AST_Argument);
 
-  // AST Dumping
-  virtual void		dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  const Direction	pd_direction;	// Argument direction
+  // Data.
+
+  const Direction pd_direction;
+  // Argument direction
 };
 
 #endif           // _AST_ARGUMENT_AST_ARGUMENT_HH

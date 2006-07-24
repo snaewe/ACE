@@ -1,31 +1,34 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 
-/* Copyright (C) 1989 Free Software Foundation, Inc.
-   written by Douglas C. Schmidt (schmidt@ics.uci.edu)
+// Copyright (C) 1989 Free Software Foundation, Inc.
+// written by Douglas C. Schmidt (schmidt@cs.wustl.edu)
 
-This file is part of GNU GPERF.
+// This file is part of GNU GPERF.
 
-GNU GPERF is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation; either version 1, or (at your option) any
-later version.
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
 
-GNU GPERF is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with GNU GPERF; see the file COPYING.  If not, write to the Free
-Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111,
-USA.  */
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-#if !defined (OPTIONS_H)
+#ifndef OPTIONS_H
 #define OPTIONS_H
 
-#include "ace/OS.h"
 #include "ace/Log_Msg.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 #if defined (ACE_HAS_GPERF)
 
@@ -33,7 +36,7 @@ USA.  */
 
 enum Option_Type
 {
-  DEBUG        = 01,            // Enable debugging (prints diagnostics to stderr).
+  DEBUGGING    = 01,            // Enable debugging (prints diagnostics to stderr).
   ORDER        = 02,            // Apply ordering heuristic to speed-up search time.
   ANSI         = 04,            // Generate ANSI prototypes.
   ALLCHARS     = 010,           // Use all characters in hash function.
@@ -53,19 +56,27 @@ enum Option_Type
   CONSTANT     = 0400000,       // Make the generated tables readonly (const).
   CPLUSPLUS    = 01000000,      // Generate C++ code.
   C            = 02000000,      // Generate C code.
-  ENUM	       = 04000000,      // Use enum for constants.
+  ENUM         = 04000000,      // Use enum for constants.
   STRCASECMP   = 010000000,     // Use the case insensitive comparison.
   OPTIMIZE     = 020000000,     // Assume all input keywords are in the keyset.
   ADA          = 040000000,     // Generate Ada code.
   MUTE         = 0100000000,    // Dont print the warnings.
   SKIPCLASS    = 0200000000,    // Skip the class definition part in the output while in C++ mode.
-  SKIPSTRINGH  = 0400000000     // Skip including the header file string.h.
+  SKIPSTRINGH  = 0400000000,    // Skip including the header file string.h.
+  BINARYSEARCH = 01000000000,   // Generates Binary Search code.
+  LINEARSEARCH = 02000000000    // Generates Linear Search code.
 };
 
 // Define some useful constants (these don't really belong here, but
 // I'm not sure where else to put them!).  These should be consts, but
 // g++ doesn't seem to do the right thing with them at the
 // moment... ;-(
+
+// PharLap ETS defines EOS as well... so if building for ETS, clear out
+// their EOS.
+#if defined (ACE_HAS_PHARLAP) && defined (EOS)
+# undef EOS
+#endif /* ACE_HAS_PHARLAP && EOS */
 
 enum
 {
@@ -92,73 +103,77 @@ public:
   Options (void);
   ~Options (void);
   int operator[] (Option_Type option);
-  void operator() (int argc, char *argv[]);
+  int parse_args (int argc, char *argv[]);
   void operator= (enum Option_Type);
-  void operator!= (enum Option_Type);
+  bool operator!= (enum Option_Type);
   static void print_options (void);
-  static void set_asso_max (int r);
-  static int get_asso_max (void);
+  static void asso_max (int r);
+  static int asso_max (void);
   static void reset (void);
   static int get (void);
-  static int get_iterations (void);
-  static int get_max_keysig_size (void);
-  static void set_keysig_size (int);
-  static int get_jump (void);
+  static int iterations (void);
+  static u_int max_keysig_size (void);
+  static void keysig_size (u_int);
+  static int jump (void);
   static int initial_value (void);
-  static int get_total_switches (void);
-  static const char *get_function_name (void);
-  static const char *get_key_name (void);
-  static const char *get_class_name (void);
-  static const char *get_hash_name (void);
-  static const char *get_delimiter (void);
+  static int total_switches (void);
+  static const char *function_name (void);
+  static const char *fill_default (void);
+  static const char *key_name (void);
+  static const char *class_name (void);
+  static const char *hash_name (void);
+  static const char *delimiter (void);
 
 private:
-  static int option_word;
+  static int option_word_;
   // Holds the user-specified Options.
 
-  static int total_switches;
+  static int total_switches_;
   // Number of switch statements to generate.
 
-  static int total_keysig_size;
+  static u_int total_keysig_size_;
   // Total number of distinct key_positions.
 
-  static int size;
+  static int size_;
   // Range of the hash table.
 
-  static int key_pos;
+  static int key_pos_;
   // Tracks current key position for Iterator.
 
-  static int jump;
+  static int jump_;
   // Jump length when trying alternative values.
 
-  static int initial_asso_value;
+  static int initial_asso_value_;
   // Initial value for asso_values table.
 
-  static int argument_count;
-  // Records count of command-line arguments.
-
-  static int iterations;
+  static int iterations_;
   // Amount to iterate when a collision occurs.
 
-  static char **argument_vector;
+  static int argc_;
+  // Records count of command-line arguments.
+
+  static char **argv_;
   // Stores a pointer to command-line vector.
 
-  static const char *function_name;
+  static const char *function_name_;
   // Names used for generated lookup function.
 
-  static const char *key_name;
+  static const char  *fill_default_;
+  // Expression used to assign default values in keyword table.
+
+  static const char *key_name_;
   // Name used for keyword key.
 
-  static const char *class_name;
+  static const char *class_name_;
   // Name used for generated C++ class.
 
-  static const char *hash_name;
+  static const char *hash_name_;
   // Name used for generated hash function.
 
-  static const char *delimiters;
+  static const char *delimiters_;
   // Separates keywords from other attributes.
 
-  static char key_positions[MAX_KEY_POS];
+  static char key_positions_[MAX_KEY_POS];
   // Contains user-specified key choices.
 
   static int key_sort (char *base, int len);
@@ -171,12 +186,5 @@ private:
 // Global option coordinator for the entire program.
 extern Options option;
 
-// If we're using GCC then we'll stack-allocate some large arrays.  If
-// this causes problems simple disable this #define.
-#if defined (__GNUC__)
-#define LARGE_STACK_ARRAYS
-#endif /* LARGE_STACK_ARRAYS */
-
 #endif /* ACE_HAS_GPERF */
-
 #endif /* OPTIONS_H */

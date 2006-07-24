@@ -1,88 +1,99 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-//
-// = FILENAME
-//    Priority_Reactor.h
-//
-// = AUTHOR
-//    Doug Schmidt
-//
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Priority_Reactor.h
+ *
+ *  $Id$
+ *
+ *  @author Carlos O'Ryan <coryan@uci.edu>
+ */
+//=============================================================================
 
-#if !defined (ACE_PRIORITY_REACTOR_H)
+#ifndef ACE_PRIORITY_REACTOR_H
 #define ACE_PRIORITY_REACTOR_H
+#include /**/ "ace/pre.h"
 
-#include "ace/Containers.h"
+#include "ace/ACE_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Select_Reactor.h"
+#include "ace/Unbounded_Queue.h"
 
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class ACE_Priority_Reactor
+ *
+ * @brief Implements priority based dispatching.
+ *
+ * This class refines the dispatching mechanism for the
+ * Select_Reactor by taking advantage of the priority method on
+ * ACE_Event_Handler.
+ */
 class ACE_Export ACE_Priority_Reactor : public ACE_Select_Reactor
 {
-  // = TITLE
-  //     Implements priority based dispatching.
-  //
-  // = DESCRIPTION
-  //     This class refines the dispatching mechanism for the
-  //     Select_Reactor by taking advantage of the priority method on
-  //     ACE_Event_Handler.
 public:
   // = Initialization and termination methods.
 
+  /// Initialize <ACE_Priority_Reactor> with the default size.
   ACE_Priority_Reactor (ACE_Sig_Handler * = 0,
-			ACE_Timer_Queue * = 0);
-  // Initialize <ACE_Priority_Reactor> with the default size.
+                        ACE_Timer_Queue * = 0);
 
+  /// Initialize <ACE_Priority_Reactor> with size <size>.
   ACE_Priority_Reactor (size_t size,
-			int restart = 0,
-			ACE_Sig_Handler * = 0,
-			ACE_Timer_Queue * = 0);
-  // Initialize <ACE_Priority_Reactor> with size <size>.
+                        int restart = 0,
+                        ACE_Sig_Handler * = 0,
+                        ACE_Timer_Queue * = 0);
 
+  /// Close down the select_reactor and release all of its resources.
   virtual ~ACE_Priority_Reactor (void);
-  // Close down the select_reactor and release all of its resources.
 
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 protected:
   // = Dispatching methods.
 
+  /// We simply override this function to implement the priority
+  /// dispatching.
   virtual int dispatch_io_set (int number_of_active_handles,
-			       int& number_dispatched,
-			       int mask,
-			       ACE_Handle_Set& dispatch_mask,
-			       ACE_Handle_Set& ready_mask,
-			       ACE_EH_PTMF callback);
-  // We simply override this function to implement the priority
-  // dispatching.
+                               int &number_dispatched,
+                               int mask,
+                               ACE_Handle_Set &dispatch_mask,
+                               ACE_Handle_Set &ready_mask,
+                               ACE_EH_PTMF callback);
 
 private:
+  /// A small helper to initialize the bucket.
   void init_bucket (void);
-  // A small helper to initialize the bucket.
 
+  /// Build the bucket from the given dispatch_mask
+  void build_bucket (ACE_Handle_Set& dispatch_mask,
+                     int &min_priority,
+                     int &max_priority);
+
+  /// There is a queue per-priority, which simply holds the
+  /// Event_Handlers until we know who goes first.
   typedef ACE_Unbounded_Queue<ACE_Event_Tuple> QUEUE;
   QUEUE** bucket_;
-  // There is a queue per-priority, which simply holds the
-  // Event_Handlers until we knwo who goes first.
 
+  /// The queues themselves use this allocator to minimize dynamic
+  /// memory usage.
   ACE_Allocator* tuple_allocator_;
-  // The queues themselves use this allocator to minimize dynamic
-  // memory usage.
 
-  ACE_Priority_Reactor (const ACE_Select_Reactor &);
-  ACE_Priority_Reactor &operator = (const ACE_Select_Reactor &);
-  // Deny access since member-wise won't work...
+  /// Deny access since member-wise won't work...
+  ACE_Priority_Reactor (const ACE_Priority_Reactor &);
+  ACE_Priority_Reactor &operator = (const ACE_Priority_Reactor &);
 };
 
-#if defined (__ACE_INLINE__)
-#include "ace/Priority_Reactor.i"
-#endif /* __ACE_INLINE__ */
+ACE_END_VERSIONED_NAMESPACE_DECL
 
+#include /**/ "ace/post.h"
 #endif /* ACE_PRIORITY_REACTOR_H */

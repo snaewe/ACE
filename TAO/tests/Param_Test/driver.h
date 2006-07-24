@@ -17,10 +17,11 @@
 //
 // ============================================================================
 
-#if !defined (DRIVER_H)
+#ifndef DRIVER_H
 #define DRIVER_H
 
 #include "options.h"
+#include "param_testC.h"
 
 class Driver
 {
@@ -48,5 +49,4 @@ private:
   // object reference (we do not own it)
 };
 
-typedef ACE_Singleton<Driver, ACE_SYNCH_RECURSIVE_MUTEX> DRIVER;
 #endif /* !defined */

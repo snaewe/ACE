@@ -10,8 +10,8 @@
 //
 // = DESCRIPTION
 //  Test all the member functions of the OCTET class. An Object
-//  representing an ASN.1 Integer64 SMI OCTET STRING SYNTAX. 
-// 
+//  representing an ASN.1 Integer64 SMI OCTET STRING SYNTAX.
+//
 // = AUTHOR
 //    Michael R. MacFaden <mrm@cisco.com>
 //
@@ -19,7 +19,7 @@
 
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 Copyright 1997 Cisco Systems, Inc.
- 
+
 Permission to use, copy, modify, and distribute this software for any
 purpose and without fee is hereby granted, provided that this
 copyright and permission notice appear on all copies of the software and
@@ -28,7 +28,7 @@ in advertising or publicity pertaining to distribution of the
 program without specific prior permission, and notice be given
 in supporting documentation that modification, copying and distribution is by
 permission of Cisco Systems, Inc.
- 
+
 Cisco Systems, Inc. makes no representations about the suitability of this
 software for any purpose.  THIS SOFTWARE IS PROVIDED ``AS IS''
 AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT
@@ -38,40 +38,36 @@ LIABLE FOR ANY DAMAGES ARISING OUT OF THIS LICENSE OR YOUR USE OF THE
 SOFTWARE INCLUDING WITHOUT LIMITATION, DIRECT, INDIRECT OR CONSEQUENTIAL
 DAMAGES.
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-*/
- 
- 
-#include "ace/OS.h"
+
+#include "ace/OS_main.h"
+#include "ace/OS_NS_string.h"
 #include "asnmp/octet.h"
 #include "test_config.h"
- 
+
 ACE_RCSID(tests, Octet_Test, "$Id$")
 
-// hack: do this so when linking SUNC 4.x compiler will instantiate template
-#include "ace/Containers.h"
-ACE_Unbounded_Set<ACE_Log_Msg*> x;
- 
 /*
   OctetStr( const char *string, long size = -1);
   OctetStr ( const OctetStr &octet);
   ~OctetStr();
- 
+
   SmiUINT32 get_syntax();
   void set_data( const SmiBYTE* string, long int size = -1);
   OctetStr& operator=( const char *string);
   OctetStr& operator=( const OctetStr &octet);
 
-  int operator==( const OctetStr &lhs, const OctetStr &rhs);
-  int operator!=( const OctetStr &lhs, const OctetStr &rhs);
-  int operator<( const OctetStr &lhs, const OctetStr &rhs);
-  int operator<=( const OctetStr &lhs,const OctetStr &rhs);
-  int operator>( const OctetStr &lhs, const OctetStr &rhs);
-  int operator>=( const OctetStr &lhs, const OctetStr &rhs);
-  int operator==( const OctetStr &lhs,const char *rhs);
-  int operator!=( const OctetStr &lhs,const char  *rhs);
-  int operator<( const OctetStr &lhs,const char  *rhs);
-  int operator<=( const OctetStr &lhs,char  *rhs);
-  int operator>( const OctetStr &lhs,const char  *rhs);
-  int operator>=( const OctetStr &lhs,const char  *rhs);
+  bool operator==( const OctetStr &lhs, const OctetStr &rhs);
+  bool operator!=( const OctetStr &lhs, const OctetStr &rhs);
+  bool operator<( const OctetStr &lhs, const OctetStr &rhs);
+  bool operator<=( const OctetStr &lhs,const OctetStr &rhs);
+  bool operator>( const OctetStr &lhs, const OctetStr &rhs);
+  bool operator>=( const OctetStr &lhs, const OctetStr &rhs);
+  bool operator==( const OctetStr &lhs,const char *rhs);
+  bool operator!=( const OctetStr &lhs,const char  *rhs);
+  bool operator<( const OctetStr &lhs,const char  *rhs);
+  bool operator<=( const OctetStr &lhs,char  *rhs);
+  bool operator>( const OctetStr &lhs,const char  *rhs);
+  bool operator>=( const OctetStr &lhs,const char  *rhs);
   OctetStr& operator+=( const SmiBYTE  *a);
   OctetStr& operator+=( const char c);
   OctetStr& operator+=( const OctetStr& octetstr);
@@ -84,11 +80,11 @@ ACE_Unbounded_Set<ACE_Log_Msg*> x;
   char *to_string_hex();
   SnmpSyntax  *clone() const;
   SnmpSyntax& operator=( SnmpSyntax &val);
- */ 
+ */
 
 static void TestOctet()
 {
-  char *str = "A test of octet strings...!@@#$%^&*()_+|~{}:,./<>?";
+  const char *str = "A test of octet strings...!@@#$%^&*()_+|~{}:,./<>?";
   OctetStr o1;
   ACE_ASSERT(o1.valid() == 1);
   ACE_ASSERT(o1.length() == 0);
@@ -148,17 +144,13 @@ static void TestOctet()
    ACE_ASSERT(!(o3 != o3));
 
 }
- 
+
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST ("Octet_Test");
- 
-  TestOctet(); 
+  ACE_START_TEST (ACE_TEXT ("Octet_Test"));
+
+  TestOctet();
   ACE_END_TEST;
   return 0;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Unbounded_Set<ACE_Log_Msg*>;
-#endif

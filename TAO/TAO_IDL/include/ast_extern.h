@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,27 +67,22 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _AST_EXTERN_AST_EXTERN_HH
 #define _AST_EXTERN_AST_EXTERN_HH
 
-// ast_extern.hh
-//
+
+
+class AST_Type;
+class AST_Decl;
+
 // Declares all global functions for the AST
 
-/*
-** DEPENDENCIES: none
-**
-** USE: Included from idl_extern.hh
-*/
-
-// Functions:
-
 // Two functions are provided for storing AST nodes representing fwd
-// declared interfaces, and for checking the stored nodes after parsing
-// the entire AST. The check ensures that for each fwd declared interface
-// the full definition was also seen.
+// declared structs and unions, and for checking the stored nodes after
+// parsing the entire AST. The check ensures that for each fwd declared
+// type the full definition was also seen.
 
-extern void	AST_record_fwd_interface(AST_InterfaceFwd *i);
-extern void	AST_check_fwd_interface();
-
-extern idl_bool	AST_illegal_recursive_type(AST_Decl *t);
+extern void AST_record_fwd_decl (AST_Type *i);
+extern TAO_IDL_FE_Export void AST_check_fwd_decls (void);
+extern bool AST_illegal_recursive_type (AST_Decl *t);
+extern bool AST_illegal_interface_recursion (AST_Decl *t);
 
 #endif           // _AST_EXTERN_AST_EXTERN_HH
 

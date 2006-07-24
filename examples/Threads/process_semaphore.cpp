@@ -3,8 +3,12 @@
 // This program tests ACE_Process_Semaphore.  To run it, open 3 or 4
 // windows and run this program in each window...
 
-#include "ace/Synch.h"
+#include "ace/OS_main.h"
+#include "ace/OS_NS_unistd.h"
 #include "ace/Signal.h"
+#include "ace/Log_Msg.h"
+#include "ace/Process_Semaphore.h"
+#include "ace/OS_NS_stdlib.h"
 
 ACE_RCSID(Threads, process_semaphore, "$Id$")
 
@@ -17,9 +21,9 @@ handler (int)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
-  const char *name = argc == 1 ? "hello" : argv[1];
+  const ACE_TCHAR *name = argc == 1 ? ACE_TEXT("hello") : argv[1];
   int iterations =  argc > 2 ? ACE_OS::atoi (argv[2]) : 100;
 
   ACE_Process_Semaphore pm (1, name);
@@ -31,30 +35,29 @@ main (int argc, char *argv[])
     {
       ACE_DEBUG ((LM_DEBUG, "(%P|%t) = acquiring\n"));
       if (pm.acquire () == -1)
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "acquire failed"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "acquire failed"));
       else
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = acquired\n"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = acquired\n"));
 
       ACE_OS::sleep (3);
 
       if (pm.release () == -1)
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "release failed"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "release failed"));
       else
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = released\n"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = released\n"));
 
       if (pm.tryacquire () == -1)
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "tryacquire failed"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "tryacquire failed"));
       else
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = tryacquire\n"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = tryacquire\n"));
 
       if (pm.release () == -1)
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "release failed"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = %p\n", "release failed"));
       else
-	ACE_DEBUG ((LM_DEBUG, "(%P|%t) = released\n"));
+        ACE_DEBUG ((LM_DEBUG, "(%P|%t) = released\n"));
     }
 
   if (argc > 2)
     pm.remove ();
   return 0;
 }
-

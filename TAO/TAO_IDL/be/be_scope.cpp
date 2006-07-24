@@ -1,20 +1,33 @@
 //
 // $Id$
 //
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_scope.h"
+#include "be_valuetype.h"
+#include "be_eventtype.h"
+#include "be_component.h"
+#include "be_home.h"
+#include "be_module.h"
+#include "be_exception.h"
+#include "be_union.h"
+#include "be_structure.h"
+#include "be_enum.h"
+#include "be_operation.h"
+#include "be_factory.h"
+#include "be_root.h"
+#include "be_visitor.h"
 
-ACE_RCSID(be, be_scope, "$Id$")
+ACE_RCSID (be, 
+           be_scope, 
+           "$Id$")
 
-
-// Default Constructor
+// Default Constructor.
 be_scope::be_scope (void)
-  : comma_ (0)
+  : UTL_Scope (),
+    comma_ (0)
 {
 }
 
-// Constructor
+// Constructor.
 be_scope::be_scope (AST_Decl::NodeType type)
   : UTL_Scope (type),
     comma_ (0)
@@ -25,7 +38,8 @@ be_scope::~be_scope (void)
 {
 }
 
-// Code generation methods
+// Code generation methods.
+
 void
 be_scope::comma (unsigned short comma)
 {
@@ -38,87 +52,22 @@ be_scope::comma (void) const
   return this->comma_;
 }
 
-int
-be_scope::gen_encapsulation (void)
-{
-  UTL_ScopeActiveIterator *si;
-  AST_Decl *d;
-  be_decl *bd;
-
-  // if there are elements in this scope
-  if (this->nmembers () > 0)
-    {
-      // instantiate a scope iterator.
-      si = new UTL_ScopeActiveIterator (this, UTL_Scope::IK_decls);
-
-      while (!(si->is_done ()))
-        {
-          // get the next AST decl node
-          d = si->item ();
-          bd = be_decl::narrow_from_decl (d);
-          if (bd->gen_encapsulation () == -1)
-            {
-              // failure
-              return -1;
-            }
-          si->next ();
-        } // end of while
-      delete si; // free the iterator object
-    }
-  return 0;
-}
-
-long
-be_scope::tc_encap_len (void)
-{
-  UTL_ScopeActiveIterator *si;
-  AST_Decl *d;
-  be_decl *bd;
-  long encap_len = 0;
-
-  if (this->nmembers () > 0)
-    {
-      // if there are elements in this scope
-
-      si = new UTL_ScopeActiveIterator (this, UTL_Scope::IK_decls);
-      // instantiate a scope iterator.
-
-      while (!(si->is_done ()))
-        {
-          // get the next AST decl node
-          d = si->item ();
-
-          // NOTE: Our assumptin here is that whatever scope we are in, the
-          // node type that shows up here *MUST* be valid according to the
-          // IDL grammar. We do not check for this since the front end must
-          // have taken care of weeding out such errors
-
-          bd = be_decl::narrow_from_decl (d);
-          if (bd != 0)
-            {
-              encap_len += bd->tc_encap_len ();
-            }
-          else
-            {
-              ACE_DEBUG ((LM_DEBUG,
-                          "WARNING (%N:%l): be_scope::tc_encap_len - "
-                          "narrow_from_decl returned 0\n"));
-            }
-          si->next ();
-        } // end of while
-      delete si; // free the iterator object
-    }
-  return encap_len;
-}
-
-// return the scope created by this node (if one exists, else NULL)
+// Return the scope created by this node (if one exists, else NULL).
 be_decl *
 be_scope::decl (void)
 {
-  switch (this->scope_node_type())
+  switch (this->scope_node_type ())
     {
     case AST_Decl::NT_interface:
       return be_interface::narrow_from_scope (this);
+    case AST_Decl::NT_valuetype:
+      return be_valuetype::narrow_from_scope (this);
+    case AST_Decl::NT_eventtype:
+      return be_eventtype::narrow_from_scope (this);
+    case AST_Decl::NT_component:
+      return be_component::narrow_from_scope (this);
+    case AST_Decl::NT_home:
+      return be_home::narrow_from_scope (this);
     case AST_Decl::NT_module:
       return be_module::narrow_from_scope (this);
     case AST_Decl::NT_root:
@@ -133,9 +82,16 @@ be_scope::decl (void)
       return be_enum::narrow_from_scope (this);
     case AST_Decl::NT_op:
       return be_operation::narrow_from_scope (this);
+    case AST_Decl::NT_factory:
+      return be_factory::narrow_from_scope (this);
     default:
       return (be_decl *)0;
     }
+}
+
+void
+be_scope::destroy (void)
+{
 }
 
 int
@@ -144,6 +100,6 @@ be_scope::accept (be_visitor *visitor)
   return visitor->visit_scope (this);
 }
 
-// narrowing methods
+// Narrowing methods.
 IMPL_NARROW_METHODS1 (be_scope, UTL_Scope)
 IMPL_NARROW_FROM_SCOPE (be_scope)

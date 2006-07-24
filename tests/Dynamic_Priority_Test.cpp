@@ -10,10 +10,11 @@
 //
 // = DESCRIPTION
 //    This is a test to verify and illustrate the static and dynamic
-//    priority mechanisms of the ACE_Message_Queue class and the
-//    ACE_Dynamic_Message_Queue class. As in the Priority_Buffer_Test,
-//    a producer generates messages and enqueues them, and a consumer
-//    dequeues them and checks their ordering.
+//    priority mechanisms of the <ACE_Message_Queue> class and the
+//    <ACE_Dynamic_Message_Queue> class.  As in the
+//    <Priority_Buffer_Test>, a producer generates messages and
+//    enqueues them, and a consumer dequeues them and checks their
+//    ordering.
 //
 //    In these tests, every effort is made to ensure that there is
 //    plenty of time for the messages to be enqueued and dequeued,
@@ -52,14 +53,13 @@
 #include "ace/High_Res_Timer.h"
 #include "ace/Sched_Params.h"
 
+#if defined (VXWORKS)
+# include "ace/OS_NS_string.h"
+#endif /* VXWORKS */
+
 ACE_RCSID(tests, Dynamic_Priority_Test, "$Id$")
 
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
-
-
+#if defined (ACE_HAS_TIMED_MESSAGE_BLOCKS)
 enum Test_Type {BEST, WORST, RANDOM};
 
 class ArgStruct
@@ -139,9 +139,12 @@ order_consumer (void *args)
 {
   ACE_ASSERT (args != 0);
 
-  ACE_Message_Queue<ACE_SYNCH> *msg_queue = ACE_static_cast (ArgStruct *, args)->queue_;
-  const char *receipt_order = ACE_static_cast (ArgStruct *, args)->order_string_;
-  u_int expected_count = ACE_static_cast (ArgStruct *, args)->expected_count_;
+  ACE_Message_Queue<ACE_SYNCH> *msg_queue =
+    static_cast<ArgStruct *> (args)->queue_;
+  const char *receipt_order =
+    static_cast<ArgStruct *> (args)->order_string_;
+  u_int expected_count =
+    static_cast<ArgStruct *> (args)->expected_count_;
 
   ACE_ASSERT (receipt_order != 0);
   ACE_ASSERT (msg_queue != 0);
@@ -182,10 +185,14 @@ order_producer (void *args)
 {
   ACE_ASSERT (args != 0);
 
-  ACE_Message_Queue<ACE_SYNCH> *msg_queue = ACE_static_cast (ArgStruct *, args)->queue_;
-  const char *send_order = ACE_static_cast (ArgStruct *, args)->order_string_;
-  ACE_Message_Block **block_array = ACE_static_cast (ArgStruct *, args)->array_;
-  int expected_count = ACE_static_cast (ArgStruct *, args)->expected_count_;
+  ACE_Message_Queue<ACE_SYNCH> *msg_queue =
+    static_cast<ArgStruct *> (args)->queue_;
+  const char *send_order =
+    static_cast<ArgStruct *> (args)->order_string_;
+  ACE_Message_Block **block_array =
+    static_cast<ArgStruct *> (args)->array_;
+  int expected_count =
+    static_cast<ArgStruct *> (args)->expected_count_;
 
   ACE_ASSERT (send_order != 0);
   ACE_ASSERT (block_array != 0);
@@ -204,7 +211,7 @@ order_producer (void *args)
 
       // Set the current send character in the current message block
       // at its read pointer position, and adjust the write pointer.
-      *mb->rd_ptr () = *c;
+      *mb->wr_ptr () = *c;
       mb->wr_ptr (1);
 
 
@@ -255,7 +262,9 @@ run_order_test (ACE_Message_Queue<ACE_SYNCH>* msg_queue,
       supplier_args.array_[i]->msg_priority (i);
 
       // Assign every other message short or long execution time.
-      supplier_args.array_[i]->msg_execution_time (((i % 2) ? slow_execution : fast_execution));
+      supplier_args.array_[i]->msg_execution_time (((i % 2)
+                                                    ? slow_execution
+                                                    : fast_execution));
     }
 
   consumer_args.queue_ = msg_queue;
@@ -282,7 +291,7 @@ run_order_test (ACE_Message_Queue<ACE_SYNCH>* msg_queue,
 
   for (i = 0; i < array_size; ++i)
     {
-      switch ((4*i)/array_size)
+      switch ((4 * i) / array_size)
         {
         case 0:
           supplier_args.array_[i]->msg_deadline_time (future_deadline);
@@ -298,7 +307,7 @@ run_order_test (ACE_Message_Queue<ACE_SYNCH>* msg_queue,
           break;
           // should never reach here, but its better to make sure
         default:
-          ACE_ASSERT ((4*i)/array_size < 4);
+          ACE_ASSERT ((4 * i) / array_size < 4);
           break;
         }
     }
@@ -333,8 +342,10 @@ performance_consumer (void * args)
 
   ACE_ASSERT (args != 0);
 
-  ACE_Message_Queue<ACE_SYNCH> *msg_queue = ACE_static_cast (ArgStruct *, args)->queue_;
-  u_int expected_count = ACE_static_cast (ArgStruct *, args)->expected_count_;
+  ACE_Message_Queue<ACE_SYNCH> *msg_queue =
+    static_cast<ArgStruct *> (args)->queue_;
+  u_int expected_count =
+    static_cast<ArgStruct *> (args)->expected_count_;
 
   ACE_ASSERT (msg_queue != 0);
 
@@ -348,19 +359,17 @@ performance_consumer (void * args)
   // Keep looping, reading a message out of the queue, until the
   // expected number of messages have been dequeued.
   for (local_count = 0; local_count < expected_count; ++local_count)
-    {
-      if (msg_queue->dequeue_head (mb) == -1)
-        break;
-    }
+    if (msg_queue->dequeue_head (mb) == -1)
+      break;
 
   // Stop timer, obtain and report its elapsed time.x
   timer.stop ();
   ACE_Time_Value tv;
   timer.elapsed_time (tv);
-  ACE_DEBUG ((LM_INFO, "%6u, %6u, %f",
+  ACE_DEBUG ((LM_INFO, ACE_TEXT ("%6u, %6u, %f"),
               local_count,
               tv.msec (),
-              (double) tv.msec () / local_count));
+              (ACE_timer_t) tv.msec () / local_count));
 
   ACE_ASSERT (local_count == expected_count);
   return 0;
@@ -379,9 +388,12 @@ performance_producer (void *args)
 
   ACE_ASSERT (args != 0);
 
-  ACE_Message_Queue<ACE_SYNCH> *msg_queue = ACE_static_cast (ArgStruct *, args)->queue_;
-  ACE_Message_Block **block_array = ACE_static_cast (ArgStruct *, args)->array_;
-  int expected_count = ACE_static_cast (ArgStruct *, args)->expected_count_;
+  ACE_Message_Queue<ACE_SYNCH> *msg_queue =
+    static_cast<ArgStruct *> (args)->queue_;
+  ACE_Message_Block **block_array =
+    static_cast<ArgStruct *> (args)->array_;
+  int expected_count =
+    static_cast<ArgStruct *> (args)->expected_count_;
 
   ACE_ASSERT (send_order != 0);
   ACE_ASSERT (block_array != 0);
@@ -403,7 +415,8 @@ performance_producer (void *args)
 
       // Set a character in the current message block at its
       // read pointer position, and adjust the write pointer.
-      *mb->rd_ptr () = 'a';
+      mb->reset();
+      *mb->wr_ptr () = 'a';
       mb->wr_ptr (1);
 
       // Enqueue the message block in priority order.
@@ -415,10 +428,10 @@ performance_producer (void *args)
   timer.stop ();
   ACE_Time_Value tv;
   timer.elapsed_time (tv);
-  ACE_DEBUG ((LM_INFO, "%6u, %6u, %f, ",
+  ACE_DEBUG ((LM_INFO, ACE_TEXT ("%6u, %6u, %f, "),
               local_count,
               tv.msec (),
-              (double) tv.msec () / local_count));
+              (ACE_timer_t) tv.msec () / local_count));
 
   ACE_ASSERT (local_count == expected_count);
   return 0;
@@ -465,35 +478,35 @@ run_performance_test (u_int min_load,
     {
     case BEST:
       ACE_DEBUG ((LM_INFO,
-                  "\n\nenqueued, best static time, best static avg, "
-                  "dequeued, best static time, best static avg, "
-                  "enqueued, best deadline time, best deadline avg, "
-                  "dequeued, best deadline time, best deadline avg, "
-                  "enqueued, best laxity time, best laxity avg, "
-                  "dequeued, best laxity time, best laxity avg\n"));
+                  ACE_TEXT ("\n\nenqueued, best static time, best static avg, ")
+                  ACE_TEXT ("dequeued, best static time, best static avg, ")
+                  ACE_TEXT ("enqueued, best deadline time, best deadline avg, ")
+                  ACE_TEXT ("dequeued, best deadline time, best deadline avg, ")
+                  ACE_TEXT ("enqueued, best laxity time, best laxity avg, ")
+                  ACE_TEXT ("dequeued, best laxity time, best laxity avg\n")));
       break;
     case WORST:
       ACE_DEBUG ((LM_INFO,
-                  "\n\nenqueued, worst static time, worst static avg, "
-                  "dequeued, worst static time, worst static avg, "
-                  "enqueued, worst deadline time, worst deadline avg, "
-                  "dequeued, worst deadline time, worst deadline avg, "
-                  "enqueued, worst laxity time, worst laxity avg, "
-                  "dequeued, worst laxity time, worst laxity avg\n"));
+                  ACE_TEXT ("\n\nenqueued, worst static time, worst static avg, ")
+                  ACE_TEXT ("dequeued, worst static time, worst static avg, ")
+                  ACE_TEXT ("enqueued, worst deadline time, worst deadline avg, ")
+                  ACE_TEXT ("dequeued, worst deadline time, worst deadline avg, ")
+                  ACE_TEXT ("enqueued, worst laxity time, worst laxity avg, ")
+                  ACE_TEXT ("dequeued, worst laxity time, worst laxity avg\n")));
 
       break;
     case RANDOM:
       ACE_DEBUG ((LM_INFO,
-                  "\n\nenqueued, random static time, random static avg, "
-                  "dequeued, random static time, random static avg, "
-                  "enqueued, random deadline time, random deadline avg, "
-                  "dequeued, random deadline time, random deadline avg, "
-                  "enqueued, random laxity time, random laxity avg, "
-                  "dequeued, random laxity time, random laxity avg\n"));
+                  ACE_TEXT ("\n\nenqueued, random static time, random static avg, ")
+                  ACE_TEXT ("dequeued, random static time, random static avg, ")
+                  ACE_TEXT ("enqueued, random deadline time, random deadline avg, ")
+                  ACE_TEXT ("dequeued, random deadline time, random deadline avg, ")
+                  ACE_TEXT ("enqueued, random laxity time, random laxity avg, ")
+                  ACE_TEXT ("dequeued, random laxity time, random laxity avg\n")));
       break;
     default:
       ACE_ERROR_RETURN ((LM_ERROR,
-                         "unknown test type %d",
+                         ACE_TEXT ("unknown test type %d"),
                          test_type),
                         -1);
     }
@@ -521,13 +534,16 @@ run_performance_test (u_int min_load,
       // Fill in information for all types of tests.
       for (i = 0; i < load; ++i)
         {
-          // construct a message new block off the heap, to hold a single character
+          // Construct a message new block off the heap, to hold a
+          // single character.
           ACE_NEW_RETURN (supplier_args.array_[i],
                           ACE_Message_Block (1),
                           -1);
 
           // Assign every other message short or long execution time.
-          supplier_args.array_[i]->msg_execution_time (((i % 2) ? slow_execution : fast_execution));
+          supplier_args.array_[i]->msg_execution_time (((i % 2)
+                                                        ? slow_execution
+                                                        : fast_execution));
         }
 
       // Fill in information for the specific type of test.
@@ -547,6 +563,7 @@ run_performance_test (u_int min_load,
               // Assign time to deadline in descending order.
               time_offsets [i] = time_offsets [i - 1] + offset_step;
             }
+
           break;
         case WORST:
           // Fill in worst case information.
@@ -598,7 +615,7 @@ run_performance_test (u_int min_load,
                 // This should only happen for a *very* large messages
                 // relative to the system's representation size.
                 ACE_ERROR_RETURN ((LM_ERROR,
-                                   "Insufficient range of random numbers"),
+                                   ACE_TEXT ("Insufficient range of random numbers")),
                                   -1);
               shuffle_index = random_int % load;
 
@@ -617,7 +634,7 @@ run_performance_test (u_int min_load,
           break;
         default:
           ACE_ERROR_RETURN ((LM_ERROR,
-                             "unknown test type %d",
+                             ACE_TEXT ("unknown test type %d"),
                              test_type),
                             -1);
         }
@@ -637,7 +654,7 @@ run_performance_test (u_int min_load,
 
       // Add a comma delimiter for most recent outputs.
       ACE_DEBUG ((LM_INFO,
-                  ", "));
+                  ACE_TEXT (", ")));
 
       // Run the performance test producer and consumer on the
       // deadline queue.
@@ -648,7 +665,7 @@ run_performance_test (u_int min_load,
 
       // Add a comma delimiter for most recent outputs.
       ACE_DEBUG ((LM_INFO,
-                  ", "));
+                  ACE_TEXT (", ")));
 
       // Run the performance test producer and consumer on the laxity
       // queue.
@@ -659,7 +676,7 @@ run_performance_test (u_int min_load,
 
       // Move to the next line of output.
       ACE_DEBUG ((LM_INFO,
-                  "\n"));
+                  ACE_TEXT ("\n")));
 
       delete [] time_offsets;
 
@@ -678,12 +695,14 @@ run_performance_test (u_int min_load,
   delete laxity_queue;
   return 0;
 }
+#endif /* ACE_HAS_TIMED_MESSAGE_BLOCKS */
 
 int
-main (int, ASYS_TCHAR *[])
+run_main (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Dynamic_Priority_Test"));
+  ACE_START_TEST (ACE_TEXT ("Dynamic_Priority_Test"));
 
+#if defined (ACE_HAS_TIMED_MESSAGE_BLOCKS)
   // Enable FIFO scheduling, e.g., RT scheduling class on Solaris.
   if (ACE_OS::sched_params (
         ACE_Sched_Params (
@@ -693,15 +712,15 @@ main (int, ASYS_TCHAR *[])
   {
     if (ACE_OS::last_error () == EPERM)
       ACE_DEBUG ((LM_MAX,
-                  "preempt: user is not superuser, "
-                  "so remain in time-sharing class\n"));
+                  ACE_TEXT ("user is not superuser, ")
+                  ACE_TEXT ("so remain in time-sharing class\n")));
     else if (ACE_OS::last_error () == ENOTSUP)
       ACE_DEBUG ((LM_MAX,
-                  "preempt: process scope scheduling not supported, "
-                  "so remain in time-sharing class\n"));
+                  ACE_TEXT ("process scope scheduling is not available, ")
+                  ACE_TEXT ("so remain in time-sharing class\n")));
     else
       ACE_ERROR_RETURN ((LM_ERROR,
-                         "%n: ACE_OS::sched_params failed\n%a"),
+                         ACE_TEXT ("%n: ACE_OS::sched_params failed\n%a")),
                         -1);
   }
 
@@ -709,23 +728,31 @@ main (int, ASYS_TCHAR *[])
   ACE_Message_Queue<ACE_SYNCH> *test_queue =
     ACE_Message_Queue_Factory<ACE_SYNCH>::create_static_message_queue (max_queue);
   ACE_ASSERT (test_queue != 0);
-  run_order_test (test_queue, send_order, static_receipt_order);
+  run_order_test (test_queue,
+                  send_order,
+                  static_receipt_order);
   delete test_queue;
 
   // Test factory, dynamic message queue (deadline strategy).
-  test_queue = ACE_Message_Queue_Factory<ACE_SYNCH>::create_deadline_message_queue (max_queue);
+  test_queue =
+    ACE_Message_Queue_Factory<ACE_SYNCH>::create_deadline_message_queue (max_queue);
   ACE_ASSERT (test_queue != 0);
-  run_order_test (test_queue, send_order, deadline_receipt_order);
+  run_order_test (test_queue,
+                  send_order,
+                  deadline_receipt_order);
   delete test_queue;
 
   // Test factory, dynamic message queue (laxity strategy).
-  test_queue =  ACE_Message_Queue_Factory<ACE_SYNCH>::create_laxity_message_queue (max_queue);
+  test_queue =
+    ACE_Message_Queue_Factory<ACE_SYNCH>::create_laxity_message_queue (max_queue);
   ACE_ASSERT (test_queue != 0);
-  run_order_test (test_queue, send_order, laxity_receipt_order);
+  run_order_test (test_queue,
+                  send_order,
+                  laxity_receipt_order);
   delete test_queue;
 
 #if defined (VXWORKS)
-  // test factory for VxWorks message queue
+  // test factory for VxWorks message queue.
   ACE_Message_Queue_Vx *test_queue_vx =
     ACE_Message_Queue_Factory<ACE_NULL_SYNCH>::create_Vx_message_queue (vx_max_queue,
                                                                         vx_msg_size);
@@ -744,21 +771,26 @@ main (int, ASYS_TCHAR *[])
 
   // For each of an increasing number of message loads, run the same
   // performance test (best case, worst case, and randomized, over
-  // each kind of queue
+  // each kind of queue).
   run_performance_test (MIN_LOAD,
                         MAX_LOAD,
                         LOAD_STEP,
                         BEST);
+
   run_performance_test (MIN_LOAD,
                         MAX_LOAD,
                         LOAD_STEP,
                         WORST);
+
   run_performance_test (MIN_LOAD,
                         MAX_LOAD,
                         LOAD_STEP,
                         RANDOM);
+#else
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("ACE is not compiled with ACE_HAS_TIMED_MESSAGE_BLOCKS enabled\n")));
+#endif /* ACE_HAS_TIMED_MESSAGE_BLOCKS */
+
   ACE_END_TEST;
   return 0;
 }
-
-

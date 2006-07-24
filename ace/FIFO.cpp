@@ -1,38 +1,44 @@
-// FIFO.cpp
 // $Id$
 
-/* -*- C++ -*- */
-
-#define ACE_BUILD_DLL
 #include "ace/FIFO.h"
 
 #if !defined (__ACE_INLINE__)
-#include "ace/FIFO.i"
+#include "ace/FIFO.inl"
 #endif /* __ACE_INLINE__ */
 
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_errno.h"
+#include "ace/OS_NS_sys_stat.h"
+#include "ace/OS_NS_fcntl.h"
+
 ACE_RCSID(ace, FIFO, "$Id$")
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_ALLOC_HOOK_DEFINE(ACE_FIFO)
 
 void
 ACE_FIFO::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_FIFO::dump");
 
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("rendezvous_ = %s"), this->rendezvous_));
+  ACE_DEBUG ((LM_DEBUG, ACE_LIB_TEXT ("rendezvous_ = %s"), this->rendezvous_));
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
 int
-ACE_FIFO::open (const char *r, int flags, int perms,
+ACE_FIFO::open (const ACE_TCHAR *r, int flags, mode_t perms,
                 LPSECURITY_ATTRIBUTES sa)
 {
   ACE_TRACE ("ACE_FIFO::open");
-  ACE_OS::strncpy (this->rendezvous_, r, MAXPATHLEN);
+  ACE_OS::strsncpy (this->rendezvous_, r, MAXPATHLEN);
 
-  if ((flags & O_CREAT) != 0 
-      && ACE_OS::mkfifo (this->rendezvous_, perms) == -1 
+  if ((flags & O_CREAT) != 0
+      && ACE_OS::mkfifo (this->rendezvous_, perms) == -1
       && !(errno == EEXIST))
     return -1;
 
@@ -40,14 +46,14 @@ ACE_FIFO::open (const char *r, int flags, int perms,
   return this->get_handle () == ACE_INVALID_HANDLE ? -1 : 0;
 }
 
-ACE_FIFO::ACE_FIFO (const char *fifo_name, 
-		    int flags, 
-		    int perms,
+ACE_FIFO::ACE_FIFO (const ACE_TCHAR *fifo_name,
+                    int flags,
+                    mode_t perms,
                     LPSECURITY_ATTRIBUTES sa)
 {
   ACE_TRACE ("ACE_FIFO::ACE_FIFO");
-  if (this->open (fifo_name, flags, perms, sa) == -1) 
-    ACE_ERROR ((LM_ERROR,  ASYS_TEXT ("%p\n"),  ASYS_TEXT ("ACE_FIFO")));
+  if (this->open (fifo_name, flags, perms, sa) == -1)
+    ACE_ERROR ((LM_ERROR,  ACE_LIB_TEXT ("%p\n"),  ACE_LIB_TEXT ("ACE_FIFO")));
 }
 
 ACE_FIFO::ACE_FIFO (void)
@@ -69,3 +75,4 @@ ACE_FIFO::close (void)
  return result;
 }
 
+ACE_END_VERSIONED_NAMESPACE_DECL

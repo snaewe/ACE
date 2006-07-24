@@ -1,72 +1,60 @@
 // $Id$
 
-/* -*- c++ -*- */
 // ============================================================================
 //
 // = LIBRARY
-//    TAO IDL Backend
+//    TAO IDL
 //
 // = FILENAME
 //    be_factory.h
 //
 // = DESCRIPTION
-//    Defines a factory that returns a specialized output stream object that
-//    understands a specific Front End
+//    Extension of class AST_Factory that provides additional means for C++
+//    mapping.
 //
 // = AUTHOR
-//    Aniruddha Gokhale
+//    Copyright 1994-1995 by Sun Microsystems, Inc.
+//    and
+//    Boris Kolpackov <bosk@ipmce.ru>
 //
 // ============================================================================
 
-#if !defined (TAO_BE_FACTORY_H)
-#define TAO_BE_FACTORY_H
+#ifndef BE_FACTORY_H
+#define BE_FACTORY_H
 
-class TAO_Visitor_Factory
+#include "be_scope.h"
+#include "be_decl.h"
+#include "ast_factory.h"
+
+class AST_Type;
+class UTL_StrList;
+class be_visitor;
+class be_argument;
+
+class be_factory : public virtual AST_Factory,
+                   public virtual be_scope,
+                   public virtual be_decl
 {
-  // =TITLE
-  //   TAO_Visitor_Factory
-  //
-  // =DESCRIPTION
-  //   Abstract factory that creates visitors
 public:
-  virtual ~TAO_Visitor_Factory (void);
-  // destructor
+  be_factory (void);
+  // Default constructor.
 
-  virtual be_visitor *make_visitor (be_visitor_context *) = 0;
-  // create the right visitor
+  be_factory (UTL_ScopedName *n);
+  // Constructor
 
+  ~be_factory (void);
+  // Destructor.
+
+  virtual void destroy (void);
+  // Cleanup method.
+
+  // Visiting.
+  virtual int accept (be_visitor *visitor);
+
+  // Narrowing
+  DEF_NARROW_METHODS3 (be_factory, AST_Factory, be_scope, be_decl);
+  DEF_NARROW_FROM_DECL (be_factory);
+  DEF_NARROW_FROM_SCOPE (be_factory);
 };
 
-class TAO_OutStream_Factory
-{
-  // =TITLE
-  //   TAO_OutStream_Factory
-  // =DESCRIPTION
-  //   factory to produce specialized instances of the output stream objects
-public:
-  enum TAO_OutStream_Type
-  {
-    TAO_SUNSOFT,
-    TAO_FLICK
-  };
-
-  TAO_OutStream_Factory (void);
-  // constructor
-
-  ~TAO_OutStream_Factory (void);
-  // destructor
-
-  TAO_OutStream *make_outstream (void);
-  // make the specialized out stream class
-
-  int set_stream_type (TAO_OutStream_Type t);
-  // set the stream type
-
-private:
-  TAO_OutStream_Type  strm_type_;
-};
-
-typedef ACE_Singleton<TAO_OutStream_Factory, ACE_SYNCH_RECURSIVE_MUTEX> TAO_OUTSTREAM_FACTORY;
-// Singleton instance of the OutStream factory
-
-#endif // if !defined
+#endif

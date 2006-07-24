@@ -1,85 +1,85 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Log_Priority.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Log_Priority.h
+ *
+ *  $Id$
+ *
+ *  @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//=============================================================================
 
-#if !defined (ACE_LOG_PRIORITY_H)
+#ifndef ACE_LOG_PRIORITY_H
 #define ACE_LOG_PRIORITY_H
 
+#include /**/ "ace/pre.h"
+
+#include "ace/config-lite.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @enum ACE_Log_Priority
+ *
+ * @brief This data type indicates the relative priorities of the
+ *    logging messages, from lowest to highest priority.
+ *
+ * These values are defined using powers of two so that it's
+ * possible to form a mask to turn them on or off dynamically.
+ * We only use 12 bits, however, so users are free to use the
+ * remaining 19 bits to define their own priority masks.
+ */
 enum ACE_Log_Priority
 {
-  // = TITLE
-  //     This data type indicates the relative priorities of the
-  //     logging messages, from lowest to highest priority.
-  //
-  // = DESCRIPTION
-  //     These values are defined using powers of two so that it's
-  //     possible to form a mask to turn them on or off dynamically.
+  // = Note, this first argument *must* start at 1!
 
-  // = Note, this first argument *must* start at 1! 
-
+  /// Shutdown the logger (decimal 1).
   LM_SHUTDOWN = 01,
-  // Shutdown the logger (decimal 1).
 
-  LM_TRACE = 02,    
-  // Messages indicating function-calling sequence (decimal 2).
+  /// Messages indicating function-calling sequence (decimal 2).
+  LM_TRACE = 02,
 
-  LM_DEBUG = 04,    
-  // Messages that contain information normally of use only when
-  // debugging a program (decimal 4).
+  /// Messages that contain information normally of use only when
+  /// debugging a program (decimal 4).
+  LM_DEBUG = 04,
 
-  LM_INFO = 010,	    
-  // Informational messages (decimal 8).
+  /// Informational messages (decimal 8).
+  LM_INFO = 010,
 
-  LM_NOTICE = 020,   
-  // Conditions that are not error conditions, but that may require
-  // special handling (decimal 16).
+  /// Conditions that are not error conditions, but that may require
+  /// special handling (decimal 16).
+  LM_NOTICE = 020,
 
-  LM_WARNING = 040,  
-  // Warning messages (decimal 32).
+  /// Warning messages (decimal 32).
+  LM_WARNING = 040,
 
-  LM_STARTUP = 0100,  
-  // Initialize the logger (decimal 64).
+  /// Initialize the logger (decimal 64).
+  LM_STARTUP = 0100,
 
-  LM_ERROR = 0200,    
-  // Error messages (decimal 128).
+  /// Error messages (decimal 128).
+  LM_ERROR = 0200,
 
-  LM_CRITICAL = 0400,	    
-  // Critical conditions, such as hard device errors (decimal 256).
+  /// Critical conditions, such as hard device errors (decimal 256).
+  LM_CRITICAL = 0400,
 
-  LM_ALERT = 01000,    
-  // A condition that should be corrected immediately, such as a
-  // corrupted system database (decimal 512).
+  /// A condition that should be corrected immediately, such as a
+  /// corrupted system database (decimal 512).
+  LM_ALERT = 01000,
 
+  /// A panic condition.  This is normally broadcast to all users
+  /// (decimal 1024).
   LM_EMERGENCY = 02000,
-  // A panic condition.  This is normally broadcast to all users
-  // (decimal 1024).
 
+  /// The maximum logging priority.
   LM_MAX = LM_EMERGENCY,
-  // The maximum logging priority.
 
-  // Do not use!!, this enum value ensures that the underlying
-  // integral type for this enum is at least 32 bits.
-#if !defined (ACE_HAS_BROKEN_ENUMS)
-  ENSURE_32_BITS = 0xFFFFFFFF
-#else
-  ENSURE_32_BITS = 0x1FFFFFFF
-  // HP/CXX makes an error the usage of "long enumerators", but this
-  // one (that requires 29 bits) is OK.... only HP can come up with
-  // something like that...
-#endif /* ACE_HAS_BROKEN_ENUMS */
+  /// Do not use!!  This enum value ensures that the underlying
+  /// integral type for this enum is at least 32 bits.
+  LM_ENSURE_32_BITS = 0x7FFFFFFF
 };
 
-#endif /* ACE_LOG_PRIORITY_H */
+ACE_END_VERSIONED_NAMESPACE_DECL
 
+#include /**/ "ace/post.h"
+#endif /* ACE_LOG_PRIORITY_H */

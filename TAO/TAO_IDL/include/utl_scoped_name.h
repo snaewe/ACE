@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,16 +67,11 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _AST_SCOPED_NAME_AST_SCOPED_NAME_HH
 #define _AST_SCOPED_NAME_AST_SCOPED_NAME_HH
 
-// Define UTL_ScopedName as a list of strings
+#include "utl_idlist.h"
 
-/*
-** DEPENDENCIES: utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+// Define UTL_ScopedName as a list of strings.
 
-typedef UTL_IdList			UTL_ScopedName;
-
-typedef UTL_IdListActiveIterator	UTL_ScopedNameActiveIterator;
+typedef UTL_IdList UTL_ScopedName;
+typedef UTL_IdListActiveIterator UTL_ScopedNameActiveIterator;
 
 #endif           // _AST_SCOPED_NAME_AST_SCOPED_NAME_HH

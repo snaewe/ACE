@@ -2,6 +2,7 @@
 
 #define ACE_BUILD_SVC_DLL
 
+#include "ace/OS_NS_unistd.h"
 #include "Event_Channel.h"
 #include "Concrete_Connection_Handlers.h"
 
@@ -18,22 +19,28 @@ Consumer_Handler::Consumer_Handler (const Connection_Config_Info &pci)
 // unexpectedly.  This method simply marks the Connection_Handler as
 // having failed so that handle_close () can reconnect.
 
+// Do not close handler when received data successfully.
+// Consumer_Handler should could process received data.
+// For example, Consumer could send reply-event to Supplier.
 int
 Consumer_Handler::handle_input (ACE_HANDLE)
 {
-  char buf[1];
+  // Do not set FAILED state at here, just at real failed place.
 
-  this->state (Connection_Handler::FAILED);
+  char buf[BUFSIZ];
+  ssize_t received = this->peer ().recv (buf, sizeof buf);
 
-  switch (this->peer ().recv (buf, sizeof buf))
+  switch (received)
     {
     case -1:
+      this->state (Connection_Handler::FAILED);
       ACE_ERROR_RETURN ((LM_ERROR,
                         "(%t) Peer has failed unexpectedly for Consumer_Handler %d\n",
                         this->connection_id ()),
                         -1);
       /* NOTREACHED */
     case 0:
+      this->state (Connection_Handler::FAILED);
       ACE_ERROR_RETURN ((LM_ERROR,
                         "(%t) Peer has shutdown unexpectedly for Consumer_Handler %d\n",
                         this->connection_id ()),
@@ -41,9 +48,11 @@ Consumer_Handler::handle_input (ACE_HANDLE)
       /* NOTREACHED */
     default:
       ACE_ERROR_RETURN ((LM_ERROR,
-                        "(%t) Consumer is erroneously sending input to Consumer_Handler %d\n",
-                        this->connection_id ()),
-                        -1);
+                        "(%t) IGNORED: Consumer is erroneously sending input to Consumer_Handler %d\n"
+                        "data size = %d\n",
+                        this->connection_id (),
+                        received),
+                        0); // Return 0 to identify received data successfully.
       /* NOTREACHED */
     }
 }
@@ -64,14 +73,18 @@ Consumer_Handler::nonblk_put (ACE_Message_Block *event)
 
   if (n == -1)
     {
-      // Things have gone wrong, let's try to close down and set up a
-      // new reconnection by calling handle_close().
+      // -1 is returned only when things have really gone wrong (i.e.,
+      // not when flow control occurs).  Thus, let's try to close down
+      // and set up a new reconnection by calling handle_close().
       this->state (Connection_Handler::FAILED);
       this->handle_close ();
       return -1;
     }
-  else if (errno == EWOULDBLOCK) // Didn't manage to send everything.
+  else if (errno == EWOULDBLOCK) 
     {
+      // We didn't manage to send everything, so we need to queue
+      // things up.
+
       ACE_DEBUG ((LM_DEBUG,
                   "(%t) queueing activated on handle %d to routing id %d\n",
                   this->get_handle (),
@@ -94,7 +107,7 @@ Consumer_Handler::nonblk_put (ACE_Message_Block *event)
                           -1);
       return 0;
     }
-  else
+  else 
     return n;
 }
 
@@ -112,8 +125,11 @@ Consumer_Handler::send (ACE_Message_Block *event)
   if (n <= 0)
     return errno == EWOULDBLOCK ? 0 : n;
   else if (n < len)
-    // Re-adjust pointer to skip over the part we did send.
-    event->rd_ptr (n);
+    {
+      // Re-adjust pointer to skip over the part we did send.
+      event->rd_ptr (n);
+      errno = EWOULDBLOCK;
+    }
   else // if (n == length)
     {
       // The whole event is sent, we now decrement the reference count
@@ -134,11 +150,88 @@ Consumer_Handler::handle_output (ACE_HANDLE)
   ACE_Message_Block *event = 0;
 
   ACE_DEBUG ((LM_DEBUG,
-              "(%t) in handle_output on handle %d\n",
+              ACE_TEXT("(%t) Receiver signalled 'resume transmission' %d\n"),
               this->get_handle ()));
 
-  // The list had better not be empty, otherwise there's a bug!
+  // WIN32 Notes: When the receiver blocked, we started adding to the
+  // consumer handler's message Q. At this time, we registered a
+  // callback with the reactor to tell us when the TCP layer signalled
+  // that we could continue to send messages to the consumer. However,
+  // Winsock only sends this notification ONCE, so we have to assume
+  // at the application level, that we can continue to send until we
+  // get any subsequent blocking signals from the receiver's buffer.
 
+#if defined (ACE_WIN32)
+  // Win32 Winsock doesn't trigger multiple "You can write now"
+  // signals, so we have to assume that we can continue to write until
+  // we get another EWOULDBLOCK.
+
+  // We cancel the wakeup callback we set earlier.
+  if (ACE_Reactor::instance ()->cancel_wakeup
+      (this, ACE_Event_Handler::WRITE_MASK) == -1)
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       ACE_TEXT ("(%t) %p\n"),
+                       ACE_TEXT ("Error in ACE_Reactor::cancel_wakeup()")),
+                      -1);
+
+  // The list had better not be empty, otherwise there's a bug!
+  while (this->msg_queue ()->dequeue_head
+         (event, (ACE_Time_Value *) &ACE_Time_Value::zero) != -1)
+    {
+      switch (this->nonblk_put (event))
+        {
+        case -1:                // Error sending message to consumer.
+          {
+            // We are responsible for releasing an ACE_Message_Block if
+            // failures occur.
+            event->release ();
+
+            ACE_ERROR ((LM_ERROR,
+                        ACE_TEXT ("(%t) %p\n"),
+                        ACE_TEXT ("transmission failure")));
+            break;
+          }
+        case 0:                 // Partial Send - we got flow controlled by the receiver
+          {
+            ACE_DEBUG ((LM_DEBUG,
+                        ACE_TEXT ("%D Partial Send due to flow control")
+                        ACE_TEXT ("- scheduling new wakeup with reactor\n")));
+
+            // Re-schedule a wakeup call from the reactor when the
+            // flow control conditions abate.
+            if (ACE_Reactor::instance ()->schedule_wakeup
+                (this,
+                 ACE_Event_Handler::WRITE_MASK) == -1)
+              ACE_ERROR_RETURN ((LM_ERROR,
+                                 ACE_TEXT ("(%t) %p\n"),
+                                 ACE_TEXT ("Error in ACE_Reactor::schedule_wakeup()")),
+                                -1);
+
+            // Didn't write everything this time, come back later...
+            return 0;
+          }
+        default:                // Sent the whole thing
+          {
+            ACE_DEBUG ((LM_DEBUG,
+                        ACE_TEXT ("Sent message from message Q, Q size = %d\n"),
+                        this->msg_queue()->message_count ()));
+            break;
+          }
+        }
+    }
+
+  // If we drop out of the while loop, then the message Q should be
+  // empty...or there's a problem in the dequeue_head() call...but
+  // thats another story.
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("%D Sent all messages from consumers message Q\n")));
+
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("(%t) queueing deactivated on handle %d to routing id %d\n"),
+              this->get_handle (),
+              this->connection_id ()));
+#else /* !defined (ACE_WIN32) */
+  // The list had better not be empty, otherwise there's a bug!
   if (this->msg_queue ()->dequeue_head
       (event, (ACE_Time_Value *) &ACE_Time_Value::zero) != -1)
     {
@@ -146,6 +239,9 @@ Consumer_Handler::handle_output (ACE_HANDLE)
         {
         case 0:           // Partial send.
           ACE_ASSERT (errno == EWOULDBLOCK);
+          ACE_DEBUG ((LM_DEBUG,
+                      ACE_TEXT ("%D Partial Send\n")));
+
           // Didn't write everything this time, come back later...
           break;
 
@@ -154,8 +250,8 @@ Consumer_Handler::handle_output (ACE_HANDLE)
           // failures occur.
           event->release ();
           ACE_ERROR ((LM_ERROR,
-                      "(%t) %p\n",
-                      "transmission failure"));
+                      ACE_TEXT ("(%t) %p\n"),
+                      ACE_TEXT ("transmission failure")));
 
           /* FALLTHROUGH */
         default: // Sent the whole thing.
@@ -166,25 +262,29 @@ Consumer_Handler::handle_output (ACE_HANDLE)
           // ACE_Reactor not to notify us anymore (at least until
           // there are new events queued up).
 
+          ACE_DEBUG ((LM_DEBUG,
+                      ACE_TEXT ("QQQ::Sent Message from consumer's Q\n")));
+
           if (this->msg_queue ()->is_empty ())
             {
               ACE_DEBUG ((LM_DEBUG,
-                          "(%t) queueing deactivated on handle %d to routing id %d\n",
+                          ACE_TEXT ("(%t) queueing deactivated on handle %d to routing id %d\n"),
                           this->get_handle (),
                           this->connection_id ()));
 
               if (ACE_Reactor::instance ()->cancel_wakeup
                   (this, ACE_Event_Handler::WRITE_MASK) == -1)
                 ACE_ERROR ((LM_ERROR,
-                            "(%t) %p\n",
-                            "cancel_wakeup"));
+                            ACE_TEXT ("(%t) %p\n"),
+                            ACE_TEXT ("cancel_wakeup")));
             }
         }
     }
   else
     ACE_ERROR ((LM_ERROR,
-                "(%t) %p\n",
-                "dequeue_head"));
+                ACE_TEXT ("(%t) %p\n"),
+                ACE_TEXT ("dequeue_head - handle_output called by reactor but nothing in Q")));
+#endif /* ACE_WIN32 */
   return 0;
 }
 
@@ -304,7 +404,9 @@ Supplier_Handler::recv (ACE_Message_Block *&forward_addr)
     ssize_t (event->header_.len_ - (msg_frag_->wr_ptr () - event->data_));
 
   ssize_t data_received =
-    this->peer ().recv (this->msg_frag_->wr_ptr (), data_bytes_left_to_read);
+    !data_bytes_left_to_read
+    ? 0 // peer().recv() should not be called when data_bytes_left_to_read is 0.
+    : this->peer ().recv (this->msg_frag_->wr_ptr (), data_bytes_left_to_read);
 
   // Try to receive the remainder of the event.
 
@@ -318,8 +420,12 @@ Supplier_Handler::recv (ACE_Message_Block *&forward_addr)
         /* FALLTHROUGH */;
 
     case 0: // Premature EOF.
-      this->msg_frag_ = this->msg_frag_->release ();
-      return 0;
+      if (data_bytes_left_to_read)
+        {
+          this->msg_frag_ = this->msg_frag_->release ();
+          return 0;
+        }
+      /* FALLTHROUGH */;
 
     default:
       // Set the write pointer at 1 past the end of the event.
@@ -380,8 +486,8 @@ Supplier_Handler::recv (ACE_Message_Block *&forward_addr)
     }
 }
 
-// Receive various types of input (e.g., Peer event from the
-// gatewayd, as well as stdio).
+// Receive various types of input (e.g., Peer event from the gatewayd,
+// as well as stdio).
 
 int
 Supplier_Handler::handle_input (ACE_HANDLE)
@@ -431,26 +537,47 @@ Supplier_Handler::process (ACE_Message_Block *event_key)
 Thr_Consumer_Handler::Thr_Consumer_Handler (const Connection_Config_Info &pci)
   : Consumer_Handler (pci)
 {
+  // It is not in thread svc() now.
+  in_thread_ = 0;
+}
+
+// Overriding handle_close() method.  If in thread svc(), no need to
+// process handle_close() when call peer().close(), because the
+// connection is blocked now.
+
+int
+Thr_Consumer_Handler::handle_close (ACE_HANDLE h, ACE_Reactor_Mask m)
+{
+  if (in_thread_)
+    return 0;
+  else
+    return Consumer_Handler::handle_close (h, m);
 }
 
 // This method should be called only when the Consumer shuts down
-// unexpectedly.  This method marks the Connection_Handler as having failed
-// and deactivates the ACE_Message_Queue (to wake up the thread
+// unexpectedly.  This method marks the Connection_Handler as having
+// failed and deactivates the ACE_Message_Queue (to wake up the thread
 // blocked on <dequeue_head> in svc()).
-// Thr_Output_Handler::handle_close () will eventually try to
+// Thr_Consumer_Handler::handle_close () will eventually try to
 // reconnect...
 
+// Let Consumer_Handler receive normal data.
 int
 Thr_Consumer_Handler::handle_input (ACE_HANDLE h)
 {
   // Call down to the <Consumer_Handler> to handle this first.
-  this->Consumer_Handler::handle_input (h);
+  if (this->Consumer_Handler::handle_input (h) != 0)
+    {
+      // Only do such work when failed.
 
-  ACE_Reactor::instance ()->remove_handler
-    (h, ACE_Event_Handler::ALL_EVENTS_MASK | ACE_Event_Handler::DONT_CALL);
+      ACE_Reactor::instance ()->remove_handler
+        (h, ACE_Event_Handler::ALL_EVENTS_MASK | ACE_Event_Handler::DONT_CALL);
 
-  // Deactivate the queue while we try to get reconnected.
-  this->msg_queue ()->deactivate ();
+      // Deactivate the queue while we try to get reconnected.
+      this->msg_queue ()->deactivate ();
+      // Will call handle_close.
+      return -1;
+    }
   return 0;
 }
 
@@ -462,31 +589,42 @@ Thr_Consumer_Handler::open (void *)
 {
   // Turn off non-blocking I/O.
   if (this->peer ().disable (ACE_NONBLOCK) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "(%t) %p\n", "enable"), -1);
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       "(%t) %p\n",
+                       "disable"),
+                      -1); // Incorrect info fixed.
 
   // Call back to the <Event_Channel> to complete our initialization.
   else if (this->event_channel_->complete_connection_connection (this) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "(%t) %p\n", "complete_connection_connection"), -1);
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       "(%t) %p\n",
+                       "complete_connection_connection"),
+                      -1);
 
   // Register ourselves to receive input events (which indicate that
   // the Consumer has shut down unexpectedly).
   else if (ACE_Reactor::instance ()->register_handler
       (this, ACE_Event_Handler::READ_MASK) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "(%t) %p\n", "register_handler"), -1);
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       "(%t) %p\n",
+                       "register_handler"),
+                      -1);
 
   // Reactivate message queue.  If it was active then this is the
   // first time in and we need to spawn a thread, otherwise the queue
   // was inactive due to some problem and we've already got a thread.
   else if (this->msg_queue ()->activate () == ACE_Message_Queue<ACE_SYNCH>::WAS_ACTIVE)
     {
-      ACE_DEBUG ((LM_DEBUG, "(%t) spawning new thread\n"));
+      ACE_DEBUG ((LM_DEBUG,
+                  "(%t) spawning new thread\n"));
       // Become an active object by spawning a new thread to transmit
       // events to Consumers.
       return this->activate (THR_NEW_LWP | THR_DETACHED);
     }
   else
     {
-      ACE_DEBUG ((LM_DEBUG, "(%t) reusing existing thread\n"));
+      ACE_DEBUG ((LM_DEBUG,
+                  "(%t) reusing existing thread\n"));
       return 0;
     }
 }
@@ -509,8 +647,7 @@ Thr_Consumer_Handler::put (ACE_Message_Block *mb, ACE_Time_Value *)
 int
 Thr_Consumer_Handler::svc (void)
 {
-
-  for (;;)
+  for (in_thread_ = 1;;)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "(%t) Thr_Consumer_Handler's handle = %d\n",
@@ -536,10 +673,15 @@ Thr_Consumer_Handler::svc (void)
 
       this->peer ().close ();
 
-      // Re-establish the connection, using expoential backoff.
+      // Re-establish the connection, using exponential backoff.
       for (this->timeout (1);
            // Default is to reconnect synchronously.
-           this->event_channel_->initiate_connection_connection (this) == -1; )
+           this->event_channel_->initiate_connection_connection (this, 1) == -1;
+           // Second parameter '1' means using sync mode directly,
+           // don't care Options::blocking_semantics().  If don't do
+           // so, async mode will be used to connect which won't
+           // satisfy original design.
+           )
         {
           ACE_Time_Value tv (this->timeout ());
 
@@ -551,13 +693,27 @@ Thr_Consumer_Handler::svc (void)
         }
     }
 
-  /* NOTREACHED */
-  return 0;
+  ACE_NOTREACHED (return 0;)
 }
 
 Thr_Supplier_Handler::Thr_Supplier_Handler (const Connection_Config_Info &pci)
   : Supplier_Handler (pci)
 {
+  // It is not in thread svc() now.
+  in_thread_ = 0;
+}
+
+// Overriding handle_close() method.  If in thread svc(), no need to
+// process handle_close() when call peer().close(), because the
+// connection is blocked now.
+
+int
+Thr_Supplier_Handler::handle_close (ACE_HANDLE h, ACE_Reactor_Mask m)
+{
+  if (in_thread_)
+    return 0;
+  else
+    return Supplier_Handler::handle_close (h, m);
 }
 
 int
@@ -565,18 +721,25 @@ Thr_Supplier_Handler::open (void *)
 {
   // Turn off non-blocking I/O.
   if (this->peer ().disable (ACE_NONBLOCK) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "(%t) %p\n", "enable"), -1);
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       "(%t) %p\n",
+                       "disable"),
+                      -1); // Incorrect info fixed.
 
   // Call back to the <Event_Channel> to complete our initialization.
   else if (this->event_channel_->complete_connection_connection (this) == -1)
-    ACE_ERROR_RETURN ((LM_ERROR, "(%t) %p\n", "complete_connection_connection"), -1);
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       "(%t) %p\n",
+                       "complete_connection_connection"),
+                      -1);
 
   // Reactivate message queue.  If it was active then this is the
   // first time in and we need to spawn a thread, otherwise the queue
   // was inactive due to some problem and we've already got a thread.
   else if (this->msg_queue ()->activate () == ACE_Message_Queue<ACE_SYNCH>::WAS_ACTIVE)
     {
-      ACE_DEBUG ((LM_DEBUG, "(%t) spawning new thread\n"));
+      ACE_DEBUG ((LM_DEBUG,
+                  "(%t) spawning new thread\n"));
       // Become an active object by spawning a new thread to transmit
       // events to peers.
       return this->activate (THR_NEW_LWP | THR_DETACHED);
@@ -594,7 +757,7 @@ Thr_Supplier_Handler::open (void *)
 int
 Thr_Supplier_Handler::svc (void)
 {
-  for (;;)
+  for (in_thread_ = 1;;)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "(%t) Thr_Supplier_Handler's handle = %d\n",
@@ -621,7 +784,12 @@ Thr_Supplier_Handler::svc (void)
       // Re-establish the connection, using expoential backoff.
       for (this->timeout (1);
            // Default is to reconnect synchronously.
-           this->event_channel_->initiate_connection_connection (this) == -1; )
+           this->event_channel_->initiate_connection_connection (this, 1) == -1;
+           // Second parameter '1' means using sync mode directly,
+           // don't care Options::blocking_semantics().  If don't do
+           // so, async mode will be used to connect which won't
+           // satisfy original design.
+           )
         {
           ACE_Time_Value tv (this->timeout ());
           ACE_ERROR ((LM_ERROR,

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,78 +62,130 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_OPERATION_AST_OPERATION_HH
 #define _AST_OPERATION_AST_OPERATION_HH
 
-// Representation of operation declaration:
+#include "ast_decl.h"
+#include "utl_scope.h"
 
-/*
-** DEPENDENCIES: ast_decl.hh, utl_scope.hh, ast_type.hh, utl_strlist.hh,
-**		 utl_exceptlist.hh, utl_scoped_name.hh
-**
-** USE: included from ast.hh
-*/
+class UTL_ExceptList;
 
-#include	"idl_fwd.h"
-#include	"idl_narrow.h"
-#include	"utl_list.h"
-#include	"ast_decl.h"
-#include	"utl_scope.h"
-#include	"utl_scoped_name.h"
-
-
-class	AST_Operation : public virtual AST_Decl, public virtual UTL_Scope
+class TAO_IDL_FE_Export AST_Operation : public virtual AST_Decl,
+                                        public virtual UTL_Scope
 {
 public:
-  // Define enum with flags for operation attributes
-  enum Flags {
-       OP_noflags		// No flags present
-     , OP_oneway		// Operation is oneway
-     , OP_idempotent		// Operation is idempotent
+  // Define enum with flags for operation attributes.
+  enum Flags
+  {
+       OP_noflags               // No flags present.
+     , OP_oneway                // Operation is oneway.
+     , OP_idempotent            // Operation is idempotent.
   };
 
-  // Operations
+  // Constructor(s).
+  AST_Operation (void);
 
-  // Constructor(s)
-  AST_Operation();
-  AST_Operation(AST_Type *return_type,
-		Flags flags,
-		UTL_ScopedName *n,
-		UTL_StrList *p);
-  virtual ~AST_Operation() {}
+  AST_Operation (AST_Type *return_type,
+                 Flags flags,
+                 UTL_ScopedName *n,
+                 bool local,
+                 bool abstract);
 
-  // Data Accessors
-  AST_Type *return_type();
-  Flags flags();
-  UTL_StrList *context();
-  UTL_ExceptList *exceptions();
-  
-  // Narrowing
+  // Destructor.
+  virtual ~AST_Operation (void);
+
+  // Data Accessors.
+
+  AST_Type *return_type (void);
+
+  Flags flags (void);
+
+  UTL_StrList *context (void);
+
+  UTL_ExceptList *exceptions (void);
+
+  // Public operations.
+
+  int void_return_type (void);
+  /// Returns 1 if the operation has a void return type.
+
+  /// Return the number of arguments
+  virtual int argument_count (void);
+
+  /// Count the number of arguments of a certain type.
+  /**
+   * @param direction_mask limit the direction (IN, OUT or INOUT) of
+   * the arguments considered.  Typically used as follows:
+   *
+   * int count =
+   *    ast_operation->count_arguments_with_direction
+   *    (AST_Argument::dir_IN
+   *     | AST_Argument::dir_OUT);
+   */
+  int count_arguments_with_direction (int direction_mask);
+
+  virtual int has_native (void);
+  // Any of the arguments or the return value is a <native> type.
+  // This is important because in that case no code should be
+  // generated for the stubs.
+
+  // Narrowing.
   DEF_NARROW_METHODS2(AST_Operation, AST_Decl, UTL_Scope);
   DEF_NARROW_FROM_DECL(AST_Operation);
   DEF_NARROW_FROM_SCOPE(AST_Operation);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Method to add exceptions
+  UTL_ExceptList *be_add_exceptions (UTL_ExceptList *t);
+
+  // Add an argument to the scope.
+  AST_Argument *be_add_argument (AST_Argument *arg);
+
+  // Insert an exception at the head of the list.
+  int be_insert_exception (AST_Exception *ex);
+
+  // Cleanup function.
+  virtual void destroy (void);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
 
 private:
-  // Data
-  AST_Type			*pd_return_type;	// Return type
-  Flags				pd_flags;		// Operation flags
-  UTL_StrList			*pd_context;		// Context
-  UTL_ExceptList		*pd_exceptions;		// Exceptions raised
+  // Data.
 
-  // Scope Management Protocol
-  friend int tao_yyparse();
+  AST_Type *pd_return_type;
+  // Return type
 
-  virtual AST_Argument		*fe_add_argument(AST_Argument	*a);
-  virtual UTL_StrList		*fe_add_context(UTL_StrList 	*c);	
-							// Add context
-  virtual UTL_NameList		*fe_add_exceptions(UTL_NameList *e);
-							// exceptions
+  Flags pd_flags;
+  // Operation flags
 
+  UTL_StrList *pd_context;
+  // Context
+
+  UTL_ExceptList *pd_exceptions;
+  // Exceptions raised
+
+  int argument_count_;
+  // Number of arguments.
+
+  int has_native_;
+  // Is any argument of type native.
+
+  // Operations.
+
+  int compute_argument_attr (void);
+  // Count the number of arguments.
+
+  // Scope Management Protocol.
+
+  friend int tao_yyparse (void);
+  virtual AST_Argument *fe_add_argument (AST_Argument *a);
+  virtual UTL_StrList *fe_add_context (UTL_StrList *c);
+  virtual UTL_NameList *fe_add_exceptions (UTL_NameList *e);
 };
 
 #endif           // _AST_OPERATION_AST_OPERATION_HH

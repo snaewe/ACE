@@ -5,8 +5,11 @@
 // suspension and resumption, and cooperative thread cancellation
 // mechanisms.
 
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Service_Config.h"
 #include "ace/Thread_Manager.h"
+#include "ace/Signal.h"
 
 ACE_RCSID(Threads, thread_manager, "$Id$")
 
@@ -25,14 +28,14 @@ worker (int iterations)
     {
       if ((i % 1000) == 0)
 	{
-	  ACE_DEBUG ((LM_DEBUG, 
-		      "(%t) checking cancellation before iteration %d!\n", 
+	  ACE_DEBUG ((LM_DEBUG,
+		      "(%t) checking cancellation before iteration %d!\n",
 		      i));
-	
+
 	  if (ACE_Thread_Manager::instance ()->testcancel (ACE_Thread::self ()) != 0)
 	    {
-	      ACE_DEBUG ((LM_DEBUG, 
-			  "(%t) has been cancelled before iteration %d!\n", 
+	      ACE_DEBUG ((LM_DEBUG,
+			  "(%t) has been cancelled before iteration %d!\n",
 			  i));
 	      break;
 	    }
@@ -47,7 +50,7 @@ static const int DEFAULT_THREADS = ACE_DEFAULT_THREADS;
 static const int DEFAULT_ITERATIONS = 100000;
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   ACE_Service_Config daemon;
 
@@ -63,7 +66,7 @@ main (int argc, char *argv[])
   ACE_Thread_Manager *thr_mgr = ACE_Thread_Manager::instance ();
 
   int grp_id = thr_mgr->spawn_n (n_threads, ACE_THR_FUNC (worker),
-				 (void *) n_iterations,
+				 reinterpret_cast<void *> (n_iterations),
 				 THR_NEW_LWP | THR_DETACHED);
 
   // Wait for 1 second and then suspend every thread in the group.
@@ -97,8 +100,8 @@ main (int argc, char *argv[])
   return 0;
 }
 #else
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR_RETURN ((LM_ERROR, "threads not supported on this platform\n"), -1);
 }

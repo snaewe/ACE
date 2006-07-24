@@ -19,41 +19,61 @@
 //
 // ============================================================================
 
-#if !defined (BE_OPERATION_H)
+#ifndef BE_OPERATION_H
 #define BE_OPERATION_H
 
-class be_argument;
+#include "be_scope.h"
+#include "be_decl.h"
+#include "be_codegen.h"
+#include "ast_operation.h"
 
-/*
- * BE_Operation
- */
+class AST_Type;
+class be_visitor;
+class be_argument;
+class be_operation_strategy;
+
 class be_operation : public virtual AST_Operation,
                      public virtual be_scope,
                      public virtual be_decl
 {
 public:
-  // =Operations
-
   be_operation (void);
-  // default constructor
+  // Default constructor.
 
-  be_operation (AST_Type *rt, AST_Operation::Flags fl, UTL_ScopedName *n,
-                UTL_StrList *p);
-  // constructor
+  be_operation (AST_Type *rt,
+                AST_Operation::Flags fl,
+                UTL_ScopedName *n,
+                bool local,
+                bool abstract);
+  // Constructor
 
-  virtual int argument_count (void);
-  // return the count of members
+  ~be_operation (void);
+  // Destructor.
 
-  virtual int has_native (void);
-  // Any of the arguments or the return value is a <native> type.
-  // This is important because in that case no code should be
-  // generated for the stubs.
+  virtual void destroy (void);
+  // Cleanup method.
 
-  be_argument *add_argument_to_scope (be_argument *arg);
-  // add an argument to the scope
-
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
+
+  be_operation_strategy *set_strategy (be_operation_strategy *new_strategy);
+
+  TAO_CodeGen::CG_STATE next_state (TAO_CodeGen::CG_STATE current_state,
+                                    int is_extra_state = 0);
+  // Decide on the next state.
+
+  int has_extra_code_generation (TAO_CodeGen::CG_STATE current_state);
+  // Returns true if we have to genrate extra code.
+
+  be_operation *marshaling (void);
+  // returns the operation containing special marshaling information,
+  // this makes sense if not all arguments get marshaled, e.g. AMI
+  // sendc_ operations.
+
+  be_operation *arguments (void);
+  // Returns a customized arguments list, e.g. AMI sendc_ operations
+  // only use the in and inout arguments but not the out arguments,
+  // also the first argument is the reply handler.
 
   // Narrowing
   DEF_NARROW_METHODS3 (be_operation, AST_Operation, be_scope, be_decl);
@@ -61,18 +81,10 @@ public:
   DEF_NARROW_FROM_SCOPE (be_operation);
 
 protected:
-  //=helper
-  int compute_size_type (void);
-  // compute the size type if it is unknown
-
-  int compute_argument_attr (void);
-  // count the number of arguments
-
-  int argument_count_;
-  // number of arguments
-
-  int has_native_;
-  // Is any argument of type native.
+  be_operation_strategy *strategy_;
+  // Member for holding the strategy for covering
+  // differences between various operations, e.g. sendc_, raise_
+  // operations in the AMI spec.
 };
 
 #endif

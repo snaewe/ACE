@@ -1,25 +1,35 @@
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/Read_Buffer.h"
-#include "ace/Service_Config.h"
+
+#include "ace/config-all.h"
 
 #if !defined (__ACE_INLINE__)
-#include "ace/Read_Buffer.i"
+#include "ace/Read_Buffer.inl"
 #endif /* __ACE_INLINE__ */
 
+#include "ace/Log_Msg.h"
+#include "ace/Malloc_Base.h"
+#include "ace/Service_Config.h"
+#include "ace/OS_NS_stdio.h"
+
 ACE_RCSID(ace, Read_Buffer, "$Id$")
+
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 void
 ACE_Read_Buffer::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_Read_Buffer::dump");
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("size_ = %d"), this->size_));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("\noccurrences_ = %d"), this->occurrences_));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("\nstream_ = %x"), this->stream_));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("\nallocator_ = %x"), this->allocator_));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("size_ = %d"), this->size_));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("\noccurrences_ = %d"), this->occurrences_));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("\nstream_ = %x"), this->stream_));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("\nallocator_ = %x"), this->allocator_));
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
 ACE_Read_Buffer::ACE_Read_Buffer (FILE *fp,
@@ -34,10 +44,11 @@ ACE_Read_Buffer::ACE_Read_Buffer (FILE *fp,
     this->allocator_ = ACE_Allocator::instance ();
 }
 
+#if !defined (ACE_HAS_WINCE)
 ACE_Read_Buffer::ACE_Read_Buffer (ACE_HANDLE handle,
                                   int close_on_delete,
                                   ACE_Allocator *alloc)
-  : stream_ (ACE_OS::fdopen (handle, "r")),
+  : stream_ (ACE_OS::fdopen (handle, ACE_LIB_TEXT ("r"))),
     close_on_delete_ (close_on_delete),
     allocator_ (alloc)
 {
@@ -46,13 +57,14 @@ ACE_Read_Buffer::ACE_Read_Buffer (ACE_HANDLE handle,
   if (this->allocator_ == 0)
     this->allocator_ = ACE_Allocator::instance ();
 }
+#endif  // ACE_HAS_WINCE
 
 ACE_Read_Buffer::~ACE_Read_Buffer (void)
 {
   ACE_TRACE ("ACE_Read_Buffer::~ACE_Read_Buffer");
 
   if (this->close_on_delete_)
-    ::fclose (this->stream_);
+    ACE_OS::fclose (this->stream_);
 }
 
 // Input: term        the character to terminate on
@@ -89,24 +101,19 @@ ACE_Read_Buffer::rec_read (int term, int search, int replace)
   char buf[BUFSIZ];
 
   int c = EOF;
-  size_t index = 0;
+  size_t slot = 0;
   int done = 0;
 
   // Read in the file char by char
-  while (index < BUFSIZ)
+  while (slot < BUFSIZ)
     {
       c = getc (this->stream_);
 
       // Don't insert EOF into the buffer...
       if (c == EOF)
         {
-          if (index == 0)
-            return 0;
-          else
-            {
-              ungetc (c, this->stream_);
-              break;
-            }
+          ungetc (c, this->stream_);
+          break;
         }
       else if (c == term)
         done = 1;
@@ -120,7 +127,7 @@ ACE_Read_Buffer::rec_read (int term, int search, int replace)
             c = replace;
         }
 
-      buf[index++] = (char) c;
+      buf[slot++] = (char) c;
 
       // Substitutions must be made before checking for termination.
       if (done)
@@ -128,7 +135,11 @@ ACE_Read_Buffer::rec_read (int term, int search, int replace)
     }
 
   // Increment the number of bytes.
-  this->size_ += index;
+  this->size_ += slot;
+
+  // Don't bother going any farther if the total size is 0.
+  if (this->size_ == 0)
+    return 0;
 
   char *result;
 
@@ -146,18 +157,20 @@ ACE_Read_Buffer::rec_read (int term, int search, int replace)
           return 0;
         }
       result += this->size_;
+
+      // Null terminate the buffer.
+      *result = '\0';
     }
   else if ((result = this->rec_read (term, search, replace)) == 0)
     return 0;
 
-  // Null terminate the buffer.
-  *result = '\0';
-
   // Copy buf into the appropriate location starting from end of
   // buffer.  Peter says this is confusing and that we should use
   // memcpy() ;-)
-  for (size_t j = index; j > 0; j--)
+  for (size_t j = slot; j > 0; j--)
     *--result = buf[j - 1];
 
   return result;
 }
+
+ACE_END_VERSIONED_NAMESPACE_DECL

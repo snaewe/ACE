@@ -20,7 +20,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_TYPECODE_TYPECODE_DECL_H_)
+#ifndef _BE_VISITOR_TYPECODE_TYPECODE_DECL_H_
 #define _BE_VISITOR_TYPECODE_TYPECODE_DECL_H_
 
 class be_visitor_typecode_decl : public be_visitor_decl
@@ -57,6 +57,12 @@ public:
   virtual int visit_interface (be_interface *node);
   // visit interface
 
+  virtual int visit_component (be_component *node);
+  // visit component
+
+  virtual int visit_home (be_home *node);
+  // visit home
+
   virtual int visit_sequence (be_sequence *node);
   // visit a sequence
 
@@ -69,6 +75,14 @@ public:
   virtual int visit_union (be_union *node);
   // visit a union
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit a valuetype
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit a valuetype
+
+  virtual int visit_eventtype (be_eventtype *node);
+  // visit a valuetype
 };
 
 #endif /* _BE_VISITOR_TYPECODE_TYPECODE_DECL_H_ */

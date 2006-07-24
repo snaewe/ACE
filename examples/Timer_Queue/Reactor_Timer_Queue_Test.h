@@ -20,15 +20,26 @@
 //
 // ============================================================================
 
-#if !defined (_REACTOR_TIMER_QUEUE_TEST_H_)
+#ifndef _REACTOR_TIMER_QUEUE_TEST_H_
 #define _REACTOR_TIMER_QUEUE_TEST_H_
 
-#include "ace/Timer_Heap.h"
 #include "Driver.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+/// @@todo: Not sure why this needs to be included. But am sure that,
+/// there is some circular dependency setup. Needs to be
+/// fixed. Atleast on g++
+#include "ace/Timer_Queue.h"
+#include "ace/Timer_Heap.h"
+#include "ace/svc_export.h"
 
 class Reactor_Timer_Queue_Test_Driver;
 
 class Input_Handler : public ACE_Event_Handler
+{
   // = TITLE
   //   Implements the handler to be called for input events.  Also has
   //   the logic to handle the different timer queue operations (i.e.,
@@ -38,12 +49,11 @@ class Input_Handler : public ACE_Event_Handler
   //   This class handles the reading of user input from stdin.  Also
   //   has the logic to handle the commands that are to be invoked in
   //   response to the user input.
-{
 public:
   typedef int (Input_Handler::*ACTION) (void *);
 
   Input_Handler (ACE_Timer_Queue *tq,
-		 Reactor_Timer_Queue_Test_Driver &timer_queue_driver);
+                 Reactor_Timer_Queue_Test_Driver &timer_queue_driver);
   // Sets <done_> flag to 0, <driver_> to <timer_queue_driver> and
   // timer queue <tq_> to <tq>
 
@@ -64,7 +74,7 @@ public:
 
   int cancel_timer (void *argument);
   // Cancel a timer.  The (void *) will be mapped to the ID of the
-  // timer beiing cancelled.
+  // timer being cancelled.
 
   int list_timer (void *argument);
   // Dump the timers in the queue.  The argument is ignored.
@@ -86,7 +96,8 @@ private:
   // all drivers.
 };
 
-class Reactor_Timer_Queue_Test_Driver : public Timer_Queue_Test_Driver <ACE_Timer_Heap, Input_Handler, Input_Handler::ACTION>
+class ACE_Svc_Export Reactor_Timer_Queue_Test_Driver : public Timer_Queue_Test_Driver <ACE_Timer_Heap, Input_Handler, Input_Handler::ACTION>
+{
   // = TITLE
   //   Implements a test driver for a reactive timer queue using
   //   <ACE_Reactor>.
@@ -94,7 +105,6 @@ class Reactor_Timer_Queue_Test_Driver : public Timer_Queue_Test_Driver <ACE_Time
   // = DESCRIPTION
   //   This class implements the logic to test the reactor
   //   implementation of timer queue, using an <ACE_Timer_Heap>.
-{
 public:
   Reactor_Timer_Queue_Test_Driver (void);
   // Sets the input handler <thandler_> with <timer_queue_> from the
@@ -123,9 +133,9 @@ private:
 };
 
 class Reactor_Timer_Handler : public ACE_Event_Handler
+{
   // = TITLE
   //     Target of the reactive timeout operation.
-{
 public:
   virtual int handle_timeout (const ACE_Time_Value &tv,
                               const void *);

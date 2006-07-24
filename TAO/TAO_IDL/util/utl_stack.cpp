@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,197 +62,194 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * utl_stack.cc - Implementation of class UTL_ScopeStack
- */
+#include "utl_stack.h"
+#include "utl_scope.h"
+#include "global_extern.h"
 
-#include	"idl.h"
-#include "ast_decl.h"
-#include	"idl_extern.h"
+ACE_RCSID (util,
+           utl_stack,
+           "$Id$")
 
-ACE_RCSID(util, utl_stack, "$Id$")
+#undef  INCREMENT
+#define  INCREMENT  64
 
-// Class UTL_ScopeStack
-
-#undef	INCREMENT
-#define	INCREMENT	64
-
-/*
- * Constructor(s) and destructor
- */
-
-UTL_ScopeStack::UTL_ScopeStack()
-  : pd_stack_data(new UTL_Scope *[INCREMENT]),
-    pd_stack_data_nalloced(INCREMENT),
-    pd_stack_top(0)
+UTL_ScopeStack::UTL_ScopeStack (void)
+  : pd_stack_data_nalloced (INCREMENT),
+    pd_stack_top (0)
 {
+  ACE_NEW (this->pd_stack_data,
+           UTL_Scope *[INCREMENT]);
 }
 
-UTL_ScopeStack::~UTL_ScopeStack()
+UTL_ScopeStack::~UTL_ScopeStack (void)
 {
-  if (pd_stack_data != NULL)
-    delete pd_stack_data;
+  if (this->pd_stack_data != 0)
+    {
+      delete [] this->pd_stack_data;
+    }
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Push an element on the stack
+// Push an element on the stack.
 UTL_ScopeStack *
-UTL_ScopeStack::push(UTL_Scope *el)
+UTL_ScopeStack::push (UTL_Scope *el)
 {
-  UTL_Scope	**tmp;
-  AST_Decl	*d = ScopeAsDecl(el);
-  long		ostack_data_nalloced;
-  long		i;
+  UTL_Scope  **tmp = 0;
+  long ostack_data_nalloced;
+  long i;
 
-  // Macro to avoid "warning: unused parameter" type warning.
-  ACE_UNUSED_ARG (d);
+  // Make sure there's space for one more.
+  if (this->pd_stack_data_nalloced == this->pd_stack_top)
+    {
+      ostack_data_nalloced = this->pd_stack_data_nalloced;
+      this->pd_stack_data_nalloced += INCREMENT;
 
-  // Make sure there's space for one more
-  if (pd_stack_data_nalloced == pd_stack_top) {
-    ostack_data_nalloced = pd_stack_data_nalloced;
-    pd_stack_data_nalloced += INCREMENT;
-    tmp			 = new UTL_Scope *[pd_stack_data_nalloced];
+      ACE_NEW_RETURN (tmp,
+                      UTL_Scope *[this->pd_stack_data_nalloced],
+                      0);
 
-    for (i = 0; i < ostack_data_nalloced; i++)
-      tmp[i] = pd_stack_data[i];
+      for (i = 0; i < ostack_data_nalloced; ++i)
+        {
+          tmp[i] = this->pd_stack_data[i];
+        }
 
-    delete []pd_stack_data;
-    pd_stack_data = tmp;
-  }
+      delete [] this->pd_stack_data;
+      this->pd_stack_data = tmp;
+    }
 
-  // Insert new scope
-  pd_stack_data[pd_stack_top++] = el;
+  // Insert new scope.
+  this->pd_stack_data[this->pd_stack_top++] = el;
 
   return this;
 }
 
-// Pop an element from the stack
+// Pop an element from the stack.
 void
-UTL_ScopeStack::pop()
+UTL_ScopeStack::pop (void)
 {
-  if (pd_stack_top <= 0)
-    return;
-  pd_stack_data[--pd_stack_top];
+  if (this->pd_stack_top <= 0)
+    {
+      return;
+    }
+
+  // If our top scope has a #pragma prefix associated with it,
+  // it goes away with the scope.
+  if (this->top_non_null ()->has_prefix ())
+    {
+      char *trash = 0;
+      idl_global->pragma_prefixes ().pop (trash);
+      delete [] trash;
+    }
+
+  --this->pd_stack_top;
 }
 
-// Return top element on stack
+// Return top element on stack.
 UTL_Scope *
-UTL_ScopeStack::top()
+UTL_ScopeStack::top (void)
 {
-  if (pd_stack_top <= 0)
-    return NULL;
-  return pd_stack_data[pd_stack_top - 1];
+  if (this->pd_stack_top <= 0)
+    {
+      return 0;
+    }
+
+  return this->pd_stack_data[pd_stack_top - 1];
 }
 
-// Return bottom element on stack
+// Return bottom element on stack.
 UTL_Scope *
-UTL_ScopeStack::bottom()
+UTL_ScopeStack::bottom (void)
 {
-  if (pd_stack_top == 0)
-    return NULL;
-  return pd_stack_data[0];
+  if (this->pd_stack_top == 0)
+    {
+      return 0;
+    }
+
+  return this->pd_stack_data[0];
 }
 
-// Clear entire stack
+// Clear entire stack.
 void
-UTL_ScopeStack::clear()
+UTL_ScopeStack::clear (void)
 {
-  pd_stack_top = 0;
+  this->pd_stack_top = 0;
 }
 
 // How deep is the stack?
 unsigned long
-UTL_ScopeStack::depth()
+UTL_ScopeStack::depth (void)
 {
-  return pd_stack_top;
+  return this->pd_stack_top;
 }
 
-// Return (top - 1) element on stack
+// Return (top - 1) element on stack.
 UTL_Scope *
-UTL_ScopeStack::next_to_top()
+UTL_ScopeStack::next_to_top (void)
 {
-  UTL_Scope	*tmp, *retval;
+  UTL_Scope  *tmp, *retval;
 
-  if (depth() < 2)
-    return NULL;
+  if (this->depth () < 2)
+    {
+      return 0;
+    }
 
-  tmp = top();		// Save top
-  (void) pop();		// Pop it
-  retval = top();	// Get next one down
-  (void) push(tmp);	// Push top back
-  return retval;	// Return next one down
+  tmp = top ();    // Save top
+  (void) pop ();    // Pop it
+  retval = top ();  // Get next one down
+  (void) push (tmp);  // Push top back
+  return retval;  // Return next one down
 }
 
-// Return topmost non-NULL element
+// Return topmost non-NULL element.
 UTL_Scope *
-UTL_ScopeStack::top_non_null()
+UTL_ScopeStack::top_non_null (void)
 {
-  long		i;
+  for (long i = this->pd_stack_top - 1; i >= 0; --i)
+    {
+      if (this->pd_stack_data[i] != 0)
+        {
+          return this->pd_stack_data[i];
+        }
+    }
 
-  for (i = pd_stack_top - 1; i >= 0; i--)
-    if (pd_stack_data[i] != NULL)
-      return pd_stack_data[i];
-  return NULL;
+  return 0;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
-
-// Class UTL_ScopeStackActiveIterator
-
-/*
- * Constructor(s)
- */
-
-UTL_ScopeStackActiveIterator::UTL_ScopeStackActiveIterator(UTL_ScopeStack *s)
-			    : source(s),
-			      il(s->pd_stack_top - 1)
+UTL_ScopeStackActiveIterator::UTL_ScopeStackActiveIterator (UTL_ScopeStack &s)
+  : source (s),
+    il (s.pd_stack_top - 1)
 {
 }
-
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
 
 // Advance to next item
 void
-UTL_ScopeStackActiveIterator::next()
+UTL_ScopeStackActiveIterator::next (void)
 {
   il--;
 }
 
-// Get current item
+// Get current item.
 UTL_Scope *
-UTL_ScopeStackActiveIterator::item()
+UTL_ScopeStackActiveIterator::item (void)
 {
-  if (il >= 0)
-    return source->pd_stack_data[il];
-  return NULL;
+  if (this->il >= 0)
+    {
+      return this->source.pd_stack_data[il];
+    }
+
+  return 0;
 }
 
 // Is this iteration done?
 long
-UTL_ScopeStackActiveIterator::is_done()
+UTL_ScopeStackActiveIterator::is_done (void)
 {
-  if (il >= 0)
-    return I_FALSE;
-  return I_TRUE;
+  if (this->il >= 0)
+    {
+      return false;
+    }
+
+  return true;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */

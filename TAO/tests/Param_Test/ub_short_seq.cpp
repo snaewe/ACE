@@ -19,7 +19,9 @@
 #include "helper.h"
 #include "ub_short_seq.h"
 
-ACE_RCSID(Param_Test, ub_short_seq, "$Id$")
+ACE_RCSID (Param_Test,
+           ub_short_seq, 
+           "$Id$")
 
 // ************************************************************************
 //               Test_Short_Sequence
@@ -27,10 +29,10 @@ ACE_RCSID(Param_Test, ub_short_seq, "$Id$")
 
 Test_Short_Sequence::Test_Short_Sequence (void)
   : opname_ (CORBA::string_dup ("test_short_sequence")),
-    in_ (new Param_Test::Short_Seq),
-    inout_ (new Param_Test::Short_Seq),
-    out_ (new Param_Test::Short_Seq),
-    ret_ (new Param_Test::Short_Seq)
+    in_ (new CORBA::ShortSeq),
+    inout_ (new CORBA::ShortSeq),
+    out_ (new CORBA::ShortSeq),
+    ret_ (new CORBA::ShortSeq)
 {
 }
 
@@ -46,14 +48,41 @@ Test_Short_Sequence::opname (void) const
   return this->opname_;
 }
 
+void
+Test_Short_Sequence::dii_req_invoke (CORBA::Request *req
+                                     ACE_ENV_ARG_DECL)
+{
+  req->add_in_arg ("s1") <<= this->in_.in ();
+  req->add_inout_arg ("s2") <<= this->inout_.in ();
+  req->add_out_arg ("s3") <<= this->out_.in ();
+
+  req->set_return_type (CORBA::_tc_ShortSeq);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  CORBA::ShortSeq *tmp;
+  req->return_value () >>= tmp;
+  this->ret_ = new CORBA::ShortSeq (*tmp);
+
+  CORBA::NamedValue_ptr o2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o2->value () >>= tmp;
+  this->inout_ = new CORBA::ShortSeq (*tmp);
+
+  CORBA::NamedValue_ptr o3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o3->value () >>= tmp;
+  this->out_ = new CORBA::ShortSeq (*tmp);
+}
+
 int
-Test_Short_Sequence::init_parameters (Param_Test_ptr objref,
-                                      CORBA::Environment &env)
+Test_Short_Sequence::init_parameters (Param_Test_ptr
+                                      ACE_ENV_ARG_DECL_NOT_USED)
 {
   Generator *gen = GENERATOR::instance (); // value generator
-
-  ACE_UNUSED_ARG (objref);
-  ACE_UNUSED_ARG (env);
 
   // get some sequence length (not more than 10)
   CORBA::ULong len = (CORBA::ULong) (gen->gen_long () % 10) + 1;
@@ -75,63 +104,36 @@ Test_Short_Sequence::init_parameters (Param_Test_ptr objref,
 int
 Test_Short_Sequence::reset_parameters (void)
 {
-  this->inout_ = new Param_Test::Short_Seq; // delete the previous ones
-  this->out_ = new Param_Test::Short_Seq;
-  this->ret_ = new Param_Test::Short_Seq;
+  this->inout_ = new CORBA::ShortSeq; // delete the previous ones
+  this->out_ = new CORBA::ShortSeq;
+  this->ret_ = new CORBA::ShortSeq;
   return 0;
 }
 
 int
-Test_Short_Sequence::run_sii_test (Param_Test_ptr objref,
-                                   CORBA::Environment &env)
+Test_Short_Sequence::run_sii_test (Param_Test_ptr objref
+                                   ACE_ENV_ARG_DECL)
 {
-  Param_Test::Short_Seq_out out (this->out_.out ());
-  this->ret_ = objref->test_short_sequence (this->in_.in (),
-                                            this->inout_.inout (),
-                                            out,
-                                            env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      CORBA::ShortSeq_out out (this->out_.out ());
 
-int
-Test_Short_Sequence::add_args (CORBA::NVList_ptr param_list,
-                               CORBA::NVList_ptr retval,
-                               CORBA::Environment &env)
-{
-  CORBA::Any in_arg (Param_Test::_tc_Short_Seq,
-                     (void *) &this->in_.in (),
-                     CORBA::B_FALSE);
+      this->ret_ = objref->test_short_sequence (this->in_.in (),
+                                                this->inout_.inout (),
+                                                out
+                                                ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-  CORBA::Any inout_arg (Param_Test::_tc_Short_Seq,
-                        &this->inout_.inout (),
-                        CORBA::B_FALSE);
- 
-  CORBA::Any out_arg (Param_Test::_tc_Short_Seq,
-                      &this->out_.inout (), // .out () causes crash
-                      CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_Short_Sequence::run_sii_test\n");
 
-  // add parameters
-  param_list->add_value ("s1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("s2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("s3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // add return value type
-  retval->item (0, env)->value ()->replace (Param_Test::_tc_Short_Seq,
-                                            &this->ret_.inout (), // see above
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
@@ -157,9 +159,8 @@ Test_Short_Sequence::check_validity (void)
 }
 
 CORBA::Boolean
-Test_Short_Sequence::check_validity (CORBA::Request_ptr req)
+Test_Short_Sequence::check_validity (CORBA::Request_ptr )
 {
-  ACE_UNUSED_ARG (req);
   return this->check_validity ();
 }
 
@@ -172,9 +173,9 @@ Test_Short_Sequence::print_values (void)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "Element #%d\n"
-                  "in : %s\n",
+                  "in : %d\n",
                   i,
-                  this->in_[i]? (const char *)this->in_[i]:"<nul>"));
+                  this->in_[i]));
     }
   if (!this->in_.ptr ())
     ACE_DEBUG ((LM_DEBUG, "\nin sequence is NUL\n"));
@@ -183,9 +184,9 @@ Test_Short_Sequence::print_values (void)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "Element #%d\n"
-                  "in : %s\n",
+                  "in : %d\n",
                   i,
-                  (this->inout_[i]? (const char *)this->inout_[i]:"<nul>")));
+                  this->inout_[i]));
     }
   if (!this->inout_.ptr ())
     ACE_DEBUG ((LM_DEBUG, "\ninout sequence is NUL\n"));
@@ -194,9 +195,9 @@ Test_Short_Sequence::print_values (void)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "Element #%d\n"
-                  "in : %s\n",
+                  "in : %d\n",
                   i,
-                  (this->out_[i]? (const char *)this->out_[i]:"<nul>")));
+                  this->out_[i]));
     }
   if (!this->out_.ptr ())
     ACE_DEBUG ((LM_DEBUG, "\nout sequence is NUL\n"));
@@ -205,12 +206,11 @@ Test_Short_Sequence::print_values (void)
     {
       ACE_DEBUG ((LM_DEBUG,
                   "Element #%d\n"
-                  "in : %s\n",
+                  "in : %d\n",
                   i,
-                  (this->ret_[i]? (const char *)this->ret_[i]:"<nul>")));
+                  this->ret_[i]));
     }
   if (!this->ret_.ptr ())
     ACE_DEBUG ((LM_DEBUG, "\nin sequence is NUL\n"));
   ACE_DEBUG ((LM_DEBUG, "\n*=*=*=*=*=*=*=*=*=*=\n"));
 }
-

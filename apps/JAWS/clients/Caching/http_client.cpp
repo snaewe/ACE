@@ -4,7 +4,7 @@
 //
 // = LIBRARY
 //    apps/JAWS/clients/Caching
-// 
+//
 // = FILENAME
 //    http_client.cpp
 //
@@ -14,15 +14,18 @@
 //
 // = AUTHOR
 //    James Hu
-// 
+//
 // ============================================================================
 
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
+#include "ace/os_include/os_ctype.h"
 #include "http_handler.h"
 
 ACE_RCSID(Caching, http_client, "$Id$")
 
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   // Present a command line.
   // * Accept a URL.
@@ -39,18 +42,24 @@ main (int, char *[])
     {
       char *s = buf;
 
+      // get rid of trailing '\n'
+      int len = ACE_OS::strlen (s);
+
+      if (len > 0 && s[len - 1] == '\n')
+        s[len - 1] = 0;
+
       while (isspace (*s))
         s++;
 
       if (*s == '!')
         {
-          do 
-	    s++; 
+          do
+	    s++;
 	  while (isspace (*s));
 
           // Shell command.
-          if (ACE_OS::system (s) == -1)
-            ACE_ERROR ((LM_ERROR, " ! Error executing: %s\n", s));
+          if (ACE_OS::system (ACE_TEXT_CHAR_TO_TCHAR (s)) == -1)
+            ACE_ERROR ((LM_ERROR, ACE_TEXT (" ! Error executing: %C\n"), s));
         }
       else if (ACE_OS::strncmp (s, "http://", 7) == 0)
         {
@@ -59,12 +68,12 @@ main (int, char *[])
           connector.connect (s);
         }
       else
-        ACE_ERROR ((LM_ERROR, " ? I don't understand: %s\n", s));
+        ACE_ERROR ((LM_ERROR, ACE_TEXT (" ? I don't understand: %C\n"), s));
 
-      ACE_ERROR ((LM_ERROR, "* "));
+      ACE_ERROR ((LM_ERROR, ACE_TEXT ("* ")));
     }
 
-  ACE_DEBUG ((LM_DEBUG, "\nBye!\n"));
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("\nBye!\n")));
 
   return 0;
 }

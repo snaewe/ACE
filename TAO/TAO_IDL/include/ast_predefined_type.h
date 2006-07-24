@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,66 +62,76 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_PREDEFINED_TYPE_AST_PREDEFINED_TYPE_HH
 #define _AST_PREDEFINED_TYPE_AST_PREDEFINED_TYPE_HH
 
-// Representation of predefined types:
-//
-// Instances of this class are inserted into the global context by
-// the front end before the start of parsing.
+#include "ast_concrete_type.h"
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, utl_scoped_name.hh, utl_strlist.hh,
-**		 ast_decl.hh
-**
-** USE: Included from ast.hh
-*/
+class ast_visitor;
 
-class	AST_PredefinedType : public virtual AST_ConcreteType
+class TAO_IDL_FE_Export AST_PredefinedType : public virtual AST_ConcreteType
 {
 public:
-  // Enum for all the different predefined types
-  enum PredefinedType {
-        PT_long		// Predefined type "long"
-      , PT_ulong	// Predefined type "unsigned long"
-      , PT_longlong	// Predefined type "long long"
-      , PT_ulonglong	// Predefined type "unsigned long long"
-      , PT_short	// Predefined type "short"
-      , PT_ushort	// Predefined type "unsigned short"
-      , PT_float	// Predefined type "float"
-      , PT_double	// Predefined type "double"
-      , PT_longdouble	// Predefined type "long double"
-      , PT_char		// Predefined type "char"
-      , PT_wchar	// Predefined type "wchar_t"
-      , PT_boolean	// Predefined type "boolean"
-      , PT_octet	// Predefined type "octet"
-      , PT_any		// Predefined type "any"
-      , PT_void		// Predefined type "void"
-      , PT_pseudo	// Predefined type for pseudo objects
-  };
+  // Enum for all the different predefined types.
+  enum PredefinedType
+    {
+        PT_long         // Predefined type "long"
+      , PT_ulong        // Predefined type "unsigned long"
+      , PT_longlong     // Predefined type "long long"
+      , PT_ulonglong    // Predefined type "unsigned long long"
+      , PT_short        // Predefined type "short"
+      , PT_ushort       // Predefined type "unsigned short"
+      , PT_float        // Predefined type "float"
+      , PT_double       // Predefined type "double"
+      , PT_longdouble   // Predefined type "long double"
+      , PT_char         // Predefined type "char"
+      , PT_wchar        // Predefined type "CORBA::WChar"
+      , PT_boolean      // Predefined type "boolean"
+      , PT_octet        // Predefined type "octet"
+      , PT_any          // Predefined type "CORBA::Any"
+      , PT_object       // Predefined type "CORBA::Object"
+      , PT_value        // Predefined type "CORBA::ValueBase"
+      , PT_void         // Predefined type "void"
+      , PT_pseudo       // Predefined type for pseudo objects
+    };
 
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_PredefinedType();
-  AST_PredefinedType(PredefinedType t, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_PredefinedType() {}
+  // Constructor(s).
+  AST_PredefinedType (void);
 
-  // Data Accessors
-  PredefinedType	pt();
+  AST_PredefinedType (PredefinedType t,
+                      UTL_ScopedName *n);
+
+  virtual ~AST_PredefinedType (void);
+
+  // Data Accessors.
+  PredefinedType pt (void);
 
   // Narrowing
   DEF_NARROW_METHODS1(AST_PredefinedType, AST_ConcreteType);
   DEF_NARROW_FROM_DECL(AST_PredefinedType);
 
   // AST Dumping
-  virtual void		dump(ostream &o);
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+  // Cleanup.
+  virtual void destroy (void);
+
+protected:
+  virtual int compute_size_type (void);
+  // Compute the size type if it is unknown.
 
 private:
-  // Data
-  const PredefinedType	pd_pt;		// The specific predefined type
-};  
+  // Data.
+
+  const PredefinedType pd_pt;
+  // The specific predefined type.
+};
 
 #endif           // _AST_PREDEFINED_TYPE_AST_PREDEFINED_TYPE_HH

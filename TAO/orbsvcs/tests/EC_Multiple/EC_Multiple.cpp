@@ -1,8 +1,10 @@
 // $Id$
 
-#include "ace/Get_Opt.h"
-#include "ace/Auto_Ptr.h"
-#include "ace/Sched_Params.h"
+#include "EC_Multiple.h"
+
+#include "Scheduler_Runtime1.h"
+#include "Scheduler_Runtime2.h"
+#include "Scheduler_Runtime_Dynamic.h" /* infos_3 */
 
 #include "orbsvcs/Event_Utilities.h"
 #include "orbsvcs/Event_Service_Constants.h"
@@ -10,19 +12,24 @@
 #include "orbsvcs/Time_Utilities.h"
 #include "orbsvcs/RtecEventChannelAdminC.h"
 #include "orbsvcs/Sched/Config_Scheduler.h"
+#include "orbsvcs/Event/EC_Event_Channel.h"
 #include "orbsvcs/Runtime_Scheduler.h"
-#include "orbsvcs/Event/Event_Channel.h"
-#include "EC_Multiple.h"
 
-#include "Scheduler_Runtime1.h"
-#include "Scheduler_Runtime2.h"
-#include "Scheduler_Runtime_Dynamic.h" /* infos_3 */
+#include "tao/ORB_Core.h"
+
+#include "ace/Get_Opt.h"
+#include "ace/Auto_Ptr.h"
+#include "ace/Sched_Params.h"
+#include "ace/OS_NS_errno.h"
+#include "ace/OS_NS_strings.h"
 
 #if defined (sun)
 # include <sys/lwp.h> /* for _lwp_self */
 #endif /* sun */
 
-ACE_RCSID(EC_Multiple, EC_Multiple, "$Id$")
+ACE_RCSID (EC_Multiple,
+           EC_Multiple,
+           "$Id$")
 
 Test_ECG::Test_ECG (void)
   : lcl_name_ ("Test_ECG"),
@@ -56,13 +63,11 @@ Test_ECG::Test_ECG (void)
 {
 }
 
-
-
 void
 print_priority_info (const char *const name)
 {
-#if defined (ACE_HAS_PTHREADS) || defined (sun)
-#if defined (ACE_HAS_PTHREADS)
+#if defined (ACE_HAS_PTHREADS_STD) || defined (sun)
+#if defined (ACE_HAS_PTHREADS_STD)
   struct sched_param param;
   int policy, status;
 
@@ -72,7 +77,7 @@ print_priority_info (const char *const name)
     ACE_DEBUG ((LM_DEBUG,
                 "%s (%lu|%u); policy is %d, priority is %d\n",
                 name,
-                getpid (),
+                ACE_OS::getpid (),
                 _lwp_self (),
                 pthread_self (),
                 policy, param.sched_priority));
@@ -80,7 +85,7 @@ print_priority_info (const char *const name)
     ACE_DEBUG ((LM_DEBUG,
                 "%s (%lu|%u); policy is %d, priority is %d\n",
                 name,
-                getpid (),
+                ACE_OS::getpid (),
                 0,
                 pthread_self (),
                 policy, param.sched_priority ));
@@ -88,7 +93,7 @@ print_priority_info (const char *const name)
   } else {
     ACE_DEBUG ((LM_DEBUG,"pthread_getschedparam failed: %d\n", status));
   }
-#endif /* ACE_HAS_PTHREADS */
+#endif /* ACE_HAS_PTHREADS_STD */
 
 #ifdef sun
   // Find what scheduling class the thread's LWP is in.
@@ -114,35 +119,41 @@ print_priority_info (const char *const name)
                   sched_params.priority ()));
     }
 #endif /* sun */
-#endif /* ACE_HAS_PTHREADS */
+#else
+  ACE_UNUSED_ARG (name);
+#endif /* ACE_HAS_PTHREADS_STD */
 }
-
-
-
 
 int
 Test_ECG::run (int argc, char* argv[])
 {
-  TAO_TRY
+  ACE_DECLARE_NEW_CORBA_ENV;
+  ACE_TRY
     {
       CORBA::ORB_var orb =
-        CORBA::ORB_init (argc, argv, "", TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+        CORBA::ORB_init (argc, argv, "" ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       CORBA::Object_var poa_object =
-        orb->resolve_initial_references("RootPOA");
+        orb->resolve_initial_references("RootPOA"
+                                        ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
       if (CORBA::is_nil (poa_object.in ()))
         ACE_ERROR_RETURN ((LM_ERROR,
                            " (%P|%t) Unable to initialize the POA.\n"),
                           1);
 
       PortableServer::POA_var root_poa =
-        PortableServer::POA::_narrow (poa_object.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+        PortableServer::POA::_narrow (poa_object.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       PortableServer::POAManager_var poa_manager =
-        root_poa->the_POAManager (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+        root_poa->the_POAManager (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      poa_manager->activate (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       if (this->parse_args (argc, argv))
         return 1;
@@ -212,7 +223,8 @@ Test_ECG::run (int argc, char* argv[])
           FILE* pid = ACE_OS::fopen (this->pid_file_name_, "w");
           if (pid != 0)
             {
-              ACE_OS::fprintf (pid, "%d\n", ACE_OS::getpid ());
+              ACE_OS::fprintf (pid, "%ld\n",
+                               static_cast<long> (ACE_OS::getpid ()));
               ACE_OS::fclose (pid);
             }
         }
@@ -242,15 +254,17 @@ Test_ECG::run (int argc, char* argv[])
       print_priority_info ("Test_ECG::run (Main after thr_setprio)");
 
       CORBA::Object_var naming_obj =
-        orb->resolve_initial_references ("NameService");
+        orb->resolve_initial_references ("NameService" ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
       if (CORBA::is_nil (naming_obj.in ()))
         ACE_ERROR_RETURN ((LM_ERROR,
                            " (%P|%t) Unable to get the Naming Service.\n"),
                           1);
 
       CosNaming::NamingContext_var naming_context =
-        CosNaming::NamingContext::_narrow (naming_obj.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+        CosNaming::NamingContext::_narrow (naming_obj.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       auto_ptr<POA_RtecScheduler::Scheduler> scheduler_impl;
       RtecScheduler::Scheduler_var scheduler;
@@ -265,12 +279,14 @@ Test_ECG::run (int argc, char* argv[])
           break;
 
         case Test_ECG::ss_local:
-          scheduler_impl =
-            auto_ptr<POA_RtecScheduler::Scheduler>(new ACE_Config_Scheduler);
+          {
+            auto_ptr<POA_RtecScheduler::Scheduler> auto_scheduler_impl (new ACE_Config_Scheduler);
+            scheduler_impl = auto_scheduler_impl;
+          }
           if (scheduler_impl.get () == 0)
-                return -1;
-          scheduler = scheduler_impl->_this (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+            return -1;
+          scheduler = scheduler_impl->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
           break;
 
         case Test_ECG::ss_runtime:
@@ -283,16 +299,17 @@ Test_ECG::run (int argc, char* argv[])
                 sizeof (runtime_infos_1)/sizeof (runtime_infos_1[0]),
                 runtime_infos_1);
 
-              scheduler_impl =
-                auto_ptr<POA_RtecScheduler::Scheduler>
-                    (new ACE_Runtime_Scheduler (runtime_configs_1_size,
-                                                runtime_configs_1,
-                                                runtime_infos_1_size,
-                                                runtime_infos_1));
+              auto_ptr<POA_RtecScheduler::Scheduler> auto_scheduler_impl
+                (new ACE_Runtime_Scheduler (runtime_configs_1_size,
+                                            runtime_configs_1,
+                                            runtime_infos_1_size,
+                                            runtime_infos_1));
+              scheduler_impl = auto_scheduler_impl;
+
               if (scheduler_impl.get () == 0)
                 return -1;
-              scheduler = scheduler_impl->_this (TAO_TRY_ENV);
-              TAO_CHECK_ENV;
+              scheduler = scheduler_impl->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+              ACE_TRY_CHECK;
             }
           else if (ACE_OS::strcmp (this->lcl_name_, "ECM2") == 0)
             {
@@ -300,19 +317,20 @@ Test_ECG::run (int argc, char* argv[])
               ACE_Scheduler_Factory::use_runtime (
                 sizeof (runtime_configs_2)/sizeof (runtime_configs_2[0]),
                 runtime_configs_2,
-				sizeof (runtime_infos_2)/sizeof (runtime_infos_2[0]),
+                sizeof (runtime_infos_2)/sizeof (runtime_infos_2[0]),
                 runtime_infos_2);
 
-              scheduler_impl =
-                auto_ptr<POA_RtecScheduler::Scheduler>
-                    (new ACE_Runtime_Scheduler (runtime_configs_2_size,
-                                                runtime_configs_2,
-												runtime_infos_2_size,
-                                                runtime_infos_2));
+              auto_ptr<POA_RtecScheduler::Scheduler> auto_scheduler_impl
+                (new ACE_Runtime_Scheduler (runtime_configs_2_size,
+                                            runtime_configs_2,
+                                            runtime_infos_2_size,
+                                            runtime_infos_2));
+              scheduler_impl = auto_scheduler_impl;
+
               if (scheduler_impl.get () == 0)
                 return -1;
-              scheduler = scheduler_impl->_this (TAO_TRY_ENV);
-              TAO_CHECK_ENV;
+              scheduler = scheduler_impl->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+              ACE_TRY_CHECK;
             }
           else if (ACE_OS::strcmp (this->lcl_name_, "ECM3") == 0)
             {
@@ -320,31 +338,34 @@ Test_ECG::run (int argc, char* argv[])
               ACE_Scheduler_Factory::use_runtime (
                 sizeof (runtime_configs_3)/sizeof (runtime_configs_3[0]),
                 runtime_configs_3,
-				sizeof (runtime_infos_3)/sizeof (runtime_infos_3[0]),
+                sizeof (runtime_infos_3)/sizeof (runtime_infos_3[0]),
                 runtime_infos_3);
 
-              scheduler_impl =
-                auto_ptr<POA_RtecScheduler::Scheduler>
-                    (new ACE_Runtime_Scheduler (runtime_configs_3_size,
-                                                runtime_configs_3,
-												runtime_infos_3_size,
-                                                runtime_infos_3));
+              auto_ptr<POA_RtecScheduler::Scheduler> auto_scheduler_impl
+                (new ACE_Runtime_Scheduler (runtime_configs_3_size,
+                                            runtime_configs_3,
+                                            runtime_infos_3_size,
+                                            runtime_infos_3));
+              scheduler_impl = auto_scheduler_impl;
+
               if (scheduler_impl.get () == 0)
                 return -1;
-              scheduler = scheduler_impl->_this (TAO_TRY_ENV);
-              TAO_CHECK_ENV;
+              scheduler = scheduler_impl->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+              ACE_TRY_CHECK;
             }
           else
             {
               ACE_ERROR ((LM_WARNING,
                           "Unknown name <%s> defaulting to "
                           "config scheduler\n", this->lcl_name_));
-              scheduler_impl =
-                auto_ptr<POA_RtecScheduler::Scheduler>(new ACE_Config_Scheduler);
+
+              auto_ptr<POA_RtecScheduler::Scheduler> auto_scheduler_impl (new ACE_Config_Scheduler);
+              scheduler_impl = auto_scheduler_impl;
+
               if (scheduler_impl.get () == 0)
                 return -1;
-              scheduler = scheduler_impl->_this (TAO_TRY_ENV);
-              TAO_CHECK_ENV;
+              scheduler = scheduler_impl->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+              ACE_TRY_CHECK;
             }
           break;
 
@@ -366,8 +387,8 @@ Test_ECG::run (int argc, char* argv[])
         case Test_ECG::ss_runtime:
           {
             CORBA::String_var str =
-              orb->object_to_string (scheduler.in (), TAO_TRY_ENV);
-            TAO_CHECK_ENV;
+              orb->object_to_string (scheduler.in () ACE_ENV_ARG_PARAMETER);
+            ACE_TRY_CHECK;
             ACE_DEBUG ((LM_DEBUG, "The (local) scheduler IOR is <%s>\n",
                         str.in ()));
 
@@ -378,8 +399,8 @@ Test_ECG::run (int argc, char* argv[])
             CosNaming::Name schedule_name (1);
             schedule_name.length (1);
             schedule_name[0].id = CORBA::string_dup (buf);
-            naming_context->bind (schedule_name, scheduler.in (), TAO_TRY_ENV);
-            TAO_CHECK_ENV;
+            naming_context->bind (schedule_name, scheduler.in () ACE_ENV_ARG_PARAMETER);
+            ACE_TRY_CHECK;
 
             if (ACE_Scheduler_Factory::use_config (naming_context.in (),
                                                    buf) == -1)
@@ -390,16 +411,18 @@ Test_ECG::run (int argc, char* argv[])
 
       // Create the EventService implementation, but don't start its
       // internal threads.
-      ACE_EventChannel ec_impl (CORBA::B_FALSE);
+      TAO_EC_Event_Channel_Attributes attr (root_poa.in (),
+                                            root_poa.in ());
+      TAO_EC_Event_Channel ec_impl (attr);
 
       // Register Event_Service with the Naming Service.
       RtecEventChannelAdmin::EventChannel_var ec =
-        ec_impl._this (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+        ec_impl._this (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       CORBA::String_var str =
-        orb->object_to_string (ec.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+        orb->object_to_string (ec.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_OS::sleep (5);
       ACE_DEBUG ((LM_DEBUG, "The (local) EC IOR is <%s>\n", str.in ()));
@@ -410,58 +433,56 @@ Test_ECG::run (int argc, char* argv[])
       CosNaming::Name channel_name (1);
       channel_name.length (1);
       channel_name[0].id = CORBA::string_dup (buf);
-      naming_context->bind (channel_name, ec.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      naming_context->bind (channel_name, ec.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_DEBUG ((LM_DEBUG, "waiting to start\n"));
 
       ACE_Time_Value tv (15, 0);
 
-      poa_manager->activate (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-
       if (this->rmt_name_ != 0)
         {
-          if (orb->run (&tv) == -1)
-            ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "orb->run"), -1);
+          orb->run (&tv ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
 
       ACE_DEBUG ((LM_DEBUG, "starting....\n"));
 
       RtecEventChannelAdmin::EventChannel_var local_ec =
         this->get_ec (naming_context.in (),
-                      this->lcl_name_,
-                      TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+                      this->lcl_name_
+                      ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_DEBUG ((LM_DEBUG, "located local EC\n"));
 
       for (int sd = 0; sd < this->supplier_disconnects_; ++sd)
         {
-          this->connect_suppliers (local_ec.in (), TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-          this->disconnect_suppliers (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+          this->connect_suppliers (local_ec.in () ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          this->disconnect_suppliers (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
           ACE_OS::sleep (5);
           ACE_DEBUG ((LM_DEBUG, "Supplier disconnection %d\n", sd));
         }
 
-      this->connect_suppliers (local_ec.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      this->connect_suppliers (local_ec.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_DEBUG ((LM_DEBUG, "connected supplier\n"));
 
+      RtecEventChannelAdmin::Observer_Handle observer_handle = 0;
       if (this->rmt_name_ != 0)
         {
           tv.set (5, 0);
-          if (orb->run (&tv) == -1)
-            ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "orb->run"), -1);
+          orb->run (&tv ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
           RtecEventChannelAdmin::EventChannel_var remote_ec =
             this->get_ec (naming_context.in (),
-                          this->rmt_name_,
-                          TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+                          this->rmt_name_
+                          ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
           ACE_DEBUG ((LM_DEBUG, "located remote EC\n"));
 
           CosNaming::Name rsch_name (1);
@@ -474,45 +495,49 @@ Test_ECG::run (int argc, char* argv[])
             }
           rsch_name[0].id = CORBA::string_dup (buf);
           CORBA::Object_var tmpobj =
-            naming_context->resolve (rsch_name, TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+            naming_context->resolve (rsch_name ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
           RtecScheduler::Scheduler_var remote_sch =
-            RtecScheduler::Scheduler::_narrow (tmpobj.in (), TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+            RtecScheduler::Scheduler::_narrow (tmpobj.in () ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
           this->connect_ecg (local_ec.in (),
                              remote_ec.in (),
-                             remote_sch.in (),
-                             TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+                             remote_sch.in ()
+                             ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
           ACE_DEBUG ((LM_DEBUG, "connected proxy\n"));
 
           tv.set (5, 0);
-          if (orb->run (&tv) == -1)
-            ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "orb->run"), -1);
+          orb->run (&tv ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
-          ec_impl.add_gateway (&this->ecg_, TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+          RtecEventChannelAdmin::Observer_ptr observer =
+            this->ecg_._this (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          observer_handle = ec_impl.append_observer (observer
+                                                     ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
 
       for (int cd = 0; cd < this->consumer_disconnects_; ++cd)
         {
-          this->connect_consumers (local_ec.in (), TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-          this->disconnect_consumers (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+          this->connect_consumers (local_ec.in () ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          this->disconnect_consumers (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
           ACE_OS::sleep (5);
           ACE_DEBUG ((LM_DEBUG, "Consumer disconnection %d\n", cd));
         }
-      this->connect_consumers (local_ec.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      this->connect_consumers (local_ec.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_DEBUG ((LM_DEBUG, "connected consumer\n"));
 
-      this->activate_suppliers (local_ec.in (), TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      this->activate_suppliers (local_ec.in () ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_DEBUG ((LM_DEBUG, "suppliers are active\n"));
 
@@ -520,7 +545,7 @@ Test_ECG::run (int argc, char* argv[])
 
       // Acquire the mutex for the ready mutex, blocking any supplier
       // that may start after this point.
-      ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, ready_mon, this->ready_mtx_, 1);
+      ACE_GUARD_RETURN (TAO_SYNCH_MUTEX, ready_mon, this->ready_mtx_, 1);
       this->ready_ = 1;
       this->test_start_ = ACE_OS::gethrtime ();
       this->ready_cnd_.broadcast ();
@@ -528,12 +553,18 @@ Test_ECG::run (int argc, char* argv[])
 
       ACE_DEBUG ((LM_DEBUG, "activate the  EC\n"));
 
+      if (this->rmt_name_ != 0)
+        {
+          ec_impl.remove_observer (observer_handle ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+        }
+
       // Create the EC internal threads
       ec_impl.activate ();
 
       ACE_DEBUG ((LM_DEBUG, "running the test\n"));
-      if (orb->run () == -1)
-        ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "orb->run"), -1);
+      orb->run (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       this->test_stop_ = ACE_OS::gethrtime ();
 
@@ -545,82 +576,64 @@ Test_ECG::run (int argc, char* argv[])
       if (this->schedule_file_ != 0)
         {
           RtecScheduler::RT_Info_Set_var infos;
+          RtecScheduler::Dependency_Set_var deps;
           RtecScheduler::Config_Info_Set_var configs;
+          RtecScheduler::Scheduling_Anomaly_Set_var anomalies;
 
-#if defined (__SUNPRO_CC)
-          // Sun C++ 4.2 warns with the code below:
-          //   Warning (Anachronism): Temporary used for non-const
-          //   reference, now obsolete.
-          //   Note: Type "CC -migration" for more on anachronisms.
-          //   Warning (Anachronism): The copy constructor for argument
-          //   infos of type RtecScheduler::RT_Info_Set_out should take
-          //   const RtecScheduler::RT_Info_Set_out&.
-          // But, this code is not CORBA conformant, because users should
-          // not define instances of _out types.
-
-          RtecScheduler::RT_Info_Set_out infos_out (infos);
-          RtecScheduler::Config_Info_Set_out configs_out (configs);
           ACE_Scheduler_Factory::server ()->compute_scheduling
             (ACE_Sched_Params::priority_min (ACE_SCHED_FIFO,
                                              ACE_SCOPE_THREAD),
              ACE_Sched_Params::priority_max (ACE_SCHED_FIFO,
                                              ACE_SCOPE_THREAD),
-             infos_out, configs_out, TAO_TRY_ENV);
-#else  /* ! __SUNPRO_CC */
-          ACE_Scheduler_Factory::server ()->compute_scheduling
-            (ACE_Sched_Params::priority_min (ACE_SCHED_FIFO,
-                                             ACE_SCOPE_THREAD),
-             ACE_Sched_Params::priority_max (ACE_SCHED_FIFO,
-                                             ACE_SCOPE_THREAD),
-             infos.out (), configs.out (), TAO_TRY_ENV);
-#endif /* ! __SUNPRO_CC */
+             infos.out (), deps.out (),
+             configs.out (), anomalies.out ()
+             ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
-          TAO_CHECK_ENV;
-          ACE_Scheduler_Factory::dump_schedule (infos.in (), 
+          ACE_Scheduler_Factory::dump_schedule (infos.in (),
+                                                deps.in (),
                                                 configs.in (),
+                                                anomalies.in (),
                                                 this->schedule_file_);
         }
 
+      naming_context->unbind (channel_name ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
       if (this->rmt_name_ != 0)
         {
-          ec_impl.del_gateway (&this->ecg_, TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-
-          this->ecg_.close (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-          this->ecg_.shutdown (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+          this->ecg_.close (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          this->ecg_.shutdown (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
 
-      this->disconnect_consumers (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-      this->disconnect_suppliers (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      this->disconnect_consumers (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+      this->disconnect_suppliers (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       ACE_DEBUG ((LM_DEBUG, "shutdown grace period\n"));
       tv.set (5, 0);
-      if (orb->run (&tv) == -1)
-        ACE_ERROR_RETURN ((LM_ERROR, "%p\n", "orb->run"), -1);
-
-      naming_context->unbind (channel_name, TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+      orb->run (&tv ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
     }
-  TAO_CATCH (CORBA::SystemException, sys_ex)
+  ACE_CATCH (CORBA::SystemException, sys_ex)
     {
-      TAO_TRY_ENV.print_exception ("SYS_EX");
+      ACE_PRINT_EXCEPTION (sys_ex, "SYS_EX");
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("NON SYS EX");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "NON SYS EX");
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
   return 0;
 }
 
 RtecEventChannelAdmin::EventChannel_ptr
 Test_ECG::get_ec (CosNaming::NamingContext_ptr naming_context,
-                  const char* process_name,
-                  CORBA::Environment &_env)
+                  const char* process_name
+                  ACE_ENV_ARG_DECL)
 {
   const int bufsize = 512;
   char buf[bufsize];
@@ -632,100 +645,93 @@ Test_ECG::get_ec (CosNaming::NamingContext_ptr naming_context,
   channel_name[0].id = CORBA::string_dup (buf);
 
   CORBA::Object_var ec_ptr =
-    naming_context->resolve (channel_name, _env);
-  if (_env.exception () != 0 || CORBA::is_nil (ec_ptr.in ()))
+    naming_context->resolve (channel_name ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK_RETURN (RtecEventChannelAdmin::EventChannel::_nil ());
+  if (CORBA::is_nil (ec_ptr.in ()))
     return RtecEventChannelAdmin::EventChannel::_nil ();
 
-  return RtecEventChannelAdmin::EventChannel::_narrow (ec_ptr.in (),
-                                                       _env);
+  return RtecEventChannelAdmin::EventChannel::_narrow (ec_ptr.in ()
+                                                       ACE_ENV_ARG_PARAMETER);
 }
 
 void
-Test_ECG::disconnect_suppliers (CORBA::Environment &_env)
+Test_ECG::disconnect_suppliers (ACE_ENV_SINGLE_ARG_DECL)
 {
   for (int i = 0; i < this->hp_suppliers_ + this->lp_suppliers_; ++i)
     {
-      this->suppliers_[i]->close (_env);
-      if (_env.exception () != 0) return;
+      this->suppliers_[i]->close (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_CHECK;
     }
 }
 
 void
-Test_ECG::connect_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-                             CORBA::Environment &_env)
+Test_ECG::connect_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec
+                             ACE_ENV_ARG_DECL)
 {
-  TAO_TRY
+  int i;
+  for (i = 0; i < this->hp_suppliers_; ++i)
     {
-      int i;
-      for (i = 0; i < this->hp_suppliers_; ++i)
-        {
-          // Limit the number of messages sent by each supplier
-          int mc = this->hp_message_count_ / this->hp_suppliers_;
-          if (mc == 0)
-            mc = 1;
+      // Limit the number of messages sent by each supplier
+      int mc = this->hp_message_count_ / this->hp_suppliers_;
+      if (mc == 0)
+        mc = 1;
 
-          char buf[BUFSIZ];
-          ACE_OS::sprintf (buf, "hp_supplier_%02.2d@%s", i, this->lcl_name_);
+      char buf[BUFSIZ];
+      ACE_OS::sprintf (buf, "hp_supplier_%02d@%s", i, this->lcl_name_);
 
-          ACE_NEW (this->suppliers_[i],
-                   Test_Supplier (this, this->suppliers_ + i));
+      ACE_NEW (this->suppliers_[i],
+               Test_Supplier (this, this->suppliers_ + i));
 
-          this->suppliers_[i]->open (buf,
-                                     this->hps_event_a_,
-                                     this->hps_event_b_,
-                                     mc,
-                                     this->hp_interval_ * 10,
-                                     local_ec,
-                                     TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-        }
-
-      for (; i < this->hp_suppliers_ + this->lp_suppliers_; ++i)
-        {
-          // Limit the number of messages sent by each supplier
-          int mc = this->lp_message_count_ / this->lp_suppliers_;
-          if (mc == 0)
-            mc = 1;
-
-          char buf[BUFSIZ];
-          ACE_OS::sprintf (buf, "lp_supplier_%02.2d@%s",
-                           i - this->hp_suppliers_, this->lcl_name_);
-
-          ACE_NEW (this->suppliers_[i],
-                   Test_Supplier (this, this->suppliers_ + i));
-
-          this->suppliers_[i]->open (buf,
-                                     this->lps_event_a_,
-                                     this->lps_event_b_,
-                                     mc,
-                                     this->lp_interval_ * 10,
-                                     local_ec,
-                                     TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-        }
+      this->suppliers_[i]->open (buf,
+                                 this->hps_event_a_,
+                                 this->hps_event_b_,
+                                 mc,
+                                 this->hp_interval_ * 10,
+                                 local_ec
+                                 ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK;
     }
-  TAO_CATCHANY
+
+  for (; i < this->hp_suppliers_ + this->lp_suppliers_; ++i)
     {
-      TAO_RETHROW;
+      // Limit the number of messages sent by each supplier
+      int mc = this->lp_message_count_ / this->lp_suppliers_;
+      if (mc == 0)
+        mc = 1;
+
+      char buf[BUFSIZ];
+      ACE_OS::sprintf (buf, "lp_supplier_%02d@%s",
+                       i - this->hp_suppliers_, this->lcl_name_);
+
+      ACE_NEW (this->suppliers_[i],
+               Test_Supplier (this, this->suppliers_ + i));
+
+      this->suppliers_[i]->open (buf,
+                                 this->lps_event_a_,
+                                 this->lps_event_b_,
+                                 mc,
+                                 this->lp_interval_ * 10,
+                                 local_ec
+                                 ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK;
     }
-  TAO_ENDTRY;
 }
 
 void
-Test_ECG::disconnect_consumers (CORBA::Environment &_env)
+Test_ECG::disconnect_consumers (ACE_ENV_SINGLE_ARG_DECL)
 {
   for (int i = 0; i < this->hp_consumers_ + this->lp_consumers_; ++i)
     {
-      this->consumers_[i]->close (_env);
-      if (_env.exception () != 0) return;
+      this->consumers_[i]->close (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_CHECK;
     }
 }
 
 void
-Test_ECG::activate_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-                              CORBA::Environment &_env)
+Test_ECG::activate_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec
+                              ACE_ENV_ARG_DECL)
 {
-  TAO_TRY
+  ACE_TRY
     {
       int i;
       for (i = 0; i < this->hp_suppliers_; ++i)
@@ -736,13 +742,13 @@ Test_ECG::activate_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
             mc = 1;
 
           char buf[BUFSIZ];
-          ACE_OS::sprintf (buf, "hp_supplier_%02.2d@%s", i, this->lcl_name_);
+          ACE_OS::sprintf (buf, "hp_supplier_%02d@%s", i, this->lcl_name_);
 
           this->suppliers_[i]->activate (buf,
                                          this->hp_interval_ * 10,
-                                         local_ec,
-                                         TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+                                         local_ec
+                                         ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
 
       for (; i < this->hp_suppliers_ + this->lp_suppliers_; ++i)
@@ -753,142 +759,129 @@ Test_ECG::activate_suppliers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
             mc = 1;
 
           char buf[BUFSIZ];
-          ACE_OS::sprintf (buf, "lp_supplier_%02.2d@%s",
+          ACE_OS::sprintf (buf, "lp_supplier_%02d@%s",
                            i - this->hp_suppliers_, this->lcl_name_);
 
           this->suppliers_[i]->activate (buf,
                                          this->lp_interval_ * 10,
-                                         local_ec,
-                                         TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+                                         local_ec
+                                         ACE_ENV_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_RETHROW;
+      ACE_RE_THROW;
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
 }
 
 void
-Test_ECG::connect_consumers (RtecEventChannelAdmin::EventChannel_ptr local_ec,
-                             CORBA::Environment &_env)
+Test_ECG::connect_consumers (RtecEventChannelAdmin::EventChannel_ptr local_ec
+                             ACE_ENV_ARG_DECL)
 {
-  TAO_TRY
+  int i;
+  for (i = 0; i < this->hp_consumers_; ++i)
     {
-      int i;
-      for (i = 0; i < this->hp_consumers_; ++i)
-        {
-          char buf[BUFSIZ];
-          ACE_OS::sprintf (buf, "hp_consumer_%02.2d@%s", i, this->lcl_name_);
+      char buf[BUFSIZ];
+      ACE_OS::sprintf (buf, "hp_consumer_%02d@%s", i, this->lcl_name_);
 
-          ACE_NEW (this->consumers_[i],
-                   Test_Consumer (this, this->consumers_ + i));
+      ACE_NEW (this->consumers_[i],
+               Test_Consumer (this, this->consumers_ + i));
 
-          this->consumers_[i]->open (buf,
-                                     this->hpc_event_a_,
-                                     this->hpc_event_b_,
-                                     local_ec,
-                                     TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-          this->stats_[i].total_time_ = 0;
-          this->stats_[i].lcl_count_ = 0;
-          this->stats_[i].rmt_count_ = 0;
-        }
-
-      for (; i < this->hp_consumers_ + this->lp_consumers_; ++i)
-        {
-          char buf[BUFSIZ];
-          ACE_OS::sprintf (buf, "lp_consumer_%02.2d@%s",
-                           i - this->hp_consumers_, this->lcl_name_);
-
-          ACE_NEW (this->consumers_[i],
-                   Test_Consumer (this, this->consumers_ + i));
-
-          this->consumers_[i]->open (buf,
-                                     this->lpc_event_a_,
-                                     this->lpc_event_b_,
-                                     local_ec,
-                                     TAO_TRY_ENV);
-          TAO_CHECK_ENV;
-          this->stats_[i].total_time_ = 0;
-          this->stats_[i].lcl_count_ = 0;
-          this->stats_[i].rmt_count_ = 0;
-        }
-      this->running_consumers_ = this->hp_consumers_ + this->lp_consumers_;
+      this->consumers_[i]->open (buf,
+                                 this->hpc_event_a_,
+                                 this->hpc_event_b_,
+                                 local_ec
+                                 ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK;
+      this->stats_[i].total_time_ = 0;
+      this->stats_[i].lcl_count_ = 0;
+      this->stats_[i].rmt_count_ = 0;
     }
-  TAO_CATCHANY
+
+  for (; i < this->hp_consumers_ + this->lp_consumers_; ++i)
     {
-      TAO_RETHROW;
+      char buf[BUFSIZ];
+      ACE_OS::sprintf (buf, "lp_consumer_%02d@%s",
+                       i - this->hp_consumers_, this->lcl_name_);
+
+      ACE_NEW (this->consumers_[i],
+               Test_Consumer (this, this->consumers_ + i));
+
+      this->consumers_[i]->open (buf,
+                                 this->lpc_event_a_,
+                                 this->lpc_event_b_,
+                                 local_ec
+                                 ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK;
+      this->stats_[i].total_time_ = 0;
+      this->stats_[i].lcl_count_ = 0;
+      this->stats_[i].rmt_count_ = 0;
     }
-  TAO_ENDTRY;
+  this->running_consumers_ = this->hp_consumers_ + this->lp_consumers_;
 }
 
 void
 Test_ECG::connect_ecg (RtecEventChannelAdmin::EventChannel_ptr local_ec,
                        RtecEventChannelAdmin::EventChannel_ptr remote_ec,
-                       RtecScheduler::Scheduler_ptr remote_sch,
-                       CORBA::Environment &_env)
+                       RtecScheduler::Scheduler_ptr remote_sch
+                       ACE_ENV_ARG_DECL)
 {
-  TAO_TRY
-    {
-      RtecScheduler::Scheduler_ptr local_sch =
-        ACE_Scheduler_Factory::server ();
+  RtecScheduler::Scheduler_ptr local_sch =
+    ACE_Scheduler_Factory::server ();
 
-      // ECG name.
-      const int bufsize = 512;
-      char ecg_name[bufsize];
-      ACE_OS::strcpy (ecg_name, "ecg_");
-      ACE_OS::strcat (ecg_name, this->lcl_name_);
+  // ECG name.
+  const int bufsize = 512;
+  char ecg_name[bufsize];
+  ACE_OS::strcpy (ecg_name, "ecg_");
+  ACE_OS::strcat (ecg_name, this->lcl_name_);
 
-      // We could use the same name on the local and remote scheduler,
-      // but that fails when using a global scheduler.
-      char rmt[BUFSIZ];
-      ACE_OS::strcpy (rmt, ecg_name);
-      ACE_OS::strcat (rmt, "@");
-      ACE_OS::strcat (rmt, this->rmt_name_);
+  // We could use the same name on the local and remote scheduler,
+  // but that fails when using a global scheduler.
+  char rmt[BUFSIZ];
+  ACE_OS::strcpy (rmt, ecg_name);
+  ACE_OS::strcat (rmt, "@");
+  ACE_OS::strcat (rmt, this->rmt_name_);
 
-      // We could use the same name on the local and remote scheduler,
-      // but that fails when using a global scheduler.
-      char lcl[bufsize];
-      ACE_OS::strcpy (lcl, ecg_name);
-      ACE_OS::strcat (lcl, "@");
-      ACE_OS::strcat (lcl, this->lcl_name_);
+  // We could use the same name on the local and remote scheduler,
+  // but that fails when using a global scheduler.
+  char lcl[bufsize];
+  ACE_OS::strcpy (lcl, ecg_name);
+  ACE_OS::strcat (lcl, "@");
+  ACE_OS::strcat (lcl, this->lcl_name_);
 
-      this->ecg_.init (remote_ec, local_ec, remote_sch, local_sch,
-                       rmt, lcl, TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-    }
-  TAO_CATCHANY
-    {
-      TAO_RETHROW;
-    }
-  TAO_ENDTRY;
+  this->ecg_.init (remote_ec, local_ec, remote_sch, local_sch,
+                   rmt, lcl ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 }
 
 void
 Test_ECG::push_supplier (void * /* cookie */,
                          RtecEventChannelAdmin::ProxyPushConsumer_ptr consumer,
-                         const RtecEventComm::EventSet &events,
-                         CORBA::Environment & _env)
+                         const RtecEventComm::EventSet &events
+                         ACE_ENV_ARG_DECL)
 {
   this->wait_until_ready ();
   // ACE_DEBUG ((LM_DEBUG, "(%P|%t) events sent by supplier\n"));
   // @@ TODO we could keep somekind of stats here...
   if (!this->short_circuit_)
     {
-      consumer->push (events, _env);
+      consumer->push (events ACE_ENV_ARG_PARAMETER);
+      ACE_CHECK;
     }
   else
     {
       int i = 0;
-      for (; i < this->hp_consumers_ && !_env.exception (); ++i)
+      for (; i < this->hp_consumers_; ++i)
         {
-          this->consumers_[i]->push (events, _env);
+          this->consumers_[i]->push (events ACE_ENV_ARG_PARAMETER);
+          ACE_CHECK;
         }
-      for (; i < this->hp_consumers_ + this->lp_consumers_ && !_env.exception (); ++i)
+      for (; i < this->hp_consumers_ + this->lp_consumers_; ++i)
         {
-          this->consumers_[i]->push (events, _env);
+          this->consumers_[i]->push (events ACE_ENV_ARG_PARAMETER);
+          ACE_CHECK;
         }
     }
 }
@@ -896,11 +889,11 @@ Test_ECG::push_supplier (void * /* cookie */,
 void
 Test_ECG::push_consumer (void *consumer_cookie,
                          ACE_hrtime_t arrival,
-                         const RtecEventComm::EventSet &events,
-                         CORBA::Environment &)
+                         const RtecEventComm::EventSet &events
+                         ACE_ENV_ARG_DECL_NOT_USED)
 {
   int ID =
-    (ACE_reinterpret_cast(Test_Consumer**,consumer_cookie)
+    (reinterpret_cast<Test_Consumer**> (consumer_cookie)
      - this->consumers_);
 
   // ACE_DEBUG ((LM_DEBUG, "(%P|%t) events received by consumer %d\n", ID));
@@ -924,16 +917,16 @@ Test_ECG::push_consumer (void *consumer_cookie,
     {
       const RtecEventComm::Event& e = events[i];
 
-      if (e.type_ == ACE_ES_EVENT_SHUTDOWN)
+      if (e.header.type == ACE_ES_EVENT_SHUTDOWN)
         {
           this->shutdown_consumer (ID);
           continue;
         }
 
       ACE_hrtime_t s;
-      ORBSVCS_Time::TimeT_to_hrtime (s, e.creation_time_);
+      ORBSVCS_Time::TimeT_to_hrtime (s, e.header.creation_time);
       ACE_hrtime_t nsec = arrival - s;
-      if (this->local_source (e.source_))
+      if (this->local_source (e.header.source))
         {
           int& count = this->stats_[ID].lcl_count_;
 
@@ -967,9 +960,7 @@ Test_ECG::push_consumer (void *consumer_cookie,
           // + Use the start of the test to keep the current frame.
           // + Use the last execution.
 
-          // Work around MSVC++ bug, it does not not how to convert an
-          // unsigned 64 bit int into a long....
-          CORBA::ULong tmp = ACE_static_cast(CORBA::ULong,(s - now));
+          CORBA::ULong tmp = ACE_U64_TO_U32 (s - now);
           this->stats_[ID].laxity_[count] = 1 + tmp/1000.0F/interval;
           count++;
         }
@@ -985,37 +976,33 @@ Test_ECG::push_consumer (void *consumer_cookie,
 void
 Test_ECG::wait_until_ready (void)
 {
-  ACE_GUARD (ACE_Thread_Mutex, ready_mon, this->ready_mtx_);
+  ACE_GUARD (TAO_SYNCH_MUTEX, ready_mon, this->ready_mtx_);
   while (!this->ready_)
     this->ready_cnd_.wait ();
 }
 
 void
 Test_ECG::shutdown_supplier (void* /* supplier_cookie */,
-                             RtecEventComm::PushConsumer_ptr consumer,
-                             CORBA::Environment& _env)
+                             RtecEventComm::PushConsumer_ptr consumer
+                             ACE_ENV_ARG_DECL)
 {
 
   this->running_suppliers_--;
-  if (this->running_suppliers_ == 0)
-    {
-      // We propagate a shutdown event through the system...
-      RtecEventComm::EventSet shutdown (1);
-      shutdown.length (1);
-      RtecEventComm::Event& s = shutdown[0];
+  if (this->running_suppliers_ != 0)
+    return;
 
-      s.source_ = 0;
-      s.ttl_ = 1;
+  // We propagate a shutdown event through the system...
+  RtecEventComm::EventSet shutdown (1);
+  shutdown.length (1);
+  RtecEventComm::Event& s = shutdown[0];
 
-      ACE_hrtime_t t = ACE_OS::gethrtime ();
-      ORBSVCS_Time::hrtime_to_TimeT (s.creation_time_, t);
-      s.ec_recv_time_ = ORBSVCS_Time::zero;
-      s.ec_send_time_ = ORBSVCS_Time::zero;
-      s.data_.x = 0;
-      s.data_.y = 0;
-      s.type_ = ACE_ES_EVENT_SHUTDOWN;
-      consumer->push (shutdown, _env);
-    }
+  s.header.source = 0;
+  s.header.ttl = 1;
+
+  ACE_hrtime_t t = ACE_OS::gethrtime ();
+  ORBSVCS_Time::hrtime_to_TimeT (s.header.creation_time, t);
+  s.header.type = ACE_ES_EVENT_SHUTDOWN;
+  consumer->push (shutdown ACE_ENV_ARG_PARAMETER);
 }
 
 void
@@ -1036,14 +1023,14 @@ Test_ECG::shutdown_consumer (int id)
 }
 
 int
-Test_ECG::shutdown (CORBA::Environment& _env)
+Test_ECG::shutdown (ACE_ENV_SINGLE_ARG_DECL)
 {
   ACE_DEBUG ((LM_DEBUG, "Shutting down the multiple EC test\n"));
 
   if (this->rmt_name_ != 0)
     {
-      this->ecg_.shutdown (_env);
-      if (_env.exception () != 0) return -1;
+      this->ecg_.shutdown (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_CHECK_RETURN (-1);
     }
 
   TAO_ORB_Core_instance ()->orb ()->shutdown ();
@@ -1059,17 +1046,15 @@ Test_ECG::dump_results (void)
   int i;
   for (i = 0; i < this->hp_consumers_; ++i)
     {
-      ACE_OS::sprintf (buf, "HP%02.2d", i);
+      ACE_OS::sprintf (buf, "HP%02d", i);
       this->dump_results (buf, this->stats_[i]);
     }
   for (i = 0; i < this->lp_consumers_; ++i)
     {
-      ACE_OS::sprintf (buf, "LP%02.2d", i);
+      ACE_OS::sprintf (buf, "LP%02d", i);
       this->dump_results (buf, this->stats_[i + this->hp_consumers_]);
     }
-  // the cast is to workaround a msvc++ bug...
-  CORBA::ULong tmp = ACE_static_cast(CORBA::ULong,
-                                     this->test_stop_ - this->test_start_);
+  CORBA::ULong tmp = ACE_U64_TO_U32 (this->test_stop_ - this->test_start_);
   double usec =  tmp / 1000.0;
   ACE_DEBUG ((LM_DEBUG, "Time[TOTAL]: %.3f\n", usec));
 }
@@ -1078,27 +1063,23 @@ void
 Test_ECG::dump_results (const char* name, Stats& stats)
 {
   // @@ We are reporting the information without specifics about
-  // the cast is to workaround a msvc++ bug...
-  double usec = ACE_static_cast(CORBA::ULong,stats.total_time_) / 1000.0;
+  double usec = ACE_U64_TO_U32 (stats.total_time_) / 1000.0;
   ACE_DEBUG ((LM_DEBUG, "Time[LCL,%s]: %.3f\n", name, usec));
   int i;
   for (i = 1; i < stats.lcl_count_ - 1; ++i)
     {
-      // the cast is to workaround a msvc++ bug...
-      usec = ACE_static_cast(CORBA::ULong,stats.lcl_latency_[i]) / 1000.0;
+      usec = ACE_U64_TO_U32 (stats.lcl_latency_[i]) / 1000.0;
       ACE_DEBUG ((LM_DEBUG, "Latency[LCL,%s]: %.3f\n", name, usec));
 
       double percent = stats.laxity_[i] * 100.0;
       ACE_DEBUG ((LM_DEBUG, "Laxity[LCL,%s]: %.3f\n", name, percent));
 
-      // the cast is to workaround a msvc++ bug...
-      usec = ACE_static_cast(CORBA::ULong,stats.end_[i] - this->test_start_) / 1000.0;
+      usec = ACE_U64_TO_U32 (stats.end_[i] - this->test_start_) / 1000.0;
       ACE_DEBUG ((LM_DEBUG, "Completion[LCL,%s]: %.3f\n", name, usec));
     }
   for (i = 1; i < stats.rmt_count_ - 1; ++i)
     {
-      // the cast is to workaround a msvc++ bug...
-      double usec = ACE_static_cast(CORBA::ULong,stats.rmt_latency_[i]) / 1000.0;
+      double usec = ACE_U64_TO_U32 (stats.rmt_latency_[i]) / 1000.0;
       ACE_DEBUG ((LM_DEBUG, "Latency[RMT,%s]: %.3f\n", name, usec));
     }
 }
@@ -1125,23 +1106,23 @@ Test_ECG::parse_args (int argc, char *argv [])
       switch (opt)
         {
         case 'l':
-          this->lcl_name_ = get_opt.optarg;
+          this->lcl_name_ = get_opt.opt_arg ();
           break;
 
         case 'r':
-          this->rmt_name_ = get_opt.optarg;
+          this->rmt_name_ = get_opt.opt_arg ();
           break;
 
         case 's':
-          if (ACE_OS::strcasecmp (get_opt.optarg, "global") == 0)
+          if (ACE_OS::strcasecmp (get_opt.opt_arg (), "global") == 0)
             {
               this->scheduling_type_ = Test_ECG::ss_global;
             }
-          else if (ACE_OS::strcasecmp (get_opt.optarg, "local") == 0)
+          else if (ACE_OS::strcasecmp (get_opt.opt_arg (), "local") == 0)
             {
               this->scheduling_type_ = Test_ECG::ss_local;
             }
-          else if (ACE_OS::strcasecmp (get_opt.optarg, "runtime") == 0)
+          else if (ACE_OS::strcasecmp (get_opt.opt_arg (), "runtime") == 0)
             {
               this->scheduling_type_ = Test_ECG::ss_runtime;
             }
@@ -1150,7 +1131,7 @@ Test_ECG::parse_args (int argc, char *argv [])
               ACE_DEBUG ((LM_DEBUG,
                           "Unknown scheduling type <%s> "
                           "defaulting to local\n",
-                          get_opt.optarg));
+                          get_opt.opt_arg ()));
               this->scheduling_type_ = Test_ECG::ss_local;
             }
           break;
@@ -1161,8 +1142,8 @@ Test_ECG::parse_args (int argc, char *argv [])
 
         case 'i':
           {
-            char* aux;
-            char* arg = ACE_OS::strtok_r (get_opt.optarg, ",", &aux);
+            char* aux = 0;
+            char* arg = ACE_OS::strtok_r (get_opt.opt_arg (), ",", &aux);
             this->consumer_disconnects_ = ACE_OS::atoi (arg);
             arg = ACE_OS::strtok_r (0, ",", &aux);
             this->supplier_disconnects_ = ACE_OS::atoi (arg);
@@ -1171,8 +1152,8 @@ Test_ECG::parse_args (int argc, char *argv [])
 
         case 'h':
           {
-            char* aux;
-                char* arg = ACE_OS::strtok_r (get_opt.optarg, ",", &aux);
+            char* aux = 0;
+                char* arg = ACE_OS::strtok_r (get_opt.opt_arg (), ",", &aux);
 
             this->hp_suppliers_ = ACE_OS::atoi (arg);
                 arg = ACE_OS::strtok_r (0, ",", &aux);
@@ -1196,8 +1177,8 @@ Test_ECG::parse_args (int argc, char *argv [])
 
         case 'w':
           {
-            char* aux;
-                char* arg = ACE_OS::strtok_r (get_opt.optarg, ",", &aux);
+            char* aux = 0;
+                char* arg = ACE_OS::strtok_r (get_opt.opt_arg (), ",", &aux);
 
             this->lp_suppliers_ = ACE_OS::atoi (arg);
                 arg = ACE_OS::strtok_r (0, ",", &aux);
@@ -1220,10 +1201,10 @@ Test_ECG::parse_args (int argc, char *argv [])
           break;
 
         case 'p':
-          this->pid_file_name_ = get_opt.optarg;
+          this->pid_file_name_ = get_opt.opt_arg ();
           break;
         case 'd':
-          this->schedule_file_ = get_opt.optarg;
+          this->schedule_file_ = get_opt.opt_arg ();
           break;
 
         case '?':
@@ -1286,8 +1267,6 @@ Test_ECG::parse_args (int argc, char *argv [])
   return 0;
 }
 
-// ****************************************************************
-
 Test_Supplier::Test_Supplier (Test_ECG *test,
                               void *cookie)
   :  test_ (test),
@@ -1301,173 +1280,155 @@ Test_Supplier::open (const char* name,
                      int event_a,
                      int event_b,
                      int message_count,
-                     const RtecScheduler::Period& rate,
-                     RtecEventChannelAdmin::EventChannel_ptr ec,
-                     CORBA::Environment &_env)
+                     const RtecScheduler::Period_t& rate,
+                     RtecEventChannelAdmin::EventChannel_ptr ec
+                     ACE_ENV_ARG_DECL)
 {
   this->event_a_ = event_a;
   this->event_b_ = event_b;
   this->message_count_ = message_count;
 
-  TAO_TRY
-    {
-      RtecScheduler::Scheduler_ptr server =
-        ACE_Scheduler_Factory::server ();
+  RtecScheduler::Scheduler_ptr server =
+    ACE_Scheduler_Factory::server ();
 
-      RtecScheduler::handle_t rt_info =
-        server->create (name, TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  RtecScheduler::handle_t rt_info =
+    server->create (name ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 
-      // The execution times are set to reasonable values, but
-      // actually they are changed on the real execution, i.e. we
-      // lie to the scheduler to obtain right priorities; but we
-      // don't care if the set is schedulable.
-      ACE_Time_Value tv (0, 2000);
-      TimeBase::TimeT time;
-      ORBSVCS_Time::Time_Value_to_TimeT (time, tv);
-      ACE_DEBUG ((LM_DEBUG, "register supplier \"%s\"\n", name));
-      server->set (rt_info,
-                   RtecScheduler::VERY_HIGH_CRITICALITY,
-                   time, time, time,
-                   rate,
-                   RtecScheduler::VERY_LOW_IMPORTANCE,
-                   time,
-                   1,
-                   RtecScheduler::OPERATION,
-                   TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  // The execution times are set to reasonable values, but
+  // actually they are changed on the real execution, i.e. we
+  // lie to the scheduler to obtain right priorities; but we
+  // don't care if the set is schedulable.
+  ACE_Time_Value tv (0, 2000);
+  TimeBase::TimeT time;
+  ORBSVCS_Time::Time_Value_to_TimeT (time, tv);
+  ACE_DEBUG ((LM_DEBUG, "register supplier \"%s\"\n", name));
+  server->set (rt_info,
+               RtecScheduler::VERY_HIGH_CRITICALITY,
+               time, time, time,
+               rate,
+               RtecScheduler::VERY_LOW_IMPORTANCE,
+               time,
+               1,
+                   RtecScheduler::OPERATION
+               ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 
-      this->supplier_id_ = ACE::crc32 (name);
-      ACE_DEBUG ((LM_DEBUG, "ID for <%s> is %04.4x\n", name,
-                  this->supplier_id_));
+  this->supplier_id_ = ACE::crc32 (name);
+  ACE_DEBUG ((LM_DEBUG, "ID for <%s> is %04.4x\n", name,
+              this->supplier_id_));
 
-      ACE_SupplierQOS_Factory qos;
-      qos.insert (this->supplier_id_,
-                  this->event_a_,
-                  rt_info, 1);
-      qos.insert (this->supplier_id_,
-                  this->event_b_,
-                  rt_info, 1);
-      qos.insert (this->supplier_id_,
-                  ACE_ES_EVENT_SHUTDOWN,
-                  rt_info, 1);
+  ACE_SupplierQOS_Factory qos;
+  qos.insert (this->supplier_id_,
+              this->event_a_,
+              rt_info, 1);
+  qos.insert (this->supplier_id_,
+              this->event_b_,
+              rt_info, 1);
+  qos.insert (this->supplier_id_,
+              ACE_ES_EVENT_SHUTDOWN,
+              rt_info, 1);
 
-      RtecEventChannelAdmin::SupplierAdmin_var supplier_admin =
-        ec->for_suppliers (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  RtecEventChannelAdmin::SupplierAdmin_var supplier_admin =
+    ec->for_suppliers (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      this->consumer_proxy_ =
-        supplier_admin->obtain_push_consumer (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  this->consumer_proxy_ =
+    supplier_admin->obtain_push_consumer (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      RtecEventComm::PushSupplier_var objref = this->_this (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  RtecEventComm::PushSupplier_var objref = this->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      this->consumer_proxy_->connect_push_supplier (objref.in (),
-                                                    qos.get_SupplierQOS (),
-                                                    TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-
-    }
-  TAO_CATCHANY
-    {
-      TAO_RETHROW;
-    }
-  TAO_ENDTRY;
+  this->consumer_proxy_->connect_push_supplier (objref.in (),
+                                                qos.get_SupplierQOS ()
+                                                ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 }
 
 void
-Test_Supplier::close (CORBA::Environment &_env)
+Test_Supplier::close (ACE_ENV_SINGLE_ARG_DECL)
 {
   if (CORBA::is_nil (this->consumer_proxy_.in ()))
     return;
 
-  this->consumer_proxy_->disconnect_push_consumer (_env);
-  if (_env.exception () != 0) return;
-
-  this->consumer_proxy_ = 0;
+  RtecEventChannelAdmin::ProxyPushConsumer_var proxy =
+    this->consumer_proxy_._retn ();
+  proxy->disconnect_push_consumer (ACE_ENV_SINGLE_ARG_PARAMETER);
 }
 
 void
 Test_Supplier::activate (const char* name,
-                         const RtecScheduler::Period& rate,
-                         RtecEventChannelAdmin::EventChannel_ptr ec,
-                         CORBA::Environment &_env)
+                         const RtecScheduler::Period_t& rate,
+                         RtecEventChannelAdmin::EventChannel_ptr ec
+                         ACE_ENV_ARG_DECL)
 {
-  TAO_TRY
-    {
-      RtecScheduler::Scheduler_ptr server =
-        ACE_Scheduler_Factory::server ();
+  RtecScheduler::Scheduler_ptr server =
+    ACE_Scheduler_Factory::server ();
 
-      const int bufsize = 512;
-      char buf[bufsize];
-      ACE_OS::strcpy (buf, "consumer_");
-      ACE_OS::strcat (buf, name);
-      RtecScheduler::handle_t rt_info =
-        server->create (buf, TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  const int bufsize = 512;
+  char buf[bufsize];
+  ACE_OS::strcpy (buf, "consumer_");
+  ACE_OS::strcat (buf, name);
+  RtecScheduler::handle_t rt_info =
+    server->create (buf ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 
+  // The execution times are set to reasonable values, but
+  // actually they are changed on the real execution, i.e. we
+  // lie to the scheduler to obtain right priorities; but we
+  // don't care if the set is schedulable.
+  ACE_Time_Value tv (0, 2000);
+  TimeBase::TimeT time;
+  ORBSVCS_Time::Time_Value_to_TimeT (time, tv);
+  ACE_DEBUG ((LM_DEBUG, "activate \"%s\"\n", buf));
+  server->set (rt_info,
+               RtecScheduler::VERY_HIGH_CRITICALITY,
+               time, time, time,
+               rate,
+               RtecScheduler::VERY_LOW_IMPORTANCE,
+               time,
+               1,
+               RtecScheduler::OPERATION
+               ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 
-      // The execution times are set to reasonable values, but
-      // actually they are changed on the real execution, i.e. we
-      // lie to the scheduler to obtain right priorities; but we
-      // don't care if the set is schedulable.
-      ACE_Time_Value tv (0, 2000);
-      TimeBase::TimeT time;
-      ORBSVCS_Time::Time_Value_to_TimeT (time, tv);
-      ACE_DEBUG ((LM_DEBUG, "activate \"%s\"\n", buf));
-      server->set (rt_info,
-                   RtecScheduler::VERY_HIGH_CRITICALITY,
-                   time, time, time,
-                   rate,
-                   RtecScheduler::VERY_LOW_IMPORTANCE,
-                   time,
-                   1,
-                   RtecScheduler::OPERATION,
-                   TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  // Also connect our consumer for timeout events from the EC.
+  int interval = rate / 10;
+  ACE_Time_Value tv_timeout (interval / ACE_ONE_SECOND_IN_USECS,
+                             interval % ACE_ONE_SECOND_IN_USECS);
+  TimeBase::TimeT timeout;
+  ORBSVCS_Time::Time_Value_to_TimeT (timeout, tv_timeout);
 
-      // Also connect our consumer for timeout events from the EC.
-      int interval = rate / 10;
-      ACE_Time_Value tv_timeout (interval / ACE_ONE_SECOND_IN_USECS,
-                                 interval % ACE_ONE_SECOND_IN_USECS);
-      TimeBase::TimeT timeout;
-      ORBSVCS_Time::Time_Value_to_TimeT (timeout, tv_timeout);
+  ACE_ConsumerQOS_Factory consumer_qos;
+  consumer_qos.start_disjunction_group ();
+  consumer_qos.insert_time (ACE_ES_EVENT_INTERVAL_TIMEOUT,
+                            timeout,
+                            rt_info);
 
-      ACE_ConsumerQOS_Factory consumer_qos;
-      consumer_qos.start_disjunction_group ();
-      consumer_qos.insert_time (ACE_ES_EVENT_INTERVAL_TIMEOUT,
-                                timeout,
-                                rt_info);
+  // = Connect as a consumer.
+  RtecEventChannelAdmin::ConsumerAdmin_var consumer_admin =
+    ec->for_consumers (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      // = Connect as a consumer.
-      RtecEventChannelAdmin::ConsumerAdmin_var consumer_admin =
-        ec->for_consumers (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  this->supplier_proxy_ =
+    consumer_admin->obtain_push_supplier (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      this->supplier_proxy_ =
-        consumer_admin->obtain_push_supplier (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  RtecEventComm::PushConsumer_var cref =
+    this->consumer_._this (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      RtecEventComm::PushConsumer_var cref =
-        this->consumer_._this (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-
-      this->supplier_proxy_->connect_push_consumer (cref.in (),
-                                                    consumer_qos.get_ConsumerQOS (),
-                                                    TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-    }
-  TAO_CATCHANY
-    {
-      TAO_RETHROW;
-    }
-  TAO_ENDTRY;
+  this->supplier_proxy_->connect_push_consumer (
+       cref.in (),
+       consumer_qos.get_ConsumerQOS ()
+       ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 }
 
 void
-Test_Supplier::push (const RtecEventComm::EventSet& events,
-                     CORBA::Environment& _env)
+Test_Supplier::push (const RtecEventComm::EventSet& events
+                     ACE_ENV_ARG_DECL)
 {
 #if 0
    const int bufsize = 128;
@@ -1489,57 +1450,55 @@ Test_Supplier::push (const RtecEventComm::EventSet& events,
   for (u_int i = 0; i < events.length (); ++i)
     {
       const RtecEventComm::Event& e = events[i];
-      if (e.type_ != ACE_ES_EVENT_INTERVAL_TIMEOUT)
+      if (e.header.type != ACE_ES_EVENT_INTERVAL_TIMEOUT)
         continue;
 
       // ACE_DEBUG ((LM_DEBUG, "Test_Supplier - timeout (%t)\n"));
 
       RtecEventComm::Event& s = sent[i];
-      s.source_ = this->supplier_id_;
-      s.ttl_ = 1;
+      s.header.source = this->supplier_id_;
+      s.header.ttl = 1;
 
       ACE_hrtime_t t = ACE_OS::gethrtime ();
-      ORBSVCS_Time::hrtime_to_TimeT (s.creation_time_, t);
-      s.ec_recv_time_ = ORBSVCS_Time::zero;
-      s.ec_send_time_ = ORBSVCS_Time::zero;
-
-      s.data_.x = 0;
-      s.data_.y = 0;
+      ORBSVCS_Time::hrtime_to_TimeT (s.header.creation_time, t);
 
       this->message_count_--;
 
       if (this->message_count_ < 0)
         {
-          //this->supplier_proxy_->disconnect_push_supplier (_env);
-          //if (_env.exception () != 0) return;
           this->test_->shutdown_supplier (this->cookie_,
-                                          this->consumer_proxy_.in (),
-                                          _env);
+                                          this->consumer_proxy_.in ()
+                                          ACE_ENV_ARG_PARAMETER);
+          ACE_CHECK;
         }
       if (this->message_count_ % 2 == 0)
         {
           // Generate an A event...
-          s.type_ = this->event_a_;
+          s.header.type = this->event_a_;
         }
       else
         {
-          s.type_ = this->event_b_;
+          s.header.type = this->event_b_;
         }
     }
   this->test_->push_supplier (this->cookie_,
                               this->consumer_proxy_.in (),
-                              sent,
-                              _env);
+                              sent
+                              ACE_ENV_ARG_PARAMETER);
 }
 
 void
-Test_Supplier::disconnect_push_supplier (CORBA::Environment& _env)
+Test_Supplier::disconnect_push_supplier (ACE_ENV_SINGLE_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
-  this->supplier_proxy_->disconnect_push_supplier (_env);
+  if (CORBA::is_nil (this->supplier_proxy_.in ()))
+    return;
+
+  this->supplier_proxy_->disconnect_push_supplier (ACE_ENV_SINGLE_ARG_PARAMETER);
 }
 
 void
-Test_Supplier::disconnect_push_consumer (CORBA::Environment &)
+Test_Supplier::disconnect_push_consumer (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
 {
 }
 
@@ -1547,8 +1506,6 @@ int Test_Supplier::supplier_id (void) const
 {
   return this->supplier_id_;
 }
-
-// ****************************************************************
 
 Test_Consumer::Test_Consumer (Test_ECG *test,
                               void *cookie)
@@ -1560,112 +1517,96 @@ Test_Consumer::Test_Consumer (Test_ECG *test,
 void
 Test_Consumer::open (const char* name,
                      int event_a, int event_b,
-                     RtecEventChannelAdmin::EventChannel_ptr ec,
-                     CORBA::Environment& _env)
+                     RtecEventChannelAdmin::EventChannel_ptr ec
+                     ACE_ENV_ARG_DECL)
 {
-  TAO_TRY
-    {
-      RtecScheduler::Scheduler_ptr server =
-        ACE_Scheduler_Factory::server ();
+  RtecScheduler::Scheduler_ptr server =
+    ACE_Scheduler_Factory::server ();
 
-      RtecScheduler::handle_t rt_info =
-        server->create (name, TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  RtecScheduler::handle_t rt_info =
+    server->create (name ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 
-      // The worst case execution time is far less than 2
-      // milliseconds, but that is a safe estimate....
-      ACE_Time_Value tv (0, 2000);
-      TimeBase::TimeT time;
-      ORBSVCS_Time::Time_Value_to_TimeT (time, tv);
-      ACE_DEBUG ((LM_DEBUG, "register consumer \"%s\"\n", name));
-      server->set (rt_info,
-                   RtecScheduler::VERY_HIGH_CRITICALITY,
-                   time, time, time,
-                   0,
-                   RtecScheduler::VERY_LOW_IMPORTANCE,
-                   time,
-                   0,
-                   RtecScheduler::OPERATION,
-                   TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  // The worst case execution time is far less than 2
+  // milliseconds, but that is a safe estimate....
+  ACE_Time_Value tv (0, 2000);
+  TimeBase::TimeT time;
+  ORBSVCS_Time::Time_Value_to_TimeT (time, tv);
+  ACE_DEBUG ((LM_DEBUG, "register consumer \"%s\"\n", name));
+  server->set (rt_info,
+               RtecScheduler::VERY_HIGH_CRITICALITY,
+               time, time, time,
+               0,
+               RtecScheduler::VERY_LOW_IMPORTANCE,
+               time,
+               0,
+               RtecScheduler::OPERATION
+               ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 
-      ACE_ConsumerQOS_Factory qos;
-      qos.start_disjunction_group ();
-      qos.insert_type (ACE_ES_EVENT_SHUTDOWN, rt_info);
-      qos.insert_type (event_a, rt_info);
-      qos.insert_type (event_b, rt_info);
+  ACE_ConsumerQOS_Factory qos;
+  qos.start_disjunction_group ();
+  qos.insert_type (ACE_ES_EVENT_SHUTDOWN, rt_info);
+  qos.insert_type (event_a, rt_info);
+  qos.insert_type (event_b, rt_info);
 
-      // = Connect as a consumer.
-      RtecEventChannelAdmin::ConsumerAdmin_var consumer_admin =
-        ec->for_consumers (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  // = Connect as a consumer.
+  RtecEventChannelAdmin::ConsumerAdmin_var consumer_admin =
+    ec->for_consumers (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      this->supplier_proxy_ =
-        consumer_admin->obtain_push_supplier (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  this->supplier_proxy_ =
+    consumer_admin->obtain_push_supplier (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      RtecEventComm::PushConsumer_var objref = this->_this (TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+  RtecEventComm::PushConsumer_var objref = this->_this (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
 
-      this->supplier_proxy_->connect_push_consumer (objref.in (),
-                                                    qos.get_ConsumerQOS (),
-                                                    TAO_TRY_ENV);
-      TAO_CHECK_ENV;
-    }
-  TAO_CATCHANY
-    {
-      TAO_RETHROW;
-    }
-  TAO_ENDTRY;
+  this->supplier_proxy_->connect_push_consumer (objref.in (),
+                                                qos.get_ConsumerQOS ()
+                                                ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
 }
 
 void
-Test_Consumer::close (CORBA::Environment &_env)
+Test_Consumer::close (ACE_ENV_SINGLE_ARG_DECL)
 {
   if (CORBA::is_nil (this->supplier_proxy_.in ()))
     return;
 
-  this->supplier_proxy_->disconnect_push_supplier (_env);
-  if (_env.exception () != 0) return;
-
-  this->supplier_proxy_ = 0;
+  RtecEventChannelAdmin::ProxyPushSupplier_var proxy =
+    this->supplier_proxy_._retn ();
+  proxy->disconnect_push_supplier (ACE_ENV_SINGLE_ARG_PARAMETER);
 }
 
 void
-Test_Consumer::push (const RtecEventComm::EventSet& events,
-                     CORBA::Environment &_env)
+Test_Consumer::push (const RtecEventComm::EventSet& events
+                     ACE_ENV_ARG_DECL)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   ACE_hrtime_t arrival = ACE_OS::gethrtime ();
-  this->test_->push_consumer (this->cookie_, arrival, events, _env);
+  this->test_->push_consumer (this->cookie_, arrival, events ACE_ENV_ARG_PARAMETER);
 }
 
 void
-Test_Consumer::disconnect_push_consumer (CORBA::Environment &)
+Test_Consumer::disconnect_push_consumer (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
 }
-
-// ****************************************************************
 
 int
 main (int argc, char *argv [])
 {
   Test_ECG *test;
+
   // Dynamically allocate the Test_ECG instance so that we don't have
   // to worry about running out of stack space if it's large.
-  ACE_NEW_RETURN (test, Test_ECG, -1);
+  ACE_NEW_RETURN (test,
+                  Test_ECG,
+                  -1);
 
   const int status = test->run (argc, argv);
 
   delete test;
   return status;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Auto_Basic_Ptr<POA_RtecScheduler::Scheduler>;
-template class ACE_PushConsumer_Adapter<Test_Supplier>;
-template class auto_ptr<POA_RtecScheduler::Scheduler>;
-#elif defined(ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Auto_Basic_Ptr<POA_RtecScheduler::Scheduler>
-#pragma instantiate ACE_PushConsumer_Adapter<Test_Supplier>
-#pragma instantiate auto_ptr<POA_RtecScheduler::Scheduler>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */

@@ -10,6 +10,9 @@
 // should work with this flag disabled!  The BARRIER_TYPE is supposed
 // to enable/disable barrier sync on each svc a worker has done.
 
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_main.h"
 #include "ace/Task.h"
 #include "ace/Service_Config.h"
 
@@ -17,6 +20,7 @@ ACE_RCSID(Threads, barrier2, "$Id$")
 
 #if defined (ACE_HAS_THREADS)
 
+#include "ace/Null_Barrier.h"
 #define BARRIER_TYPE ACE_Null_Barrier
 
 template <class BARRIER>
@@ -49,11 +53,11 @@ private:
 
   // = Not needed for this test.
   virtual int open (void *) { return 0; }
-  virtual int close (u_long) 
+  virtual int close (u_long)
   {
     ACE_DEBUG ((LM_DEBUG,
                 "(%t) in close of worker\n"));
-    return 0; 
+    return 0;
   }
 
   int nt_;
@@ -114,7 +118,7 @@ template <class BARRIER> int
 Worker_Task<BARRIER>::service (ACE_Message_Block *mb,
                                int iter)
 {
-  int length = mb->length ();
+  size_t length = mb->length ();
 
   if (length > 0)
     {
@@ -158,7 +162,7 @@ Worker_Task<BARRIER>::svc (void)
 	  break;
 	}
 
-      int length = mb->length ();
+      size_t length = mb->length ();
       this->service (mb,iter);
 
       if (length == 0)
@@ -219,7 +223,7 @@ Worker_Task<BARRIER>::input (ACE_Message_Block *mb)
   char str[] = "kalle";
   ACE_OS::strcpy (mb->rd_ptr (), str);
 
-  int n = ACE_OS::strlen (str);
+  size_t n = ACE_OS::strlen (str);
 
   if (l == 1000)
     n = 1;
@@ -258,7 +262,7 @@ Worker_Task<BARRIER>::input (ACE_Message_Block *mb)
                         "put"));
 #if defined (delay_put)
           // this sleep helps to shutdown correctly -> was an error!
-	  ACE_OS::sleep (1); 
+	  ACE_OS::sleep (1);
 #endif /* delay_put */
 	}
       return -1;
@@ -278,7 +282,7 @@ Worker_Task<BARRIER>::input (ACE_Message_Block *mb)
 }
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   int n_threads = argc > 1 ? ACE_OS::atoi (argv[1]) : ACE_DEFAULT_THREADS;
 
@@ -302,14 +306,9 @@ main (int argc, char *argv[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class Worker_Task<ACE_Null_Barrier>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate Worker_Task<ACE_Null_Barrier>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

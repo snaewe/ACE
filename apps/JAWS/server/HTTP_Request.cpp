@@ -4,6 +4,9 @@
 #include "HTTP_Request.h"
 #include "HTTP_Helpers.h"
 #include "HTTP_Config.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_pwd.h"
+#include "ace/Log_Msg.h"
 
 ACE_RCSID(server, HTTP_Request, "$Id$")
 
@@ -93,11 +96,11 @@ HTTP_Request::parse_request (ACE_Message_Block &mb)
         }
       else if (result > 0)
         do
-	  this->headers_.parse_header_line (mb.rd_ptr ());
+          this->headers_.parse_header_line (mb.rd_ptr ());
         while (this->headers_.complete_header_line (mb.rd_ptr ()) > 0);
     }
 
-  mb.wr_ptr (strlen(mb.rd_ptr ()) - mb.length ());
+  mb.wr_ptr (ACE_OS::strlen(mb.rd_ptr ()) - mb.length ());
 
   if (this->headers_.end_of_headers ()
       || (this->got_request_line () && this->version () == 0))
@@ -129,22 +132,22 @@ HTTP_Request::parse_request_line (char *const request_line)
   *ptr = '\0';
   ptr += offset;
 
-  char *lasts; // for strtok_r
+  char *lasts = 0; // for strtok_r
 
   // Get the request type.
   this->got_request_line_ = 1;
 
   if (this->method (ACE_OS::strtok_r (buf, " \t", &lasts))
-      && this->uri (ACE_OS::strtok_r (NULL, " \t", &lasts)))
+      && this->uri (ACE_OS::strtok_r (0, " \t", &lasts)))
     {
       this->type (this->method ());
 
-      if (this->version (ACE_OS::strtok_r (NULL, " \t", &lasts)) == 0
-	  && this->type () != HTTP_Request::GET)
-	this->status_ = HTTP_Status_Code::STATUS_NOT_IMPLEMENTED;
+      if (this->version (ACE_OS::strtok_r (0, " \t", &lasts)) == 0
+          && this->type () != HTTP_Request::GET)
+        this->status_ = HTTP_Status_Code::STATUS_NOT_IMPLEMENTED;
 
       if (this->path (this->uri ()) == 0)
-	this->status_ = HTTP_Status_Code::STATUS_NOT_FOUND;
+        this->status_ = HTTP_Status_Code::STATUS_NOT_FOUND;
     }
 
   ACE_DEBUG ((LM_DEBUG, " (%t) request %s %s %s parsed\n",
@@ -157,7 +160,7 @@ HTTP_Request::parse_request_line (char *const request_line)
 
 int
 HTTP_Request::init (char *const buffer,
-		    int buflen)
+                    int buflen)
 {
   // Initialize these every time.
   content_length_ = -1;
@@ -167,7 +170,7 @@ HTTP_Request::init (char *const buffer,
   datalen_ = 0;
 
   // Set the datalen
-  if (data_ != NULL)
+  if (data_ != 0)
     datalen_ = buflen;
   else
     datalen_ = 0;
@@ -456,7 +459,7 @@ HTTP_Request::cgi_in_path (char *uri_string, char *&extra_path_info)
   if (cgi_path == 0)
     return 0;
 
-  char *lasts;
+  char *lasts = 0;
   char *cgi_path_next = ACE_OS::strtok_r (cgi_path, ":", &lasts);
 
   if (cgi_path_next)
@@ -490,7 +493,7 @@ HTTP_Request::cgi_in_path (char *uri_string, char *&extra_path_info)
 
                 // move past the executable name
                 do
-		  extra_path_info++;
+                  extra_path_info++;
                 while (*extra_path_info != '/'
                        && *extra_path_info != '?'
                        && *extra_path_info != '\0');
@@ -503,7 +506,7 @@ HTTP_Request::cgi_in_path (char *uri_string, char *&extra_path_info)
           }
         extra_path_info = 0;
 
-	cgi_path_next = ACE_OS::strtok_r (NULL, ":", &lasts);
+        cgi_path_next = ACE_OS::strtok_r (0, ":", &lasts);
       }
     while (cgi_path_next);
 
@@ -570,10 +573,10 @@ HTTP_Request::cgi_args_and_env (char *&extra_path_info)
           char *ptr = cgi_question;
           int count = 0;
           do
-	    if (*ptr == '+')
-	      *ptr = ' ';
-	    else if (*ptr == '&' || *ptr == '=')
-	      count++;
+            if (*ptr == '+')
+              *ptr = ' ';
+            else if (*ptr == '&' || *ptr == '=')
+              count++;
           while (*++ptr);
 
           count++;

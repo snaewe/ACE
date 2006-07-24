@@ -8,6 +8,8 @@
 #include "HTTP_Handler.h"
 #include "HTTP_Helpers.h"
 #include "IO.h"
+#include "ace/OS_NS_sys_socket.h"
+#include "ace/OS_NS_stdio.h"
 
 ACE_RCSID(server, HTTP_Handler, "$Id$")
 
@@ -120,14 +122,14 @@ HTTP_Handler::receive_file_error (int result)
   int status_code;
   switch (result)
     {
-    case ACE_Filecache_Handle::ACCESS_FAILED:
-    case ACE_Filecache_Handle::WRITE_FAILED:
-    case ACE_Filecache_Handle::OPEN_FAILED:
+    case ACE_Filecache_Handle::ACE_ACCESS_FAILED:
+    case ACE_Filecache_Handle::ACE_WRITE_FAILED:
+    case ACE_Filecache_Handle::ACE_OPEN_FAILED:
       status_code = HTTP_Status_Code::STATUS_NOT_FOUND;
       break;
-    case ACE_Filecache_Handle::COPY_FAILED:
-    case ACE_Filecache_Handle::STAT_FAILED:
-    case ACE_Filecache_Handle::MEMMAP_FAILED:
+    case ACE_Filecache_Handle::ACE_COPY_FAILED:
+    case ACE_Filecache_Handle::ACE_STAT_FAILED:
+    case ACE_Filecache_Handle::ACE_MEMMAP_FAILED:
       status_code = HTTP_Status_Code::STATUS_FORBIDDEN;
       break;
     default:
@@ -176,14 +178,14 @@ HTTP_Handler::transmit_file_error (int result)
 
   switch (result)
     {
-    case ACE_Filecache_Handle::ACCESS_FAILED:
-    case ACE_Filecache_Handle::WRITE_FAILED:
-    case ACE_Filecache_Handle::OPEN_FAILED:
+    case ACE_Filecache_Handle::ACE_ACCESS_FAILED:
+    case ACE_Filecache_Handle::ACE_WRITE_FAILED:
+    case ACE_Filecache_Handle::ACE_OPEN_FAILED:
       status_code = HTTP_Status_Code::STATUS_NOT_FOUND;
       break;
-    case ACE_Filecache_Handle::COPY_FAILED:
-    case ACE_Filecache_Handle::STAT_FAILED:
-    case ACE_Filecache_Handle::MEMMAP_FAILED:
+    case ACE_Filecache_Handle::ACE_COPY_FAILED:
+    case ACE_Filecache_Handle::ACE_STAT_FAILED:
+    case ACE_Filecache_Handle::ACE_MEMMAP_FAILED:
       status_code = HTTP_Status_Code::STATUS_FORBIDDEN;
       break;
     default:
@@ -255,9 +257,32 @@ void
 Synch_HTTP_Handler_Factory::destroy_http_handler (HTTP_Handler &handler,
 						  JAWS_IO &io)
 {
-  delete &handler;
   delete &io;
+  delete &handler;
 }
+
+//-------------SYNCH IO no Cache
+
+HTTP_Handler *
+No_Cache_Synch_HTTP_Handler_Factory::create_http_handler (void)
+{
+  JAWS_Synch_IO_No_Cache *io;
+  ACE_NEW_RETURN (io, JAWS_Synch_IO_No_Cache, 0);
+  HTTP_Handler *handler;
+  ACE_NEW_RETURN (handler, HTTP_Handler (*io, *this), 0);
+
+  return handler;
+}
+
+void
+No_Cache_Synch_HTTP_Handler_Factory::destroy_http_handler (HTTP_Handler &handler,
+														   JAWS_IO &io)
+{
+  delete &io;
+  delete &handler;
+}
+
+//----------------
 
 // This only works on Win32
 #if defined (ACE_WIN32)

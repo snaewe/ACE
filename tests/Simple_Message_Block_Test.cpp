@@ -9,32 +9,29 @@
 //    Simple_Message_Block_Test.cpp
 //
 // = DESCRIPTION
-//
 //      This test program is a torture test that illustrates how
 //      ACE_Message_Block reference counting works, how and when locks
 //      are used, how memory is managed, and how continuation chains
 //      of message blocks are made. Ideally used with purify :-)
 //
 // = AUTHOR
-//    Irfan Pyarali (irfan@cs.wustl.edu)
+//    Irfan Pyarali <irfan@cs.wustl.edu>
 //
 // ============================================================================
 
 #include "test_config.h"
 #include "ace/Message_Block.h"
-#include "ace/Synch.h"
+#include "ace/Synch_Traits.h"
+#include "ace/Lock_Adapter_T.h"
+#include "ace/OS_NS_string.h"
+#include "ace/Thread_Mutex.h"
 
 ACE_RCSID(tests, Simple_Message_Block_Test, "$Id$")
 
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
-
 int
-main (int, ASYS_TCHAR *[])
+run_main (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Simple_Message_Block_Test"));
+  ACE_START_TEST (ACE_TEXT ("Simple_Message_Block_Test"));
 
   {
     // Checks normal stack deletes.
@@ -177,13 +174,42 @@ main (int, ASYS_TCHAR *[])
     mb1->release ();
   }
 
+  {
+    // Checks failure of copy when "virtual" allocation (using mark)
+    // is too small
+    char message[]="abcdefghijklmnop";
+    ACE_Message_Block mb1 (ACE_OS::strlen (message) + 1);
+    ACE_Message_Block mb2 (ACE_OS::strlen (message) + 1);
+
+    // Resize mb2 so that we mark for use less than the allocated buffer
+    if (mb2.size (ACE_OS::strlen (message) + 1 - 10) == -1)
+      {
+        ACE_ERROR ((LM_ERROR,
+                    ACE_TEXT ("(%P|%t) Resize test failed ..\n")));
+      }
+
+    // We expect this to succeed
+    if (mb1.copy (message, ACE_OS::strlen (message) + 1) == -1)
+      {
+        ACE_ERROR ((LM_ERROR,
+                    ACE_TEXT ("(%P|%t) Copy test failed ..\n")));
+      }
+
+    // We expect this to fail
+    if (mb2.copy (message, ACE_OS::strlen (message) + 1) != -1)
+      {
+        ACE_ERROR ((LM_ERROR,
+                    ACE_TEXT ("(%P|%t) Copy test succeeded when it should have failed ..\n")));
+      }
+
+    // We also expect this to fail
+    if (mb2.copy (message) != -1)
+      {
+        ACE_ERROR ((LM_ERROR,
+                    ACE_TEXT ("(%P|%t) Copy test succeeded when it should have failed ..\n")));
+      }
+  }
   ACE_END_TEST;
   return 0;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Lock_Adapter<ACE_SYNCH_MUTEX>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Lock_Adapter<ACE_SYNCH_MUTEX>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
 

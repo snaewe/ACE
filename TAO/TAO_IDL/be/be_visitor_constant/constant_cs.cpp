@@ -18,13 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_constant.h"
-
-ACE_RCSID(be_visitor_constant, constant_cs, "$Id$")
+ACE_RCSID (be_visitor_constant,
+           constant_cs,
+           "$Id$")
 
 
 // ********************************************************************
@@ -45,92 +41,99 @@ be_visitor_constant_cs::~be_visitor_constant_cs (void)
 int
 be_visitor_constant_cs::visit_constant (be_constant *node)
 {
+
+  if (node->cli_stub_gen ()
+      || node->imported ())
+    {
+      return 0;
+    }
+
+  AST_Expression::ExprType etype = node->et ();
+  AST_Decl::NodeType snt = node->defined_in ()->scope_node_type ();
+
+  // If this is true, can't generate inline constants.
+  bool forbidden_in_class = (snt != AST_Decl::NT_root
+                             && snt != AST_Decl::NT_module
+                             && (etype == AST_Expression::EV_string
+                                 || etype == AST_Expression::EV_wstring
+                                 || etype == AST_Expression::EV_float
+                                 || etype == AST_Expression::EV_double
+                                 || etype == AST_Expression::EV_longdouble));
+
+  if (!node->is_nested ()
+      || (be_global->gen_inline_constants () && !forbidden_in_class))
+    {
+      return 0;
+    }
+
   TAO_OutStream *os = this->ctx_->stream ();
 
-  if (!node->cli_stub_gen () && !node->imported ())
+  if (node->is_nested ())
     {
-      if (node->is_nested ())
+      // For those constants not defined in the outermost scope,
+      // or in a module, they get assigned to their values in the source file.
+      *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+          << "// " << __FILE__ << ":" << __LINE__;
+
+      *os << be_nl << be_nl
+          << "const ";
+
+      if (node->et () == AST_Expression::EV_enum)
         {
-          if (node->defined_in ()->scope_node_type () == AST_Decl::NT_module)
-            {
-              *os << "TAO_NAMESPACE_TYPE (const "
-                  << node->exprtype_to_string () << ")" << be_nl;
-              be_module *module = be_module::narrow_from_scope (node->defined_in ());
-              if (!module || (this->gen_nested_namespace_begin (module) == -1))
-                {
-                  ACE_ERROR_RETURN ((LM_ERROR,
-                                     "be_visitor_constant_cs::visit_constant - "
-                                     "Error parsing nested name\n"),
-                                    -1);
-                }
-              *os << "TAO_NAMESPACE_DEFINE (const "
-                  << node->exprtype_to_string () << ", "
-                  << node->local_name () << ", "
-                  << node->constant_value () << ")" << be_nl;
-              if (this->gen_nested_namespace_end (module) == -1)
-                {
-                  ACE_ERROR_RETURN ((LM_ERROR,
-                                     "be_visitor_constant_cs::visit_constant - "
-                                     "Error parsing nested name\n"),
-                                    -1);
-                }
-            }
-          else
-            {
-              // for those constants not defined in the outer most scope, they get
-              // assigned to their values in the impl file
-              os->indent (); // start from whatever indentation level we were at
-              *os << "const " << node->exprtype_to_string () << " "
-                  << node->name () << " = " << node->constant_value ()
-                  << ";\n\n";
-            }
+          *os << node->enum_full_name ();
         }
-      node->cli_stub_gen (I_TRUE);
+      else
+        {
+          *os << node->exprtype_to_string ();
+        }
+
+      *os << " "
+          << node->name () << " = " << node->constant_value ()
+          << ";";
     }
+
+  node->cli_stub_gen (true);
   return 0;
 }
 
-// the following needs to be done to deal with the most bizarre behavior of
-// MSVC++ compiler
+// The following needs to be done until the MSVC++ compiler fixes its
+// broken handling of namespaces (hopefully forthcoming in version 7).
 int
 be_visitor_constant_cs::gen_nested_namespace_begin (be_module *node)
 {
   TAO_OutStream *os = this->ctx_->stream ();
-  UTL_IdListActiveIterator *i;
+  char *item_name = 0;
 
-  i = new UTL_IdListActiveIterator (node->name ());
-  while (!(i->is_done ()))
+  for (UTL_IdListActiveIterator i (node->name ()); !i.is_done (); i.next ())
     {
-      if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
+      item_name = i.item ()->get_string ();
+
+      if (ACE_OS::strcmp (item_name, "") != 0)
         {
-          // leave the outermost root scope
-          *os << "TAO_NAMESPACE_BEGIN (" << i->item ()->get_string ()
-              << ")" << be_nl;
+          // leave the outermost root scope.
+          *os << "namespace " << item_name << be_nl
+              << "{" << be_nl;
         }
-      i->next ();
     }
-  delete i;
+
   return 0;
 }
 
-// the following needs to be done to deal with the most bizarre behavior of
-// MSVC++ compiler
+// The following needs to be done until the MSVC++ compiler fixes its
+// broken handling of namespaces (hopefully forthcoming in version 7).
 int
 be_visitor_constant_cs::gen_nested_namespace_end (be_module *node)
 {
   TAO_OutStream *os = this->ctx_->stream ();
-  UTL_IdListActiveIterator *i;
 
-  i = new UTL_IdListActiveIterator (node->name ());
-  while (!(i->is_done ()))
+  for (UTL_IdListActiveIterator i (node->name ()); !i.is_done (); i.next ())
     {
-      if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
+      if (ACE_OS::strcmp (i.item ()->get_string (), "") != 0)
         {
-          // leave the outermost root scope
-          *os << "TAO_NAMESPACE_END" << be_nl;
+          // leave the outermost root scope.
+          *os << "}" << be_nl;
         }
-      i->next ();
     }
-  delete i;
+
   return 0;
 }

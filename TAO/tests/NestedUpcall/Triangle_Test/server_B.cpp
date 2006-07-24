@@ -9,7 +9,7 @@
 //    server_B.cpp
 //
 // = DESCRIPTION
-//    This class implements a simple server for the 
+//    This class implements a simple server for the
 //    Nested Upcalls - Triangle test.
 //
 // = AUTHORS
@@ -18,6 +18,8 @@
 // ============================================================================
 
 #include "server_B.h"
+#include "tao/debug.h"
+#include "ace/OS_NS_stdio.h"
 
 ACE_RCSID(Triangle_Test, server_B, "$Id$")
 
@@ -39,11 +41,11 @@ Object_B_Server::parse_args (void)
         TAO_debug_level++;
         break;
       case 'o': // output the IOR to a file.
-        this->ior_output_file_ = ACE_OS::fopen (get_opts.optarg, "w");
+        this->ior_output_file_ = ACE_OS::fopen (get_opts.opt_arg (), "w");
         if (this->ior_output_file_ == 0)
           ACE_ERROR_RETURN ((LM_ERROR,
                              "Unable to open %s for writing: %p\n",
-                             get_opts.optarg), -1);
+                             get_opts.opt_arg ()), -1);
         break;
       case '?':
       default:
@@ -62,17 +64,17 @@ Object_B_Server::parse_args (void)
 
 int
 Object_B_Server::init (int argc,
-                       char** argv,
-                       CORBA::Environment& env)
+                       char** argv
+                       ACE_ENV_ARG_DECL)
 {
   // Call the init of TAO_ORB_Manager to create a child POA
   // under the root POA.
   this->orb_manager_.init_child_poa (argc,
                                      argv,
-                                     "child_poa",
-                                     env);
+                                     "child_poa"
+                                     ACE_ENV_ARG_PARAMETER);
 
-  TAO_CHECK_ENV_RETURN (env,-1);
+  ACE_CHECK_RETURN (-1);
   this->argc_ = argc;
   this->argv_ = argv;
 
@@ -81,11 +83,9 @@ Object_B_Server::init (int argc,
 
   CORBA::String_var str  =
     this->orb_manager_.activate_under_child_poa ("object_B",
-                                                 &this->object_B_i_,
-                                                 env);
-  ACE_DEBUG ((LM_DEBUG,
-              "The IOR is: <%s>\n",
-              str.in ()));
+                                                 &this->object_B_i_
+                                                 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK_RETURN (-1);
 
   if (this->ior_output_file_)
     {
@@ -95,18 +95,21 @@ Object_B_Server::init (int argc,
       ACE_OS::fclose (this->ior_output_file_);
     }
 
-
   return 0;
 }
 
 
 int
-Object_B_Server::run (CORBA::Environment& env)
+Object_B_Server::run (ACE_ENV_SINGLE_ARG_DECL)
 {
-  if (this->orb_manager_.run (env) == -1)
+  int result = this->orb_manager_.run (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK_RETURN (-1);
+
+  if (result == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "Object_B_Server::run"),
                       -1);
+
   return 0;
 }
 
@@ -121,28 +124,31 @@ main (int argc, char *argv[])
 
   ACE_DEBUG ((LM_DEBUG,
               "\n \t NestedUpCalls.Triangle_Test: Object B Server \n \n"));
-  TAO_TRY
+
+  ACE_DECLARE_NEW_CORBA_ENV;
+  ACE_TRY
     {
-      if (object_B_Server.init (argc,argv,TAO_TRY_ENV) == -1)
+      int retval = object_B_Server.init (argc, argv ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      if (retval == -1)
         return 1;
       else
         {
-          object_B_Server.run (TAO_TRY_ENV);
-          TAO_CHECK_ENV;
+          object_B_Server.run (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
         }
     }
-  TAO_CATCH (CORBA::SystemException, sysex)
+  ACE_CATCH (CORBA::SystemException, sysex)
     {
-      ACE_UNUSED_ARG (sysex);
-      TAO_TRY_ENV.print_exception ("System Exception");
+      ACE_PRINT_EXCEPTION (sysex, "System Exception");
       return -1;
     }
-  TAO_CATCH (CORBA::UserException, userex)
+  ACE_CATCH (CORBA::UserException, userex)
     {
-      ACE_UNUSED_ARG (userex);
-      TAO_TRY_ENV.print_exception ("User Exception");
+      ACE_PRINT_EXCEPTION (userex, "User Exception");
       return -1;
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
   return 0;
 }

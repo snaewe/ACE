@@ -1,8 +1,8 @@
-/* C code produced by gperf version 2.6 (GNU C++ version) */
+/* C code produced by gperf version 2.8 (ACE version) */
 /* Command-line: ../src/gperf -D -p -t  */
-/* Command-line: gperf -p -j1 -i 1 -o -t -N is_reserved_word -k1,3,$ c-parse.gperf  */ 
+/* Command-line: gperf -p -j1 -i 1 -o -t -N is_reserved_word -k1,3,$ c-parse.gperf  */
 #include <string.h>
-struct resword { char *name; short token; enum rid rid; };
+struct resword { const char *name; short token; enum rid rid; };
 
 #define TOTAL_KEYWORDS 51
 #define MIN_WORD_LENGTH 2
@@ -11,6 +11,7 @@ struct resword { char *name; short token; enum rid rid; };
 #define MAX_HASH_VALUE 82
 #define HASH_VALUE_RANGE 79
 #define DUPLICATES 3
+#define WORDLIST_SIZE 55
 
 static unsigned int
 hash (str, len)
@@ -19,6 +20,34 @@ hash (str, len)
 {
   static unsigned char asso_values[] =
     {
+#if defined (ACE_MVS)
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83,  0,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 40,
+     20, 50, 25, 10, 30,  0,  0, 50, 83, 83,
+     83, 83, 83, 83, 83, 83,  0, 15,  0, 35,
+      0, 83, 83, 20, 83, 83, 83, 83, 83, 83,
+     83, 83,  0, 10, 40,  5, 15, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
+     83, 83, 83, 83, 83, 83,
+#else
      83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
      83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
      83, 83, 83, 83, 83, 83, 83, 83, 83, 83,
@@ -32,8 +61,9 @@ hash (str, len)
      25, 10, 30,  0,  0, 50, 83,  0, 15,  0,
      35,  0, 83, 83, 20,  0, 10, 40,  5, 15,
      83, 83, 83, 83, 83, 83, 83, 83,
+#endif /* ACE_MVS */
     };
-  return len + asso_values[str[len - 1]] + asso_values[str[0]];
+  return len + asso_values[(int) str[len - 1]] + asso_values[(int) str[0]];
 }
 
 struct resword *
@@ -41,9 +71,9 @@ in_word_set (str, len)
      char *str;
      unsigned int len;
 {
-  static struct resword wordlist[] =
+  static struct resword  wordlist[] =
     {
-      {"",}, {"",}, {"",}, {"",}, 
+      {"",},{"",},{"",},{"",},
       {"goto",  GOTO, NORID},
       {"__asm",  ASM, NORID},
       {"switch",  SWITCH, NORID},
@@ -97,38 +127,38 @@ in_word_set (str, len)
       {"if",  IF, NORID},
     };
 
-  static char lookup[] =
+  static signed char lookup[] =
     {
-        -1,  -1,  -1,  -1,   4,   5,   6,   7,  -1,   8, 100,  12,  13,  14,
-        15,  16,  17,  18,  19,  20,  21,  22,  -1,  23,  24,  25,  -1,  26,
-        -9,  -3,  27,  28,  -1,  29,  30,  -1,  31,  -1,  32,  33,  -1,  34,
-        35,  36,  37,  38,  39,  40,  41,  -1,  -1,  42,  -1,  43,  -1,  -1,
-        44,  -1,  -1,  -1,  -1,  45,  -1,  46,  47,  48,  49,  -1,  50,  -1,
-        -1,  -1,  -1,  51,  52,  -1,  -1,  -1,  -1,  -1,  53,  -1,  54,
+       -1,  -1,  -9,  -3,   4,   5,   6,   7,  -1,   8, -90,  12,  13,  14, 
+       15,  16,  17,  18,  19,  20,  21,  22,  -1,  23,  24,  25,  -1,  26, 
+       -1,  -1,  27,  28,  -1,  29,  30,  -1,  31,  -1,  32,  33,  -1,  34, 
+       35,  36,  37,  38,  39,  40,  41,  -1,  -1,  42,  -1,  43,  -1,  -1, 
+       44,  -1,  -1,  -1,  -1,  45,  -1,  46,  47,  48,  49,  -1,  50,  -1, 
+       -1,  -1,  -1,  51,  52,  -1,  -1,  -1,  -1,  -1,  53,  -1,  54, 
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
     {
-      int key = hash (str, len);
+      unsigned int key = hash (str, len);
 
       if (key <= MAX_HASH_VALUE && key >= MIN_HASH_VALUE)
         {
-          int index = lookup[key];
+          int slot = lookup[key];
 
-          if (index >= 0 && index < MAX_HASH_VALUE)
+          if (slot >= 0 && slot < WORDLIST_SIZE)
             {
-              char *s = wordlist[index].name;
+              char *s = wordlist[slot].name;
 
               if (*str == *s && !strcmp (str + 1, s + 1))
-                return &wordlist[index];
+                return &wordlist[slot];
             }
-          else if (index < 0 && index >= -MAX_HASH_VALUE)
+          else if (slot < 0 && slot >= -MAX_HASH_VALUE)
             return 0;
           else
             {
-              int offset = key + index + (index > 0 ? -MAX_HASH_VALUE : MAX_HASH_VALUE);
-              struct resword *base = &wordlist[-lookup[offset]];
-              struct resword *ptr = base + -lookup[offset + 1];
+              unsigned int offset = key + slot + (slot > 0 ? -MAX_HASH_VALUE : MAX_HASH_VALUE);
+              struct resword  *base = &wordlist[-lookup[offset]];
+              struct resword  *ptr = base + -lookup[offset + 1];
 
               while (--ptr >= base)
                 if (*str == *ptr->name && !strcmp (str + 1, ptr->name + 1))

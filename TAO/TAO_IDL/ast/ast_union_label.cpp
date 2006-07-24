@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,76 +62,89 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
+// AST_UnionLabel denotes the label of a branch in an IDL union
+// declaration.
+// AST_UnionLabel nodes have a label kind (the values come from the
+// enum AST_UnionLabel::LabelKind) and a label value (which is a
+// subclass of AST_Expression).
 
-/*
- * ast_union_label.cc - Implementation of class AST_UnionLabel
- *
- * AST_UnionLabel denotes the label of a branch in an IDL union
- * declaration.
- * AST_UnionLabel nodes have a label kind (the values come from the
- * enum AST_UnionLabel::LabelKind) and a label value (which is a
- * subclass of AST_Expression).
- */
+#include "ast_union_label.h"
+#include "ast_expression.h"
+#include "ast_visitor.h"
 
-#include	"idl.h"
-#include	"idl_extern.h"
+// FUZZ: disable check_for_streams_include
+#include "ace/streams.h"
 
-ACE_RCSID(ast, ast_union_label, "$Id$")
+ACE_RCSID (ast, 
+           ast_union_label, 
+           "$Id$")
 
-/*
- * Constructor(s)
- */
-AST_UnionLabel::AST_UnionLabel()
-	      : pd_label_kind(UL_default),
-		pd_label_val(NULL)
+AST_UnionLabel::AST_UnionLabel (void)
+  : pd_label_kind (UL_default),
+          pd_label_val (0)
 {
 }
 
-AST_UnionLabel::AST_UnionLabel(UnionLabel lk, AST_Expression *lv)
-	       : pd_label_kind(lk),
-		 pd_label_val(lv)
+AST_UnionLabel::AST_UnionLabel (UnionLabel lk,
+                                AST_Expression *lv)
+  : pd_label_kind (lk),
+    pd_label_val (lv)
 {
-    if (lv != NULL)
-      lv->evaluate(AST_Expression::EK_const);
+    if (lv != 0)
+      {
+        lv->evaluate (AST_Expression::EK_const);
+      }
 }
 
-/*
- * Private operations
- */
+AST_UnionLabel::~AST_UnionLabel (void)
+{
+}
 
-/*
- * Public operations
- */
+// Redefinition of inherited virtual operations.
 
-/*
- * Redefinition of inherited virtual operations
- */
+// Dump this AST_UnionLabel node to the ostream o.
+void
+AST_UnionLabel::dump (ACE_OSTREAM_TYPE &o)
+{
+  if (this->pd_label_kind == UL_default)
+    {
+      o << "default";
+    }
+  else
+    {
+      this->pd_label_val->dump (o);
+    }
+}
 
-/*
- * Data accessors
- */
+int
+AST_UnionLabel::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_union_label (this);
+}
+
+void
+AST_UnionLabel::destroy (void)
+{
+  // Otherwise (default label) our label value is 0.
+  if (UL_label == this->pd_label_kind)
+    {
+      this->pd_label_val->destroy ();
+      delete this->pd_label_val;
+      this->pd_label_val = 0;
+    }
+}
+
+// Data accessors.
 
 AST_UnionLabel::UnionLabel
-AST_UnionLabel::label_kind()
+AST_UnionLabel::label_kind (void)
 {
-  return pd_label_kind;
+  return this->pd_label_kind;
 }
 
 AST_Expression *
-AST_UnionLabel::label_val()
+AST_UnionLabel::label_val (void)
 {
-  return pd_label_val;
-}
-
-/*
- * Dump this AST_UnionLabel node to the ostream o
- */
-void
-AST_UnionLabel::dump(ostream &o)
-{
-  if (pd_label_kind == UL_default)
-    o << "default";
-  else
-    pd_label_val->dump(o);
+  return this->pd_label_val;
 }

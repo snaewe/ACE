@@ -17,35 +17,34 @@
 #include "orbsvcs/CosLifeCycleC.h"
 #include "orbsvcs/LifeCycleServiceC.h"
 
-#if !defined (CRITERIA_EVALUATOR_H_H)
+#ifndef CRITERIA_EVALUATOR_H_H
 #define CRITERIA_EVALUATOR_H_H
 
 class Criteria_Evaluator// : public LifeCycleService::Criteria_Evaluator
 {
   // = TITLE
-  //  
-
+  //
 public:
-  Criteria_Evaluator (const CosLifeCycle::Criteria & criteria);
-  ~Criteria_Evaluator ();
-  
-  LifeCycleService::Criteria_Evaluator::SeqNamedValuePair * getInitialization (CORBA::Environment &_tao_environment);
+  Criteria_Evaluator (const CosLifeCycle::Criteria &criteria);
+  ~Criteria_Evaluator (void);
 
-  char * getFilter (CORBA::Environment &_tao_environment);
+  LifeCycleService::Criteria_Evaluator::SeqNamedValuePair * getInitialization (ACE_ENV_SINGLE_ARG_DECL_NOT_USED);
 
-  LifeCycleService::Criteria_Evaluator::SeqNamedValuePair * getLogicalLocation (CORBA::Environment &_tao_environment) 
+  char * getFilter (ACE_ENV_SINGLE_ARG_DECL_NOT_USED);
+
+  LifeCycleService::Criteria_Evaluator::SeqNamedValuePair * getLogicalLocation (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
     {
       return 0;
     }
 
-  char * getPreferences (CORBA::Environment &_tao_environment) 
+  char * getPreferences (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
     {
       return 0;
     }
 
 private:
-  CORBA::Any *getCriteriaMember (const CORBA::String member_name);
-    
+  CORBA::Any *getCriteriaMember (const char *member_name);
+
   const CosLifeCycle::Criteria &criteria_;
 };
 

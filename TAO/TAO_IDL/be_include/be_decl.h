@@ -19,160 +19,205 @@
 //
 // ============================================================================
 
-#if !defined (TAO_BE_DECL_H)
+#ifndef TAO_BE_DECL_H
 #define TAO_BE_DECL_H
+
+#include "ast_decl.h"
 
 class be_scope;
 class be_visitor;
+class be_type;
 
-/*
- * BE_Decl
- */
 class be_decl : public virtual AST_Decl
 {
   // = TITLE
-  //   be_decl
+  //    be_decl
   // = DESCRIPTION
-  //   The back end extension of the AST_Decl class. Provides an abstract
-  //   interface
+  //    The back end extension of the AST_Decl class. Provides an abstract
+  //    interface.
   //
 public:
-  enum SIZE_TYPE
-  {
-    SIZE_UNKNOWN,
-    FIXED,
-    VARIABLE
-  };
-  // indicates if we are fixed size or variable. Most useful for structs,
-  // unions, and arrays.
-
-  // =Operations
-
   be_decl (void);
-  // Default constructor
+  // Default constructor.
 
-  be_decl (AST_Decl::NodeType type, UTL_ScopedName *n, UTL_StrList *pragmas);
-  // constructor that sets the node type
+  be_decl (AST_Decl::NodeType type,
+           UTL_ScopedName *n);
+  // Constructor that sets the node type.
 
   ~be_decl (void);
-  // destructor
+  // Destructor.
 
-  virtual void size_type (SIZE_TYPE);
-  // set the size type
+  // Methods used by the interface type strategy.
+  void compute_full_name  (const char *prefix,
+                           const char *suffix,
+                           char *&name);
+  // Both the arguments should be non-null!!!. Applies prefix and
+  // suffix to the local name and makes a flat name.
 
-  virtual SIZE_TYPE size_type (void);
-  // return our size type
+  void compute_flat_name (const char *prefix,
+                          const char *suffix,
+                          char *& name);
+  // Both the arguments should be non-null!!!. Applies prefix and
+  // suffix to the local name and makes a flat name.
 
-  const char *fullname (void);
-  // return the stringified full name
-
-  const char *flatname (void);
-  // return the flattened full scoped name
-
-  const char *repoID (void);
-  // retrieve the repository ID
-
-  const char* prefix (void);
-  // retrive the repository ID prefix
-
-  virtual idl_bool is_nested (void);
-  // determines if we are inside of a nested scope or not
-
-  virtual int gen_encapsulation (void);
-  // encapsulation of parameters
-
-  virtual long tc_encap_len (void);
-  // return length of encapsulation
+  // End of Methods use by the interface type strategy.
 
   virtual be_scope *scope (void);
-  // return the scope created by this node (if one exists)
+  // Return the scope created by this node (if one exists).
 
   // Visiting
   virtual int accept (be_visitor *visitor);
 
-  // boolean methods to test if code was already generated
-  idl_bool cli_hdr_gen (void);
-  idl_bool cli_stub_gen (void);
-  idl_bool cli_inline_gen (void);
-  idl_bool srv_hdr_gen (void);
-  idl_bool srv_skel_gen (void);
-  idl_bool srv_inline_gen (void);
-  idl_bool cli_hdr_any_op_gen (void);
-  idl_bool cli_stub_any_op_gen (void);
+  virtual void destroy (void);
+  // Cleanup function.
 
-  // set the flag indicating that code generation is done
-  void cli_hdr_gen (idl_bool);
-  void cli_stub_gen (idl_bool);
-  void cli_inline_gen (idl_bool);
-  void srv_hdr_gen (idl_bool);
-  void srv_skel_gen (idl_bool);
-  void srv_inline_gen (idl_bool);
-  void cli_hdr_any_op_gen (idl_bool);
-  void cli_stub_any_op_gen (idl_bool);
+  void set_local (bool val);
+  // Temporarily set this node's is_local_ flag.
 
-  idl_bool is_child (be_decl *node);
-  // am I a direct child of node?
+  // Boolean methods to test if code was already generated.
+  bool cli_hdr_gen (void);
+  bool cli_stub_gen (void);
+  bool cli_inline_gen (void);
+  bool srv_hdr_gen (void);
+  bool impl_hdr_gen (void);
+  bool srv_skel_gen (void);
+  bool impl_skel_gen (void);
+  bool srv_inline_gen (void);
+  bool cli_hdr_any_op_gen (void);
+  bool cli_stub_any_op_gen (void);
+  bool cli_hdr_cdr_op_gen (void);
+  bool cli_stub_cdr_op_gen (void);
+  bool cli_inline_cdr_op_gen (void);
+  bool cli_inline_cdr_decl_gen (void);
+  bool cli_hdr_serializer_op_gen (void);
+  bool cli_stub_serializer_op_gen (void);
+  bool cli_inline_serializer_op_gen (void);
+  bool cli_inline_serializer_decl_gen (void);
+
+  bool cli_traits_gen (void);
+  bool cli_arg_traits_gen (void);
+  bool srv_arg_traits_gen (void);
+  bool srv_sarg_traits_gen (void);
+  bool cli_pragma_inst_gen (void);
+  bool cli_inarg_tmpl_class_gen (void);
+  bool cli_inarg_pragma_inst_gen (void);
+  bool cli_inoutarg_tmpl_class_gen (void);
+  bool cli_inoutarg_pragma_inst_gen (void);
+  bool cli_outarg_tmpl_class_gen (void);
+  bool cli_outarg_pragma_inst_gen (void);
+  bool cli_retarg_tmpl_class_gen (void);
+  bool cli_retarg_pragma_inst_gen (void);
+  bool srv_tmpl_class_gen (void);
+  bool srv_pragma_inst_gen (void);
+  bool srv_inarg_tmpl_class_gen (void);
+  bool srv_inarg_pragma_inst_gen (void);
+  bool srv_inoutarg_tmpl_class_gen (void);
+  bool srv_inoutarg_pragma_inst_gen (void);
+  bool srv_outarg_tmpl_class_gen (void);
+  bool srv_outarg_pragma_inst_gen (void);
+  bool srv_retarg_tmpl_class_gen (void);
+  bool srv_retarg_pragma_inst_gen (void);
+  bool ccm_pre_proc_gen (void);
+
+  // Set the flag indicating that code generation is done.
+  void cli_hdr_gen (bool);
+  void cli_stub_gen (bool);
+  void cli_inline_gen (bool);
+  void srv_hdr_gen (bool);
+  void impl_hdr_gen (bool);
+  void srv_skel_gen (bool);
+  void impl_skel_gen (bool);
+  void srv_inline_gen (bool);
+  void cli_hdr_any_op_gen (bool);
+  void cli_stub_any_op_gen (bool);
+  void cli_hdr_cdr_op_gen (bool);
+  void cli_stub_cdr_op_gen (bool);
+  void cli_inline_cdr_op_gen (bool);
+  void cli_inline_cdr_decl_gen (bool);
+  void cli_hdr_serializer_op_gen (bool);
+  void cli_stub_serializer_op_gen (bool);
+  void cli_inline_serializer_op_gen (bool);
+  void cli_inline_serializer_decl_gen (bool);
+
+  void cli_traits_gen (bool);
+  void cli_arg_traits_gen (bool);
+  void srv_arg_traits_gen (bool);
+  void srv_sarg_traits_gen (bool);
+  void cli_pragma_inst_gen (bool);
+  void cli_inarg_tmpl_class_gen (bool);
+  void cli_inarg_pragma_inst_gen (bool);
+  void cli_inoutarg_tmpl_class_gen (bool);
+  void cli_inoutarg_pragma_inst_gen (bool);
+  void cli_outarg_tmpl_class_gen (bool);
+  void cli_outarg_pragma_inst_gen (bool);
+  void cli_retarg_tmpl_class_gen (bool);
+  void cli_retarg_pragma_inst_gen (bool);
+  void srv_tmpl_class_gen (bool);
+  void srv_pragma_inst_gen (bool);
+  void srv_inarg_tmpl_class_gen (bool);
+  void srv_inarg_pragma_inst_gen (bool);
+  void srv_inoutarg_tmpl_class_gen (bool);
+  void srv_inoutarg_pragma_inst_gen (bool);
+  void srv_outarg_tmpl_class_gen (bool);
+  void srv_outarg_pragma_inst_gen (bool);
+  void srv_retarg_tmpl_class_gen (bool);
+  void srv_retarg_pragma_inst_gen (bool);
+  void ccm_pre_proc_gen (bool);
 
   // Narrowing
   DEF_NARROW_METHODS1 (be_decl, AST_Decl);
   DEF_NARROW_FROM_DECL (be_decl);
 
 protected:
-  // =helper
+  // Called by be_operation (for the return type) and be_argument.
+  void set_arg_seen_bit (be_type *);
 
-  virtual int compute_size_type (void);
-  // determine our size type and set it if it is unknown
-
-  virtual void compute_fullname (void);
-  // computes the fully scoped name
-
-  virtual void compute_flatname (void);
-  // compute the flattened fully scoped name
-
-  virtual void compute_repoID (void);
-  // computes the repoID
-
-  virtual void compute_prefix (void);
-  // computes the prefix for the repoID
-
-  virtual int tc_name2long (const char *name, long *&, long &);
-  // name represented as a padded array of longs
-
-  virtual long repoID_encap_len (void);
-  // return encapsulation length required to hold repository ID
-
-  virtual long name_encap_len (void);
-  // return encapsulation length required to hold IDL name
-
-  // variables that indicate if the code generation for that node is already
+private:
+  // Variables that indicate if the code generation for that node is already
   // been done. This way we avoid regenerating same code.
-  idl_bool cli_hdr_gen_;
-  idl_bool cli_stub_gen_;
-  idl_bool cli_inline_gen_;
-  idl_bool srv_hdr_gen_;
-  idl_bool srv_skel_gen_;
-  idl_bool srv_inline_gen_;
-  idl_bool cli_hdr_any_op_gen_;
-  idl_bool cli_stub_any_op_gen_;
+  bool cli_hdr_gen_;
+  bool cli_stub_gen_;
+  bool cli_inline_gen_;
+  bool srv_hdr_gen_;
+  bool impl_hdr_gen_;
+  bool srv_skel_gen_;
+  bool impl_skel_gen_;
+  bool srv_inline_gen_;
+  bool cli_hdr_any_op_gen_;
+  bool cli_stub_any_op_gen_;
+  bool cli_hdr_cdr_op_gen_;
+  bool cli_stub_cdr_op_gen_;
+  bool cli_inline_cdr_op_gen_;
+  bool cli_inline_cdr_decl_gen_;
+  bool cli_hdr_serializer_op_gen_;
+  bool cli_stub_serializer_op_gen_;
+  bool cli_inline_serializer_op_gen_;
+  bool cli_inline_serializer_decl_gen_;
 
-  char *fullname_;
-  // our full scoped name
-
-  char *flatname_;
-  // flattened fully scoped name
-
-  char *repoID_;
-  // repository ID
-
-  char *prefix_;
-  // The repository ID prefix
-
-  SIZE_TYPE size_type_;
-  // whether we are fixed or variable size (by default fixed)
-
-  long encap_len_;
-  // encapsulation length - required for typecodes
-
+  bool cli_traits_gen_;
+  bool cli_arg_traits_gen_;
+  bool srv_arg_traits_gen_;
+  bool srv_sarg_traits_gen_;
+  bool cli_pragma_inst_gen_;
+  bool cli_inarg_tmpl_class_gen_;
+  bool cli_inarg_pragma_inst_gen_;
+  bool cli_inoutarg_tmpl_class_gen_;
+  bool cli_inoutarg_pragma_inst_gen_;
+  bool cli_outarg_tmpl_class_gen_;
+  bool cli_outarg_pragma_inst_gen_;
+  bool cli_retarg_tmpl_class_gen_;
+  bool cli_retarg_pragma_inst_gen_;
+  bool srv_tmpl_class_gen_;
+  bool srv_pragma_inst_gen_;
+  bool srv_inarg_tmpl_class_gen_;
+  bool srv_inarg_pragma_inst_gen_;
+  bool srv_inoutarg_tmpl_class_gen_;
+  bool srv_inoutarg_pragma_inst_gen_;
+  bool srv_outarg_tmpl_class_gen_;
+  bool srv_outarg_pragma_inst_gen_;
+  bool srv_retarg_tmpl_class_gen_;
+  bool srv_retarg_pragma_inst_gen_;
+  bool ccm_pre_proc_gen_;
 };
 
 #endif // if !defined

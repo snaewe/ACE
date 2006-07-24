@@ -18,13 +18,12 @@
 
 #include "ace/Sched_Params.h"
 
-#include "Scheduler_Generic.h"
-
-#if ! defined (__ACE_INLINE__)
-#include "Scheduler_Generic.i"
-#endif /* __ACE_INLINE__ */
+#include "orbsvcs/Sched/Scheduler_Generic.h"
+#include "ace/OS_NS_stdio.h"
 
 ACE_RCSID(Sched, Scheduler_Generic, "$Id$")
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -177,9 +176,9 @@ Scheduler_Generic::register_task (RT_Info *rt_info [],
           if (output_level () >= 5)
             {
               ACE_OS::printf ("registered task \"%s\" with RT_Info starting "
-                                "at %X\n",
+                              "at %p\n",
                               (const char*)rt_info[0]->entry_point,
-                              (void *) rt_info[0]);
+                              rt_info[0]);
             }
         }
         break;
@@ -217,9 +216,10 @@ Scheduler_Generic::init (const int minimum_priority,
 
 
 Scheduler::status_t
-Scheduler_Generic::schedule (void)
+Scheduler_Generic::schedule (ACE_Unbounded_Set<Scheduling_Anomaly *> &
+                             /* anomaly_set */)
 {
-  ACE_Guard<LOCK> ace_mon (lock_);
+  ACE_GUARD_RETURN (LOCK, ace_mon, lock_, ACE_Scheduler::FAILED);
 
   // here goes . . .
 
@@ -228,7 +228,7 @@ Scheduler_Generic::schedule (void)
   status_t status = ACE_Scheduler::SUCCEEDED;
 
   // store number of tasks, based on registrations
-  tasks (task_entries_.size ());
+  tasks (static_cast<u_int> (task_entries_.size ()));
 
   if (output_level () > 0)
     {
@@ -240,15 +240,12 @@ Scheduler_Generic::schedule (void)
 
 
 int
-Scheduler_Generic::priority (const handle_t handle,
+Scheduler_Generic::priority (const handle_t /* handle */,
                              OS_Thread_Priority &priority,
                              Sub_Priority &subpriority,
                              Preemption_Priority &preemption_prio,
-                             const mode_t requested_mode) const
+                             const mode_t /* requested_mode */) const
 {
-  ACE_UNUSED_ARG (handle);
-  ACE_UNUSED_ARG (requested_mode);
-
   priority = minimum_priority_;
   subpriority = ACE_Scheduler_MIN_SUB_PRIORITY;
   preemption_prio = ACE_Scheduler_MAX_PREEMPTION_PRIORITY;
@@ -269,15 +266,4 @@ Scheduler_Generic::print_schedule ()
 {
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Node<RtecScheduler::RT_Info **>;
-template class ACE_Unbounded_Set<RtecScheduler::RT_Info **>;
-template class ACE_Unbounded_Set_Iterator<RtecScheduler::RT_Info **>;
-#elif defined(ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Node<RtecScheduler::RT_Info **>
-#pragma instantiate ACE_Unbounded_Set<RtecScheduler::RT_Info **>
-#pragma instantiate ACE_Unbounded_Set_Iterator<RtecScheduler::RT_Info **>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
-
-// EOF
+TAO_END_VERSIONED_NAMESPACE_DECL

@@ -4,16 +4,22 @@
 #define TAO_TRADER_TEST_UTILS_H
 
 #include "TTestS.h"
+#include "ace/Arg_Shifter.h"
+#include "ace/Read_Buffer.h"
 #include "orbsvcs/CosTradingC.h"
+#include "orbsvcs/CosTradingReposC.h"
+#include "orbsvcs/CosTradingDynamicC.h"
+#include "ttest_export.h"
 
-class TT_Info
+class TAO_TTest_Export TT_Info
 {
 public:
 
   static void dump_properties (const CosTrading::PropertySeq& prop_seq,
-			       CORBA::Boolean print_dynamic = CORBA::B_TRUE);
+                               CORBA::Boolean print_dynamic = 1
+                               ACE_ENV_ARG_DECL_WITH_DEFAULTS);
   // Dump the contents of this property sequence.
-  
+
   enum INTERFACES
   {
     REMOTE_IO,
@@ -24,74 +30,74 @@ public:
   };
 
   // = Test servants.
-  
+
   class Remote_Output :
     public POA_TAO_Trader_Test::Remote_Output
   {
   public:
-    
+
     Remote_Output (void) {}
-    
-    virtual void confirm (CORBA::Environment& _env)
-      TAO_THROW_SPEC ((CORBA::SystemException)) {}
+
+    virtual void confirm (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+      ACE_THROW_SPEC ((CORBA::SystemException)) {}
     // Method to test that the importer received a valid reference to
     // the exported object.
   };
-  
-  class Printer :
+
+  class TAO_TTest_Export Printer :
     public POA_TAO_Trader_Test::Printer
   {
   public:
 
     Printer (void) {}
 
-    virtual void confirm (CORBA::Environment& _env)
-      TAO_THROW_SPEC ((CORBA::SystemException)) {}
+    virtual void confirm (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+      ACE_THROW_SPEC ((CORBA::SystemException)) {}
     // Method to test that the importer received a valid reference to
-    // the exported object. 
+    // the exported object.
   };
-  
-  class Plotter :
+
+  class TAO_TTest_Export Plotter :
     public POA_TAO_Trader_Test::Plotter
   {
   public:
     Plotter (void) {}
-    
-    virtual void confirm (CORBA::Environment& _env)
-      TAO_THROW_SPEC ((CORBA::SystemException)) {}
+
+    virtual void confirm (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+      ACE_THROW_SPEC ((CORBA::SystemException)) {}
     // Method to test that the importer received a valid reference to
-    // the exported object. 
+    // the exported object.
   };
-  
-  class File_System :
+
+  class TAO_TTest_Export File_System :
     public POA_TAO_Trader_Test::File_System
   {
-  public:  
+  public:
     File_System (void) {}
 
-    virtual void confirm (CORBA::Environment& _env)
-      TAO_THROW_SPEC ((CORBA::SystemException)) {}
+    virtual void confirm (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+      ACE_THROW_SPEC ((CORBA::SystemException)) {}
     // Method to test that the importer received a valid reference to
-    // the exported object. 
+    // the exported object.
   };
-  
-  class PostScript_Printer :
+
+  class TAO_TTest_Export PostScript_Printer :
     public POA_TAO_Trader_Test::PostScript_Printer
   {
   public:
     PostScript_Printer (void) {}
 
-    virtual void confirm (CORBA::Environment& _env)
-      TAO_THROW_SPEC ((CORBA::SystemException)) {}
+    virtual void confirm (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+      ACE_THROW_SPEC ((CORBA::SystemException)) {}
     // Method to test that the importer received a valid reference to
-    // the exported object. 
+    // the exported object.
   };
 
 #define NUM_TYPES 5
   static const char* INTERFACE_NAMES[];
-  
+
   // = Remote IO property descriptions
-  
+
   enum REMOTE_IO_PROPERTIES
   {
     NAME,
@@ -104,9 +110,9 @@ public:
 
   static const char* REMOTE_IO_NAME;
   static const char* REMOTE_IO_PROPERTY_NAMES[];
-  
-  // = Plotter property descriptions 
-  
+
+  // = Plotter property descriptions
+
   enum PLOTTER_PROPERTIES
   {
     PLOTTER_NUM_COLORS,
@@ -118,10 +124,10 @@ public:
   };
 
   static const char* PLOTTER_NAME;
-  static const char* PLOTTER_PROPERTY_NAMES[]; 
-  
+  static const char* PLOTTER_PROPERTY_NAMES[];
+
   // = Printer property descriptions
-  
+
   enum PRINTER_PROPERTIES
   {
     PRINTER_COLOR,
@@ -135,9 +141,9 @@ public:
 
   static const char* PRINTER_NAME;
   static const char* PRINTER_PROPERTY_NAMES[];
-  
+
   // = File System Property Descriptions
-  
+
   enum FILESYSTEM_PROPERTIES
   {
     DISK_SIZE,
@@ -148,8 +154,8 @@ public:
   static const char* FILESYSTEM_NAME;
   static const char* FILESYSTEM_PROPERTY_NAMES[];
 
-  // = PostScript Printer property descriptions.  
-  
+  // = PostScript Printer property descriptions.
+
   enum PS_PRINTER_PROPERTIES
   {
     VERSION
@@ -157,7 +163,7 @@ public:
 
   static const char* PS_PRINTER_NAME;
   static const char* PS_PRINTER_PROPERTY_NAMES[];
-  
+
   // = Offer Info
 
 #define NUM_OFFERS 15
@@ -166,9 +172,35 @@ public:
   static const char* MODEL_NUMBERS[];
 
   // = Query info
-  
+
   static const int NUM_QUERIES;
-  static const char* QUERIES[][3];  
+  static const char* QUERIES[][3];
+};
+
+class TAO_TTest_Export TT_Parse_Args
+  // = TITLE
+  // Utility to parse the command-line arguments to the trading service tests.
+{
+  public:
+
+  TT_Parse_Args (int& argc, char** argv);
+
+  ~TT_Parse_Args ();
+
+  int federated () const;
+  // True if the test should test the federated features of the trading
+  // service.
+
+  int quiet () const;
+  // True if the tests should supress all but the most essential output.
+
+  char* ior () const;
+  // Not null if the test user supplied an explicit ior.
+
+  private:
+
+  int federated_, quiet_;
+  char* ior_;
 };
 
 #endif /* TAO_TRADER_TEST_UTILS_H */

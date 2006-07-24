@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,44 +62,72 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_TYPEDEF_AST_TYPEDEF_HH
 #define _AST_TYPEDEF_AST_TYPEDEF_HH
 
-// Representation of typedef declaration
-//
-// A typedef declaration is a renaming of a base type
+#include "ast_type.h"
 
-/*
-** DEPENDENCIES: ast_decl.hh, ast_type.hh, utl_scoped_name.hh, utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+// Representation of typedef declaration.
+// A typedef declaration is a renaming of a base type.
 
-class	AST_Typedef : public virtual AST_Type
+class TAO_IDL_FE_Export AST_Typedef : public virtual AST_Type
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_Typedef();
-  AST_Typedef(AST_Type *base_type, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Typedef() {}
+  // Constructor(s) and destructor.
+  AST_Typedef (void);
 
-  // Data Accessors
-  AST_Type *base_type();
+  AST_Typedef (AST_Type *base_type,
+               UTL_ScopedName *n,
+               bool local,
+               bool abstract);
 
-  // Narrowing
+  virtual ~AST_Typedef (void);
+
+  AST_Type *primitive_base_type (void) const;
+  // Return the most primitive base type by traversing the chain of typedefed
+  // base types.
+
+  // Data Accessors.
+  AST_Type *base_type (void) const;
+
+  virtual bool legal_for_primary_key (void) const;
+  // Recursively called on valuetype to check for legal use as
+  // a primary key. Overridden for valuetype, struct, sequence,
+  // union, array, typedef, and interface.
+  
+  virtual bool is_local (void);
+  // Override the base class method.
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Typedef, AST_Type);
   DEF_NARROW_FROM_DECL(AST_Typedef);
 
-  // AST Dumping
-  virtual void		dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+  // Cleanup.
+  virtual void destroy (void);
+
+protected:
+  virtual int compute_size_type (void);
+  // Compute the size type if it is unknown.
 
 private:
-  // Data
-  AST_Type		*pd_base_type;	// typedef base type
+  // Data.
+
+  AST_Type *pd_base_type;
+  // Typedef base type.
+  
+  bool owns_base_type_;
+  // If our base type is anonymous array or sequence, we're
+  // responsible for destroying it.
 };
 
 #endif           // _AST_TYPEDEF_AST_TYPEDEF_HH

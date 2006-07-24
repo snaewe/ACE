@@ -18,13 +18,11 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_visitor_typecode/enum_typecode.h"
 
-#include "be_visitor_enum.h"
-
-ACE_RCSID(be_visitor_enum, enum_cs, "$Id$")
+ACE_RCSID (be_visitor_enum,
+           enum_cs,
+           "$Id$")
 
 
 // ********************************************************************
@@ -45,27 +43,28 @@ be_visitor_enum_cs::~be_visitor_enum_cs (void)
 int
 be_visitor_enum_cs::visit_enum (be_enum *node)
 {
-  TAO_OutStream *os = this->ctx_->stream ();
-
-  if (!node->cli_stub_gen () && !node->imported ())
+  if (node->cli_stub_gen ()
+      || node->imported ())
     {
-      // by using a visitor to declare and define the TypeCode, we have the
-      // added advantage to conditionally not generate any code. This will be
-      // based on the command line options. This is still TO-DO
-      be_visitor *visitor;
+                  return 0;
+    }
+
+  if (be_global->tc_support ())
+    {
       be_visitor_context ctx (*this->ctx_);
-      ctx.state (TAO_CodeGen::TAO_TYPECODE_DEFN);
-      visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
+      // ctx.sub_state (TAO_CodeGen::TAO_TC_DEFN_TYPECODE);
+      TAO::be_visitor_enum_typecode visitor (&ctx);
+
+      if (visitor.visit_enum (node) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_enum_cs::"
                              "visit_enum - "
-                             "TypeCode definition failed\n"
-                             ), -1);
+                             "TypeCode definition failed\n"),
+                            -1);
         }
-
-      node->cli_stub_gen (I_TRUE);
     }
+
+  node->cli_stub_gen (true);
   return 0;
 }

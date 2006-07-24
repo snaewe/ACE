@@ -19,7 +19,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_FIELD_CH_H_)
+#ifndef _BE_VISITOR_FIELD_CH_H_
 #define _BE_VISITOR_FIELD_CH_H_
 
 class be_visitor_field_ch : public be_visitor_decl
@@ -55,6 +55,15 @@ public:
   virtual int visit_interface_fwd (be_interface_fwd *node);
   // visit interface forward type
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit valuebox type
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit valuetype type
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
+  // visit valuetype forward type
+
   virtual int visit_predefined_type (be_predefined_type *node);
   // visit predefined type
 
@@ -73,6 +82,20 @@ public:
   virtual int visit_union (be_union *node);
   // visit union type
 
+  virtual int visit_component (be_component *node);
+  // visit a component node
+
+  virtual int visit_component_fwd (be_component_fwd *node);
+  // visit a forward declared component node
+
+  virtual int visit_eventtype (be_eventtype *node);
+  // visit an eventtype node
+
+  virtual int visit_eventtype_fwd (be_eventtype_fwd *node);
+  // visit a forward declared eventtype node
+
+ private:
+  int emit_common (be_type *node);
 };
 
 #endif /*  _BE_VISITOR_FIELD_CH_H_ */

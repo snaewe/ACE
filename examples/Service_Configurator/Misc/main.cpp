@@ -18,7 +18,10 @@
 //
 // ============================================================================
 
+#include "ace/OS_main.h"
 #include "ace/Service_Config.h"
+#include "ace/ARGV.h"
+#include "ace/Log_Msg.h"
 #include "Timer_Service.h"
 
 ACE_RCSID(Misc, main, "$Id$")
@@ -29,24 +32,44 @@ ACE_RCSID(Misc, main, "$Id$")
 ACE_STATIC_SVC_REQUIRE (Timer_Service_1)
 
 int
-main (int, char *argv[])
+ACE_TMAIN (int, ACE_TCHAR *argv[])
 {
-  char *l_argv[6];
+  // Set up an argument vector that we can add entries to!
+  ACE_ARGV args;
 
   // Manufacture a "fake" svc.conf entry to demonstrate the -S option
   // that allows us to pass these entries via the "command-line"
   // rather than the svc.conf file.
-  l_argv[0] = argv[0];
-  l_argv[1] = "-S";
-  l_argv[2] = "static Timer_Service_1 \"timer 1 10 $TRACE\"";
-  l_argv[3] = "-S";
-  l_argv[4] = "dynamic Timer_Service_2 Service_Object * ./Timer:_make_Timer_Service_2() \"timer 2 10 $TRACE\"";
-  l_argv[5] = 0;
+  args.add (argv[0]);
+  args.add (ACE_TEXT ("-y"));
+  args.add (ACE_TEXT ("-d"));
+  args.add (ACE_TEXT ("-S"));
+  args.add (ACE_TEXT ("\"static Timer_Service_1 'timer 1 10 $TRACE'\""));
+  args.add (ACE_TEXT ("-S"));
+  args.add (ACE_TEXT ("\"dynamic Timer_Service_2 Service_Object * ./Timer:_make_Timer_Service_2() 'timer 2 10 $TRACE'\""));
+  // Test the -f option!
+  args.add (ACE_TEXT ("-fsvc.conf1"));
+  args.add (ACE_TEXT ("-fsvc.conf2"));
 
-  if (ACE_Service_Config::open (5, l_argv) == -1 && errno != ENOENT)
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("argc = %d\n"),
+              args.argc ()));
+
+  // Print the contents of the combined <ACE_ARGV>.
+  for (int i = 0; i < args.argc (); i++)
+    ACE_DEBUG ((LM_DEBUG,
+                ACE_TEXT ("(%d) %s\n"),
+                i,
+                args.argv ()[i]));
+
+  int result = ACE_Service_Config::open (args.argc (),
+                                         args.argv (),
+                                         ACE_DEFAULT_LOGGER_KEY,
+                                         0);
+  if (result != 0)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       "%p\n",
-                       "open"),
+                       ACE_TEXT ("%p\n"),
+                       ACE_TEXT ("open")),
                       1);
 
   // Run forever, performing the configured services until we

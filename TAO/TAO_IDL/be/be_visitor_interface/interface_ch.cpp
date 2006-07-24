@@ -18,14 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_interface.h"
-
-ACE_RCSID(be_visitor_interface, interface_ch, "$Id$")
-
+ACE_RCSID (be_visitor_interface,
+           interface_ch,
+           "$Id$")
 
 // ******************************************************
 // Interface visitor for client header
@@ -43,181 +38,426 @@ be_visitor_interface_ch::~be_visitor_interface_ch (void)
 int
 be_visitor_interface_ch::visit_interface (be_interface *node)
 {
-  TAO_OutStream *os; // output stream
-  long i;            // loop index
-
-  if (!node->cli_hdr_gen () && !node->imported ()) // not already generated and
-                                                   // not imported
+  if (node->cli_hdr_gen () || node->imported ())
     {
+      return 0;
+    }
 
-      os = this->ctx_->stream ();
+  // This will be a no-op if it has already been done by a forward
+  // declaration.
+  node->gen_var_out_seq_decls ();
 
-      // == STEP 1:  generate the class name and class names we inherit ==
+  TAO_OutStream *os = this->ctx_->stream ();
+  long i;
 
-      // generate the ifdefined macro for  the _ptr type
-      os->gen_ifdef_macro (node->flatname (), "_ptr");
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
 
-      // the following two are required to be under the ifdef macro to avoid
-      // multiple declarations
+  // Now the interface definition itself.
+  os->gen_ifdef_macro (node->flat_name ());
 
-      os->indent (); // start with whatever indentation level we are at
-      // forward declaration
-      *os << "class " << node->local_name () << ";" << be_nl;
-      // generate the _ptr declaration
-      *os << "typedef " << node->local_name () << " *" << node->local_name ()
-          << "_ptr;" << be_nl;
+  // Now generate the class definition.
+  *os << be_nl << be_nl
+      << "class " << be_global->stub_export_macro ()
+      << " " << node->local_name () << be_idt_nl
+      << ": " ;
 
-      os->gen_endif ();
+  long nparents = node->n_inherits ();
+  int has_concrete_parent = 0;
 
-      // generate the ifdefined macro for the var type
-      os->gen_ifdef_macro (node->flatname (), "_var");
+  // If node interface inherits from other interfaces.
+  if (nparents > 0)
+    {
+      *os << be_idt;
 
-      // generate the _var declaration
-      if (node->gen_var_defn () == -1)
+      for (i = 0; i < nparents; ++i)
         {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_interface_ch::"
-                             "visit_interface - "
-                             "codegen for _var failed\n"), -1);
-        }
-      os->gen_endif ();
-
-      // generate the ifdef macro for the _out class
-      os->gen_ifdef_macro (node->flatname (), "_out");
-
-      // generate the _out declaration - ORBOS/97-05-15 pg 16-20 spec
-      if (node->gen_out_defn () == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_interface_ch::"
-                             "visit_interface - "
-                             "codegen for _out failed\n"), -1);
-        }
-      // generate the endif macro
-      os->gen_endif ();
-
-      // now the interface definition itself
-      os->gen_ifdef_macro (node->flatname ());
-
-      // now generate the class definition
-      os->indent ();
-      *os << "class " << idl_global->export_macro ()
-	  << " " << node->local_name ();
-
-      if (node->n_inherits () > 0)  // node interface inherits from other
-                                    // interfaces
-        {
-          *os << ": ";
-          for (i = 0; i < node->n_inherits (); i++)
+          if (! node->inherits ()[i]->is_abstract ())
             {
-              be_interface *inherited =
-                be_interface::narrow_from_decl (node->inherits ()[i]);
-              be_decl *scope = 0;
-              if (inherited->is_nested ())
-                {
-                  // inherited node is used in the scope of "node" node
-                  scope = be_scope::narrow_from_scope (node->defined_in ())
-                    ->decl ();
-                }
+              has_concrete_parent = 1;
+            }
 
-              *os << "public virtual ";
-              *os << inherited->nested_type_name (scope);  // dump the scoped name
-              if (i < node->n_inherits () - 1) // node is the case of multiple
-                                               // inheritance, so put a comma
-                {
-                  *os << ", ";
-                }
-            }  // end of for loop
-          *os << be_nl;
+          *os << "public virtual ::"
+              << node->inherits ()[i]->name ();
+
+          if (i < nparents - 1)
+            {
+              // Node has multiple inheritance, so put a comma.
+              *os << "," << be_nl;
+            }
         }
-      else
+
+      if (has_concrete_parent == 1 || node->is_abstract ())
         {
-          // we do not inherit from anybody, hence we do so from the base
-          // CORBA::Object class
-          // Generate code that uses the macro. This is required to deal with
-          // the MSVC++ insanity
-          *os << " : public virtual ACE_CORBA_1 (Object)" << be_nl;
+          *os << be_uidt << be_uidt_nl;
+        }
+      else if (! node->is_abstract ())
+        {
+          *os << "," << be_nl;
+        }
+    }
+
+  if (node->is_abstract () && nparents == 0)
+    {
+      *os << "public virtual ::CORBA::AbstractBase" << be_uidt_nl;
+    }
+
+  if (has_concrete_parent == 0 && ! node->is_abstract ())
+    {
+      *os << "public virtual ::CORBA::Object";
+
+      if (nparents > 0)
+        {
+          *os << be_uidt;
         }
 
-      // generate the body
+      *os << be_uidt_nl;
+    }
 
-      *os << "{" << be_nl
-          << "public:" << be_idt_nl
-        // generate the static _duplicate, _narrow, and _nil operations
-          << "// the static operations" << be_nl
-          << "static " << node->local_name () << "_ptr " << "_duplicate ("
-          << node->local_name () << "_ptr obj);" << be_nl
-          << "static " << node->local_name () << "_ptr "
-	  << "_narrow (" << be_idt << be_idt_nl
-          << "CORBA::Object_ptr obj," << be_nl
-	  << "CORBA::Environment &env = " << be_idt_nl
-	  << "CORBA::Environment::default_environment ()"
-	  << be_uidt << be_uidt_nl
-	  << ");" << be_uidt_nl
-          << "static " << node->local_name () << "_ptr " << "_nil (void);\n\n";
+  // Generate the body.
 
-      // generate code for the interface definition by traversing thru the
-      // elements of its scope. We depend on the front-end to have made sure
-      // that only legal syntactic elements appear in our scope.
-      if (this->visit_scope (node) == -1)
+  *os << "{" << be_nl
+      << "public:" << be_idt_nl;
+
+  if (!node->is_local () && !node->is_abstract ())
+    {
+      *os << "friend class TAO::Narrow_Utils<"
+          << node->local_name () << ">;" << be_nl;
+    }
+  else if (!node->is_local () && node->is_abstract ())
+    {
+      *os << "friend class TAO::AbstractBase_Narrow_Utils<"
+          << node->local_name () << ">;" << be_nl;
+    }
+
+  *os << "typedef " << node->local_name () << "_ptr _ptr_type;"
+      << be_nl
+      << "typedef " << node->local_name () << "_var _var_type;"
+      << be_nl
+      << "typedef " << node->local_name () << "_out _out_type;"
+      << be_nl << be_nl;
+
+  // Generate the static _duplicate, _narrow, _unchecked_narrow and
+  // _nil operations.
+  *os << "// The static operations." << be_nl
+      << "static " << node->local_name () << "_ptr " << "_duplicate ("
+      << node->local_name () << "_ptr obj);" << be_nl << be_nl
+      << "static void _tao_release ("
+      << node->local_name () << "_ptr obj);" << be_nl << be_nl;
+
+  if (this->gen_xxx_narrow ("_narrow",
+                            node,
+                            os) == false)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%P|%t) Error in "
+                         "be_visitor_interface_ch::"
+                         "visit_interface while generating "
+                         "_narrow () declaration \n"),
+                        -1);
+    }
+
+  if (this->gen_xxx_narrow ("_unchecked_narrow",
+                            node,
+                            os) == false)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%P|%t) Error in "
+                         "be_visitor_interface_ch::"
+                         "visit_interface while generating "
+                         "_unchecked_narrow () declaration \n"),
+                        -1);
+    }
+
+  // This method is defined in the header file to workaround old
+  // g++ problems.
+  *os << "static " << node->local_name () << "_ptr _nil (void)"
+      << be_nl
+      << "{" << be_idt_nl
+      << "return static_cast<" << node->local_name ()
+      << "_ptr> (0);" << be_uidt_nl
+      << "}" << be_nl << be_nl;
+      
+  bool gen_any_destructor =
+    be_global->any_support ()
+    && (!node->is_local () || be_global->gen_local_iface_anyops ());
+
+  if (gen_any_destructor)
+    {
+      *os << "static void _tao_any_destructor (void *);";
+    }
+
+  // Generate code for the interface definition by traversing thru the
+  // elements of its scope. We depend on the front-end to have made sure
+  // that only legal syntactic elements appear in our scope.
+
+  if (this->visit_scope (node) == -1)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_interface_ch::"
+                         "visit_interface - "
+                         "codegen for scope failed\n"),
+                        -1);
+    }
+
+  if (node->is_local ())
+    {
+      if (node->convert_parent_ops (this) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_interface_ch::"
-                             "visit_interface - "
-                             "codegen for scope failed\n"), -1);
+                            "(%N:%l) be_visitor_interface_ch::"
+                            "visit_interface - "
+                            "converting parent ops failed\n"),
+                            -1);
         }
-      // the _is_a method
-      os->indent ();
-      *os << "virtual CORBA::Boolean _is_a (" << be_idt << be_idt_nl
-	  << "const CORBA::Char *type_id, " << be_nl
-          << "CORBA::Environment &env = " << be_idt_nl
-	  << "CORBA::Environment::default_environment ()"
-	  << be_uidt << be_uidt_nl
-	  << ");" << be_uidt_nl
-	  << "virtual const char* "
-	  << "_interface_repository_id (void) const;" << be_uidt_nl;
+    }
 
-      // generate the "protected" constructor so that users cannot instantiate
-      // us
-      *os << "protected:" << be_idt_nl
-	  << node->local_name () << " (void); // default constructor" << be_nl
-          << node->local_name ()
-	  << " (STUB_Object *objref, " << be_idt << be_idt_nl
-          << "TAO_ServantBase *_tao_servant = 0, " << be_nl
-          << "CORBA::Boolean _tao_collocated = 0" << be_uidt_nl
-	  << ");" << be_uidt_nl
-          << "virtual ~" << node->local_name () << " (void);" << be_uidt_nl;
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__ << be_nl << be_nl;
 
-      // private copy constructor and assignment operator. These are not
-      // allowed, hence they are private.
-      *os << "private:\n";
-      os->incr_indent ();
-      *os << node->local_name () << " (const " << node->local_name () << " &);"
+  if (node->session_component_child () == 1)
+    {
+      *os << "// These two are inherited from SessionComponent."
+          << be_nl << be_nl
+          << "virtual void ciao_preactivate (" << be_idt << be_idt
+          << env_sngl_dflts << be_uidt_nl
+          << ")" << be_nl
+          << "ACE_THROW_SPEC ((" << be_idt_nl
+          << "::CORBA::SystemException," << be_nl
+          << "::Components::CCMException" << be_uidt_nl
+          << "));" << be_uidt_nl << be_nl
+          << "virtual void ciao_postactivate (" << be_idt << be_idt
+          << env_sngl_dflts << be_uidt_nl
+          << ")" << be_nl
+          << "ACE_THROW_SPEC ((" << be_idt_nl
+          << "::CORBA::SystemException," << be_nl
+          << "::Components::CCMException" << be_uidt_nl
+          << "));" << be_uidt_nl << be_nl;
+    }
+
+  // If we inherit from both CORBA::Object and CORBA::AbstractBase,
+  // we have to override _add_ref() to avoid ambiguity.
+  if (node->has_mixed_parentage ())
+    {
+      *os << "virtual void _add_ref (void);" << be_nl << be_nl;
+    }
+
+  // The _is_a method
+  *os << "virtual ::CORBA::Boolean _is_a (" << be_idt << be_idt_nl
+      << "const char *type_id" << env_dflts << be_uidt_nl
+      << ");" << be_uidt_nl << be_nl;
+
+  // The _interface_repository_id method.
+  *os << "virtual const char* _interface_repository_id (void) const;";
+
+  // The virtual marshal method, to prevent marshal of local iterfaces.
+  *os << be_nl << "virtual ::CORBA::Boolean marshal (TAO_OutputCDR &cdr);";
+
+  if (! node->is_local ())
+    {
+      // Add the Proxy Broker member variable.
+      *os << be_uidt_nl
+          << "private:" << be_idt_nl
+          << "TAO::Collocation_Proxy_Broker *"
+          << "the" << node->base_proxy_broker_name ()
+          << "_;";
+    }
+
+  *os << be_uidt_nl << be_nl
+      << "protected:" << be_idt_nl;
+
+  if (! node->is_local ())
+    {
+      // Generate the "protected" constructor so that users cannot
+      // instantiate us.
+
+      if (! node->is_abstract ())
+        {
+          *os << "// Concrete interface only." << be_nl
+              << node->local_name () << " (void);"
+              << be_nl << be_nl;
+        }
+
+      *os << "// These methods travese the inheritance tree and set the"
           << be_nl
-          << "void operator= (const " << node->local_name () << " &);\n";
+          << "// parents piece of the given class in the right mode."
+          << be_nl
+          << "virtual void " << node->flat_name ()
+          << "_setup_collocation (void);" << be_nl << be_nl;
+    }
 
-      os->decr_indent ();
-      *os << "};\n\n";
-      os->gen_endif ();
+  if (node->is_abstract () || node->is_local ())
+    {
+      // Protected default constructor for abstract interfaces.
+      *os << "// Abstract or local interface only." << be_nl
+          << node->local_name () << " (void);" << be_nl << be_nl;
+    }
 
-      // by using a visitor to declare and define the TypeCode, we have the
-      // added advantage to conditionally not generate any code. This will be
-      // based on the command line options. This is still TO-DO
-      be_visitor *visitor;
-      be_visitor_context ctx (*this->ctx_);
-      ctx.state (TAO_CodeGen::TAO_TYPECODE_DECL);
-      visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
+  if (node->is_abstract ())
+    {
+      // Protected copy constructor for abstract interfaces.
+      *os << "// Protected for abstract interfaces." << be_nl
+          << node->local_name () << " (const "
+          << node->local_name () << " &);" << be_nl << be_nl;
+    }
+
+
+  // Local interfaces don't support stub objects.
+  if (! node->is_local ())
+    {
+      if (! node->is_abstract ())
+        {
+          *os << "// Concrete non-local interface only." << be_nl
+              << node->local_name () << " (" << be_idt << be_idt_nl
+              << "IOP::IOR *ior," << be_nl
+              << "TAO_ORB_Core *orb_core = 0" << be_uidt_nl
+              << ");" << be_uidt_nl << be_nl;
+        }
+
+      *os << "// Non-local interface only." << be_nl
+          << node->local_name () << " (" << be_idt << be_idt_nl
+          << "TAO_Stub *objref," << be_nl
+          << "::CORBA::Boolean _tao_collocated = 0," << be_nl
+          << "TAO_Abstract_ServantBase *servant = 0," <<  be_nl
+          << "TAO_ORB_Core *orb_core = 0" << be_uidt_nl
+          << ");" << be_uidt_nl << be_nl;
+    }
+
+  // Protected destructor.
+  *os << "virtual ~" << node->local_name () << " (void);";
+
+  // Private copy constructor and assignment operator. These are not
+  // allowed, hence they are private.
+  *os << be_uidt_nl << be_nl
+      << "private:" << be_idt_nl;
+
+  // Abstract interfaces have a *protected* copy constructor.
+  if (! node->is_abstract ())
+    {
+      *os << "// Private and unimplemented for concrete interfaces." << be_nl
+          << node->local_name () << " (const "
+          << node->local_name () << " &);" << be_nl << be_nl;
+    }
+
+  *os << "void operator= (const " << node->local_name () << " &);";
+
+  // Generate the embedded RequestInfo classes per operation.
+  // This is to be used by interceptors.
+  be_visitor_context ctx (*this->ctx_);
+
+  ctx = *this->ctx_;
+
+  *os << be_uidt_nl;
+  *os << "};";
+
+  // Don't support smart proxies for local interfaces.
+  if (! node->is_local ())
+    {
+      // List that generates proxy broker factory function pointer.
+      be_global->non_local_interfaces.enqueue_tail (node);
+
+      if (be_global->gen_smart_proxies ())
+        {
+          *os << be_nl << be_nl;
+
+          // Smart Proxy related classes.
+          ctx.state (TAO_CodeGen::TAO_INTERFACE_SMART_PROXY_CH);
+          be_visitor_interface_smart_proxy_ch sp_visitor (&ctx);
+
+          if (node->accept (&sp_visitor) == -1)
+            {
+              ACE_ERROR_RETURN ((LM_ERROR,
+                                 "be_visitor_interface_ch::"
+                                 "visit_interface - "
+                                 "codegen for smart proxy classes failed\n"),
+                                -1);
+            }
+        }
+    }
+
+  os->gen_endif ();
+
+  if (be_global->tc_support () && !node->home_equiv ())
+    {
+      be_visitor_typecode_decl td_visitor (&ctx);
+
+      if (node->accept (&td_visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_interface_ch::"
                              "visit_interface - "
-                             "TypeCode declaration failed\n"
-                             ), -1);
+                             "TypeCode declaration failed\n"),
+                            -1);
+        }
+    }
+
+  node->cli_hdr_gen (true);
+  return 0;
+}
+
+int
+be_visitor_interface_ch::gen_abstract_ops_helper (be_interface *node,
+                                                  be_interface *base,
+                                                  TAO_OutStream *os)
+{
+  if (!base->is_abstract ())
+    {
+      return 0;
+    }
+
+  AST_Decl *d = 0;
+  be_visitor_context ctx;
+  ctx.stream (os);
+
+  for (UTL_ScopeActiveIterator si (base, UTL_Scope::IK_decls);
+       !si.is_done ();
+       si.next ())
+    {
+      d = si.item ();
+
+      if (d == 0)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_interface::"
+                             "gen_abstract_ops_helper - "
+                             "bad node in this scope\n"),
+                            -1);
         }
 
+      if (d->node_type () == AST_Decl::NT_op)
+        {
+          
+          be_operation *op = be_operation::narrow_from_decl (d);
+          op->set_local (node->is_local ());
+          ctx.state (TAO_CodeGen::TAO_OPERATION_CH);
+          be_visitor_operation_ch op_visitor (&ctx);
+          op_visitor.visit_operation (op);
+          op->set_local (base->is_local ());
+        }
+    }
 
-      node->cli_hdr_gen (I_TRUE);
-    } // if !cli_hdr_gen
   return 0;
+}
+
+bool
+be_visitor_interface_ch::gen_xxx_narrow (const char *nar,
+                                         be_interface *node,
+                                         TAO_OutStream *os)
+{
+  *os << "static " << node->local_name () << "_ptr "
+      << nar << " (" << be_idt << be_idt_nl;
+
+  if (node->is_abstract ())
+    {
+      *os << "::CORBA::AbstractBase_ptr obj";
+    }
+  else
+    {
+      *os << "::CORBA::Object_ptr obj";
+    }
+
+  *os << env_dflts << be_uidt_nl
+      << ");" << be_uidt_nl << be_nl;
+
+  return true;
 }

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,18 +67,32 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _IDL_DEFINES_IDL_DEFINES_HH
 #define _IDL_DEFINES_IDL_DEFINES_HH
 
+#include "ace/os_include/os_limits.h"
+
 /*
  * idl_defines.hh - Defines global compiler flags
  */
 
 // This cannot be an enum since more than one value may be active at
 // a given time, hence bitflags are #define'd instead
-     
-#define	IDL_CF_VERSION		(1 << 0)
-#define	IDL_CF_DUMP_AST		(1 << 1)
-#define	IDL_CF_ONLY_PREPROC	(1 << 2)
-#define	IDL_CF_ONLY_USAGE	(1 << 3)
-#define	IDL_CF_INFORMATIVE	(1 << 4)
-#define	IDL_CF_NOWARNINGS	(1 << 5)
 
-#endif	// _IDL_DEFINES_IDL_DEFINES_HH
+// HP-UX 64-bit warns that the result of '<<' is widened from an int to long.
+// They are assumed to be of type long within the tao_idl and IFR code.
+
+#define IDL_CF_VERSION          (long)(1 << 0)
+#define IDL_CF_DUMP_AST         (long)(1 << 1)
+#define IDL_CF_ONLY_PREPROC     (long)(1 << 2)
+#define IDL_CF_ONLY_USAGE       (long)(1 << 3)
+#define IDL_CF_INFORMATIVE      (long)(1 << 4)
+#define IDL_CF_NOWARNINGS       (long)(1 << 5)
+
+#define NAMEBUFSIZE 1024
+// Maximum length of static buffers used to store names.
+
+#define SUN_IDL_FE_VERSION "1.3.0"
+
+#if !defined (NFILES)
+# define NFILES 1024
+#endif /* ! NFILES */
+
+#endif  // _IDL_DEFINES_IDL_DEFINES_HH

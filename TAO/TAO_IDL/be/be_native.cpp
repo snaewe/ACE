@@ -16,25 +16,53 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_native.h"
+#include "be_visitor.h"
 
-ACE_RCSID(be, be_native, "$Id$")
+ACE_RCSID (be,
+           be_native,
+           "$Id$")
 
 
-// be_native: New IDL type added by the POA spec
-/*
- * Constructor(s)
- */
 be_native::be_native (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_ConcreteType (),
+    UTL_Scope (),
+    AST_Structure (),
+    AST_Native (),
+    be_scope (),
+    be_decl (),
+    be_type (),
+    be_exception ()
 {
 }
 
-be_native::be_native (UTL_ScopedName *n,
-                      UTL_StrList *p)
-  : AST_Native (n, p),
-    AST_Decl (AST_Decl::NT_native, n, p)
+be_native::be_native (UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_native,
+              n),
+    AST_Type (AST_Decl::NT_native,
+              n),
+    AST_ConcreteType (AST_Decl::NT_native,
+                      n),
+    UTL_Scope (AST_Decl::NT_native),
+    AST_Structure (AST_Decl::NT_native,
+                   n,
+                   true,
+                   false),
+    AST_Exception (n,
+                   true,
+                   false),
+    AST_Native (n),
+    be_decl (AST_Decl::NT_native,
+             n),
+    be_type (AST_Decl::NT_native,
+             n),
+    be_exception (n,
+                  true,
+                  false)
 {
 }
 
@@ -50,6 +78,13 @@ be_native::tc_size (void)
   return 0;
 }
 
+void
+be_native::destroy (void)
+{
+  this->be_exception::destroy ();
+  this->AST_Native::destroy ();
+}
+
 int
 be_native::accept (be_visitor *visitor)
 {
@@ -57,5 +92,5 @@ be_native::accept (be_visitor *visitor)
 }
 
 // Narrowing
-IMPL_NARROW_METHODS2(be_native, AST_Native, be_type)
+IMPL_NARROW_METHODS2(be_native, AST_Native, be_exception)
 IMPL_NARROW_FROM_DECL(be_native)

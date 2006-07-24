@@ -4,8 +4,9 @@
 // The following configuration file is designed to work for SCO UNIX
 // version 5.0 with MIT pthreads.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
 
 #if !defined (__ACE_INLINE__)
 #define __ACE_INLINE__
@@ -34,7 +35,7 @@
 #endif /* SCO */
 
 #define ACE_LACKS_PWD_FUNCTIONS
-#define ACE_HAS_LONG_FDMASK
+#define ACE_HAS_BIG_FD_SET
 
 //#define ACE_LACKS_SYSCALL
 //#define ACE_LACKS_STRRECVFD
@@ -47,18 +48,17 @@
 // Platform supports System V IPC (most versions of UNIX, but not Win32)
 #define ACE_HAS_SYSV_IPC
 #define ACE_HAS_NONCONST_MSGSND
-// #define      ACE_LACKS_POSIX_PROTOTYPES
 #define ACE_HAS_SVR4_DYNAMIC_LINKING
 #define ACE_HAS_AUTOMATIC_INIT_FINI
 
-// Platform supports Term Ioctls
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS
 
 // Platform supports recvmsg and sendmsg.
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-//#define ACE_HAS_SYSCALL_H
+//#define ACE_HAS_SYS_SYSCALL_H
 
 // Fixes a problem with HP/UX not wrapping the mmap(2) header files
 // with extern "C".
@@ -92,11 +92,8 @@
 #define ACE_HAS_STRERROR
 
 // ???
-// #define ACE_HAS_SUNOS4_GETTIMEOFDAY
+// #define ACE_HAS_VOIDPTR_GETTIMEOFDAY
 #define ACE_HAS_TIMEZONE_GETTIMEOFDAY
-
-// HP/UX has an undefined syscall for GETRUSAGE...
-//#define ACE_HAS_SYSCALL_GETRUSAGE
 
 // Note, this only works if the flag is set above!
 //#define ACE_HAS_GETRUSAGE
@@ -107,7 +104,6 @@
 // Platform has prototypes for ACE_TLI.
 #define ACE_HAS_TLI
 //#define       ACE_HAS_SVR4_TLI
-#define ACE_HAS_T_OPMGMT
 #define ACE_HAS_TLI_PROTOTYPES
 #define ACE_HAS_TIMOD_H
 #define ACE_HAS_TIUSER_H
@@ -118,15 +114,9 @@
 
 #define ACE_HAS_GNU_CSTRING_H
 
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
 #define ACE_HAS_SIGINFO_T
 #define ACE_HAS_UCONTEXT_T
 
-#define ACE_NEEDS_SYSTIME_H
 #define ACE_HAS_INLINED_OSCALLS
 
 #define ACE_HAS_STRBUF_T
@@ -142,27 +132,16 @@
 #define ACE_HAS_THREAD_SPECIFIC_STORAGE
 #define ACE_HAS_PTHREADS
 #define ACE_HAS_PTHREADS_STD
-#define ACE_HAS_PTHREAD_T
 #define ACE_LACKS_PTHREAD_CANCEL
-#define ACE_HAS_PTHREAD_SIGMASK
 #define ACE_HAS_SIGWAIT
-//#define       ACE_HAS_PTHREAD_YIELD_VOID_PTR
-//#define       ACE_HAS_YIELD_VOID_PTR
-//#define       ACE_HAS_PTHREAD_ATTR_INIT
-//#define       ACE_HAS_PTHREAD_ATTR_DESTROY
-//#define       ACE_HAS_PTHREAD_DSTATE_PTR
-//#define       ACE_HAS_PTHREAD_EQUAL
-//#define       ACE_HAS_PTHREAD_GETSPECIFIC_DATAPTR
 #define ACE_LACKS_THREAD_PROCESS_SCOPING
 //#define ACE_LACKS_THREAD_STACK_ADDR
-//#define ACE_LACKS_KEYDELETE
 // If ACE doesn't compile due to the lack of these methods, please
 // send email to schmidt@cs.wustl.edu reporting this.
 // #define ACE_LACKS_CONDATTR_PSHARED
 // #define ACE_LACKS_MUTEXATTR_PSHARED
 #define ACE_LACKS_RWLOCK_T
 #define ACE_LACKS_SETSCHED
-#define ACE_LACKS_RPC_H
 #define ACE_HAS_POSIX_TIME
 
 #include <pthread.h>
@@ -179,5 +158,7 @@
 #define ACE_HAS_READV_TIMEDWAIT
 #define ACE_HAS_WRITE_TIMEDWAIT
 #define ACE_HAS_WRITEV_TIMEDWAIT
+#define ACE_HAS_DIRENT
 
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

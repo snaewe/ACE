@@ -19,51 +19,57 @@
 //
 // ============================================================================
 
-#if !defined (BE_TYPE_H)
+#ifndef BE_TYPE_H
 #define BE_TYPE_H
+
+#include "be_decl.h"
+#include "ast_type.h"
+
+#include "ace/SString.h"
 
 class TAO_OutStream;
 
-/*
- * BE_Type
- */
 class be_type : public virtual AST_Type,
                 public virtual be_decl
 {
 public:
-  // =Operations
-
   be_type (void);
-  // default constructor
+  // Default constructor.
 
-  be_type (AST_Decl::NodeType nt, UTL_ScopedName *n, UTL_StrList *p);
-  // constructor
+  be_type (AST_Decl::NodeType nt,
+           UTL_ScopedName *n);
+  // Constructor.
 
   virtual ~be_type (void);
-
-  virtual int gen_var_defn (void);
-  // generate the _var class definition
-
-  virtual int gen_var_impl (void);
-  // generate the implementation for the _var class
-
-  virtual int gen_out_defn (void);
-  // generate the _out class definition
-
-  virtual int gen_out_impl (void);
-  // generate the _out implementation
-
-  virtual int gen_typecode (void) = 0;
-  // generate the typecode description
-
-  virtual long tc_size (void) = 0;
-  // return typecode size
+  // Destructor.
 
   UTL_ScopedName *tc_name (void);
-  // return the typecode name
+  // Return the typecode name. When both, the prefix and the suffix
+  // are non null, it computes and returns a tc name. Else, it also
+  // stores the result in a member variable.
 
-  virtual const char *nested_type_name (be_decl *d, const char *suffix = 0);
-  // type name of a node used when generating declarations
+  virtual const char *nested_sp_type_name (be_decl *use_scope,
+                                           const char *suffix = 0,
+                                           const char *prefix = 0);
+  // Type name of a node used when generating declarations for smart
+  // proxies.
+
+  void gen_fwd_helper_name (void);
+
+  const char *fwd_helper_name (void) const;
+  void fwd_helper_name (const char *name);
+  // Accessor to the member.
+
+  void gen_common_varout (TAO_OutStream *os);
+  // Generate _var and _out typedefs for structs and unions.
+
+  bool seen_in_sequence (void) const;
+  virtual void seen_in_sequence (bool val);
+  // Accessors for the member.
+
+  bool seen_in_operation (void) const;
+  virtual void seen_in_operation (bool val);
+  // Accessors for the member.
 
   virtual AST_Decl::NodeType base_node_type (void) const;
   // Typedefs are tricky to handle, in many points their mapping
@@ -71,25 +77,34 @@ public:
   // recursive simply using "base_type->node_type()" will not work, so
   // the most "unaliased" type is needed.
 
-  // Visiting
+  virtual void destroy (void);
+  // Clean up allocated members.
+
+  // Visiting.
   virtual int accept (be_visitor* visitor);
 
-  // Narrowing
+  // Narrowing.
   DEF_NARROW_METHODS2 (be_type, AST_Type, be_decl);
   DEF_NARROW_FROM_DECL (be_type);
 
 protected:
   virtual void compute_tc_name (void);
-  // computes the fully scoped typecode name
+  // Computes the fully scoped typecode name.
 
   UTL_ScopedName *tc_name_;
-  // typecode name
+  // Typecode name.
 
-  char *type_name_;
-  // type name (this uses the ACE NESTED macro)
+  ACE_CString fwd_helper_name_;
+  // Used by interfaces, valuetypes and arrays to name helper structs.
 
-  char *nested_type_name_;
-  // for the corresponding method.
+  bool common_varout_gen_;
+  // Have we generated our _var and _out class typedefs yet?
+
+  bool seen_in_sequence_;
+  // Has this declaration been used as a sequence element?
+
+  bool seen_in_operation_;
+  // Has this declaration been used as a return type or parameter?
 };
 
 #endif // end of if !defined

@@ -1,631 +1,842 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    ACE.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//=============================================================================
+/**
+ * @file    ACE.h
+ *
+ * $Id$
+ *
+ * This file contains value added ACE functions that extend the
+ * behavior of the UNIX and Win32 OS calls.
+ *
+ * All these ACE static functions are consolidated in a single place
+ * in order to manage the namespace better.  These functions are put
+ * here rather than in @c ACE_OS in order to separate concerns.
+ *
+ * @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//=============================================================================
 
-#include "ace/OS.h"
-
-#if !defined (ACE_ACE_H)
+#ifndef ACE_ACE_H
 #define ACE_ACE_H
+
+#include /**/ "ace/pre.h"
+
+#include "ace/config-lite.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "ace/Flag_Manip.h"
+#include "ace/Handle_Ops.h"
+#include "ace/Lib_Find.h"
+#include "ace/Init_ACE.h"
+#include "ace/Sock_Connect.h"
+#include "ace/Default_Constants.h"
+
+#if defined (CYGWIN32)
+// Include math.h. math.h defines a macro log2 that conflicts with ACE::log2()
+// which seems to only cause a problem on cygwin.  Insuring that math.h is
+// included first solves it since we define acelog2 as log2, then
+// undefines log2.
+# include "ace/os_include/os_math.h"
+#endif
+
+// When log2 is defined as macro redefine it as acelog2
+#if defined (log2)
+# define acelog2 log2
+# undef log2
+#endif /* log2 */
+
+#if defined (ACE_EXPORT_MACRO)
+#  undef ACE_EXPORT_MACRO
+#endif
+#define ACE_EXPORT_MACRO ACE_Export
+
+// Open versioned namespace, if enabled by the user.
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // Forward declarations.
 class ACE_Time_Value;
-class ACE_INET_Addr;
+class ACE_Message_Block;
+class ACE_Handle_Set;
 
-class ACE_Export ACE
+/**
+ * @namespace ACE
+ *
+ * @brief The namespace containing the ACE framework itself.
+ *
+ * The ACE namespace contains all types (classes, structures,
+ * typedefs, etc), and global functions and variables in the ACE
+ * framework.
+ */
+namespace ACE
 {
-  // = TITLE
-  //     Contains value added ACE methods that extend the behavior
-  //     of the UNIX and Win32 OS calls.
-  //
-  // = DESCRIPTION
-  //     This class consolidates all these ACE static methods in a
-  //     single place in order to manage the namespace better.  These
-  //     methods are put here rather than in ACE_OS in order to
-  //     separate concerns.
-  ACE_CLASS_IS_NAMESPACE (ACE);
-public:
   // = ACE version information.
-  static u_int major_version (void);
-  // E.g., the "4" in ACE 4.3.19.
+  /// e.g., the "5" in ACE 5.1.12.
+  extern ACE_Export u_int major_version (void);
 
-  static u_int minor_version (void);
-  // E.g., the "3" in ACE 4.3.19.
+  /// e.g., the "1" in ACE 5.1.12.
+  extern ACE_Export u_int minor_version (void);
 
-  static u_int beta_version (void);
-  // E.g., the "19" in ACE 4.3.19.  Returns 0 for "stable" (non-beta) releases.
+  /// e.g., the "12" in ACE 5.1.12.
+  /// Returns 0 for "stable" (non-beta) releases.
+  extern ACE_Export u_int beta_version (void);
 
   // = C++ compiler version information.
-  static const char* compiler_name (void);
-  // E.g., the "SunPro C++" in SunPro C++ 4.32.0
+  /// E.g., the "SunPro C++" in SunPro C++ 4.32.0
+  extern ACE_Export const ACE_TCHAR * compiler_name (void);
 
-  static u_int compiler_major_version (void);
-  // E.g., the "4" in SunPro C++ 4.32.0
+  /// E.g., the "4" in SunPro C++ 4.32.0
+  extern ACE_Export u_int compiler_major_version (void);
 
-  static u_int compiler_minor_version (void);
-  // E.g., the "32" in SunPro C++ 4.32.0
+  /// E.g., the "32" in SunPro C++ 4.32.0
+  extern ACE_Export u_int compiler_minor_version (void);
 
-  static u_int compiler_beta_version (void);
-  // E.g., the "0" in SunPro C++ 4.32.0
+  /// E.g., the "0" in SunPro C++ 4.32.0
+  extern ACE_Export u_int compiler_beta_version (void);
 
-  // = Recv operations that factor out differences between Win32 and UNIX.
-  static ssize_t recv (ACE_HANDLE handle, 
-                       void *buf, 
-                       size_t len, 
-                       int flags);
-  // Receive up to <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::recv> call).
+  /// Check if error indicates the process being out of handles (file
+  /// descriptors).
+  extern ACE_Export int out_of_handles (int error);
 
-  static ssize_t recv (ACE_HANDLE handle, 
-                       void *buf, 
-                       size_t len);
-  // Receive up to <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::read> system call on UNIX and the <ACE_OS::recv> call on
-  // Win32).
+  /// Simple wildcard matching function supporting '*' and '?'
+  /// return true if string s matches pattern.
+  extern ACE_Export bool wild_match(const char* s, const char* pattern, bool case_sensitive = true);
 
-  // = Recv operations that receive exactly n bytes.
-  static ssize_t recv_n (ACE_HANDLE handle, 
-                         void *buf, 
-                         size_t len, 
-                         int flags);
-  // Receive <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::recv> call).  If <handle> is set to non-blocking mode
-  // this call will poll until all <len> bytes are received.
+  /**
+   * @name I/O operations
+   *
+   * Notes on common parameters:
+   *
+   * @a handle is the connected endpoint that will be used for I/O.
+   *
+   * @a buf is the buffer to write from or receive into.
+   *
+   * @a len is the number of bytes to transfer.
+   *
+   * The @a timeout parameter in the following methods indicates how
+   * long to blocking trying to transfer data.  If @a timeout == 0,
+   * then the call behaves as a normal send/recv call, i.e., for
+   * blocking sockets, the call will block until action is possible;
+   * for non-blocking sockets, @c EWOULDBLOCK will be returned if no
+   * action is immediately possible.
+   *
+   * If @a timeout != 0, the call will wait until the relative time
+   * specified in  @a *timeout elapses.
+   *
+   * The "_n()" I/O methods keep looping until all the data has been
+   * transferred.  These methods also work for sockets in non-blocking
+   * mode i.e., they keep looping on @c EWOULDBLOCK.  @a timeout is
+   * used to make sure we keep making progress, i.e., the same timeout
+   * value is used for every I/O operation in the loop and the timeout
+   * is not counted down.
+   *
+   * The return values for the "*_n()" methods match the return values
+   * from the non "_n()" methods and are specified as follows:
+   *
+   * - On complete transfer, the number of bytes transferred is returned.
+   * - On timeout, -1 is returned, @c errno == @c ETIME.
+   * - On error, -1 is returned, @c errno is set to appropriate error.
+   * - On @c EOF, 0 is returned, @c errno is irrelevant.
+   *
+   * On partial transfers, i.e., if any data is transferred before
+   * timeout / error / @c EOF, @a bytes_transferred> will contain the
+   * number of bytes transferred.
+   *
+   * Methods with @a iovec parameter are I/O vector variants of the
+   * I/O operations.
+   *
+   * Methods with the extra @a flags argument will always result in
+   * @c send getting called. Methods without the extra @a flags
+   * argument will result in @c send getting called on Win32
+   * platforms, and @c write getting called on non-Win32 platforms.
+   */
+  //@{
+  extern ACE_Export ssize_t recv (ACE_HANDLE handle,
+                                  void *buf,
+                                  size_t len,
+                                  int flags,
+                                  const ACE_Time_Value *timeout = 0);
 
-  static ssize_t recv_n (ACE_HANDLE handle, 
-                         void *buf, 
-                         size_t len);
-  // Receive <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::read> system call on UNIX and the <ACE_OS::recv> call on
-  // Win32).  If <handle> is set to non-blocking mode this call will
-  // poll until all <len> bytes are received.
+#if defined (ACE_HAS_TLI)
 
-  // = Timed <recv> operations.
-  static ssize_t recv (ACE_HANDLE handle, 
-                       void *buf, 
-                       size_t len, 
-                       int flags,
-                       const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to receive up to <len> bytes
-  // into <buf> from <handle> (uses the <ACE_OS::recv> call).  The
-  // <timeout> indicates how long to blocking trying to receive.  If
-  // <timeout> == 0, the caller will block until action is possible,
-  // else will wait until the relative time specified in *<timeout>
-  // elapses).  If <recv> times out a -1 is returned with <errno ==
-  // ETIME>.  If it succeeds the number of bytes received is returned.
+  extern ACE_Export ssize_t t_rcv (ACE_HANDLE handle,
+                                   void *buf,
+                                   size_t len,
+                                   int *flags,
+                                   const ACE_Time_Value *timeout = 0);
 
-  static ssize_t recv (ACE_HANDLE handle, 
-                       void *buf, 
-                       size_t len, 
-                       const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to receive up to <len> bytes
-  // into <buf> from <handle> (uses the <ACE_OS::read> call).  The
-  // <timeout> indicates how long to blocking trying to receive.  If
-  // <timeout> == 0, the caller will block until action is possible,
-  // else will wait until the relative time specified in *<timeout>
-  // elapses).  If <recv> times out a -1 is returned with <errno ==
-  // ETIME>.  If it succeeds the number of bytes received is returned.
+#endif /* ACE_HAS_TLI */
 
-  static ssize_t recvmsg (ACE_HANDLE handle,
-                          struct msghdr *msg,
-                          int flags,
-                          const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to receive <msg> from
-  // <handle> (uses the <ACE_OS::recvmsg> call).  The <timeout>
-  // indicates how long to blocking trying to receive.  If <timeout>
-  // == 0, the caller will block until action is possible, else will
-  // wait until the relative time specified in *<timeout> elapses).
-  // If <recvmsg> times out a -1 is returned with <errno == ETIME>.
-  // If it succeeds the number of bytes received is returned.
+  extern ACE_Export ssize_t recv (ACE_HANDLE handle,
+                                  void *buf,
+                                  size_t len,
+                                  const ACE_Time_Value *timeout = 0);
 
-  static ssize_t recvfrom (ACE_HANDLE handle,
-                           char *buf,
-                           int len, 
-                           int flags,
-                           struct sockaddr *addr,
-                           int *addrlen,
-                           const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to recv up to <len> bytes
-  // into <buf> from <handle> (uses the <ACE_OS::recvfrom> call).  The
-  // <timeout> indicates how long to blocking trying to recv.  If
-  // <timeout> == 0, the caller will block until action is possible,
-  // else will wait until the relative time specified in *<timeout>
-  // elapses).  If <recvfrom> times out a -1 is returned with <errno
-  // == ETIME>.  If it succeeds the number of bytes received is
-  // returned.
+  extern ACE_Export ssize_t recvmsg (ACE_HANDLE handle,
+                                     struct msghdr *msg,
+                                     int flags,
+                                     const ACE_Time_Value *timeout = 0);
 
-  static ssize_t recv_n (ACE_HANDLE handle, 
-                         void *buf, 
-                         size_t len, 
-                         int flags,
-                         const ACE_Time_Value *timeout);
-  // Try to recv exactly <len> bytes into <buf> from <handle> (uses
-  // the <ACE_OS::recv> call).  The <timeout> indicates how long to
-  // blocking trying to receive.  If <timeout> == 0, the caller will
-  // block until action is possible, else will wait until the relative
-  // time specified in *<timeout> elapses).  If <recv> blocks for
-  // longer than <timeout> the number of bytes actually read is
-  // returned with <errno == ETIME>.  If a timeout does not occur,
-  // <recv_n> return <len> (i.e., the number of bytes requested to be
-  // read).
+  extern ACE_Export ssize_t recvfrom (ACE_HANDLE handle,
+                                      char *buf,
+                                      int len,
+                                      int flags,
+                                      struct sockaddr *addr,
+                                      int *addrlen,
+                                      const ACE_Time_Value *timeout = 0);
 
-  static ssize_t recv_n (ACE_HANDLE handle, 
-                         void *buf, 
-                         size_t len, 
-                         const ACE_Time_Value *timeout);
-  // Try to recv exactly <len> bytes into <buf> from <handle> (uses
-  // the <ACE_OS::recv> call).  The <timeout> indicates how long to
-  // blocking trying to receive.  If <timeout> == 0, the caller will
-  // block until action is possible, else will wait until the relative
-  // time specified in *<timeout> elapses).  If <recv> blocks for
-  // longer than <timeout> the number of bytes actually read is
-  // returned with <errno == ETIME>.  If a timeout does not occur,
-  // <recv_n> return <len> (i.e., the number of bytes requested to be
-  // read).
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t recv_n (ACE_HANDLE handle,
+                  void *buf,
+                  size_t len,
+                  int flags,
+                  const ACE_Time_Value *timeout = 0,
+                  size_t *bytes_transferred = 0);
 
-  // = Send operations that factor out differences between Win32 and UNIX.
-  static ssize_t send (ACE_HANDLE handle, 
-                       const void *buf, 
-                       size_t len, 
-                       int flags);
-  // Send up to <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::send> call).
+#if defined (ACE_HAS_TLI)
 
-  static ssize_t send (ACE_HANDLE handle, 
-                       const void *buf, 
-                       size_t len);
-  // Send up to <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::write> system call on UNIX and the <ACE_OS::send> call
-  // on Win32).
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t t_rcv_n (ACE_HANDLE handle,
+                   void *buf,
+                   size_t len,
+                   int *flags,
+                   const ACE_Time_Value *timeout = 0,
+                   size_t *bytes_transferred = 0);
 
-  // = Send operations that send exactly n bytes.
-  static ssize_t send_n (ACE_HANDLE handle, 
-                         const void *buf, 
-                         size_t len, 
-                         int flags);
-  // Send <len> bytes from <buf> to <handle> (uses the <ACE_OS::send>
-  // system call).  If <handle> is set to non-blocking mode this call
-  // will poll until all <len> bytes are sent.
+#endif /* ACE_HAS_TLI */
 
-  static ssize_t send_n (ACE_HANDLE handle, 
-                         const void *buf, 
-                         size_t len);
-  // Send <len> bytes from <buf> to <handle> (uses the <ACE_OS::write>
-  // system call on UNIX and the <ACE_OS::recv> call on Win32).  If
-  // <handle> is set to non-blocking mode this call will poll until
-  // all <len> bytes are sent.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t recv_n (ACE_HANDLE handle,
+                  void *buf,
+                  size_t len,
+                  const ACE_Time_Value *timeout = 0,
+                  size_t *bytes_transferred = 0);
 
-  // = Timed <send> operations.
-  static ssize_t send (ACE_HANDLE handle, 
-                       const void *buf, 
-                       size_t len, 
-                       const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to send up to <len> bytes
-  // into <buf> from <handle> (uses the <ACE_OS::write> system call on
-  // UNIX and the <ACE_OS::send> call on Win32).  The <timeout>
-  // indicates how long to blocking trying to send.  If <timeout> ==
-  // 0, the caller will block until action is possible, else will wait
-  // until the relative time specified in *<timeout> elapses).  If
-  // <send> times out a -1 is returned with <errno == ETIME>.  If it
-  // succeeds the number of bytes sent is returned.
+  /// Receive into a variable number of pieces.
+  /**
+   * Accepts a variable, caller-specified, number of pointer/length
+   * pairs. Arguments following @a n are char *, size_t pairs.
+   *
+   * @param handle The I/O handle to receive on
+   * @param n      The total number of char *, size_t pairs following @a n.
+   *
+   * @return -1 on error, else total number of bytes received.
+   */
+  extern ACE_Export ssize_t recv (ACE_HANDLE handle, size_t n, ...);
 
-  static ssize_t send (ACE_HANDLE handle, 
-                       const void *buf, 
-                       size_t len, 
-                       int flags,
-                       const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to send up to <len> bytes
-  // into <buf> from <handle> (uses the <ACE_OS::send> call).  The
-  // <timeout> indicates how long to blocking trying to send.  If
-  // <timeout> == 0, the caller will block until action is possible,
-  // else will wait until the relative time specified in *<timeout>
-  // elapses).  If <send> times out a -1 is returned with <errno ==
-  // ETIME>.  If it succeeds the number of bytes sent is returned.
+  extern ACE_Export ssize_t recvv (ACE_HANDLE handle,
+                                   iovec *iov,
+                                   int iovcnt,
+                                   const ACE_Time_Value *timeout = 0);
 
-  static ssize_t sendmsg (ACE_HANDLE handle, 
-                          const struct msghdr *msg, 
-                          int flags,
-                          const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to send the <msg> to <handle>
-  // (uses the <ACE_OS::sendmsg> call).  The <timeout> indicates how
-  // long to blocking trying to send.  If <timeout> == 0, the caller
-  // will block until action is possible, else will wait until the
-  // relative time specified in *<timeout> elapses).  If <sendmsg>
-  // times out a -1 is returned with <errno == ETIME>.  If it succeeds
-  // the number of bytes sent is returned.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t recvv_n (ACE_HANDLE handle,
+                   iovec *iov,
+                   int iovcnt,
+                   const ACE_Time_Value *timeout = 0,
+                   size_t *bytes_transferred = 0);
 
-  static ssize_t sendto (ACE_HANDLE handle,
-                         const char *buf,
-                         int len, 
-                         int flags,
-                         const struct sockaddr *addr,
-                         int addrlen,
-                         const ACE_Time_Value *timeout);
-  // Wait up to <timeout> amount of time to send up to <len> bytes
-  // into <buf> from <handle> (uses the <ACE_OS::sendto> call).  The
-  // <timeout> indicates how long to blocking trying to send.  If
-  // <timeout> == 0, the caller will block until action is possible,
-  // else will wait until the relative time specified in *<timeout>
-  // elapses).  If <sendto> times out a -1 is returned with <errno ==
-  // ETIME>.  If it succeeds the number of bytes sent is returned.
+  extern ACE_Export ssize_t recv_n (ACE_HANDLE handle,
+                                    ACE_Message_Block *message_block,
+                                    const ACE_Time_Value *timeout = 0,
+                                    size_t *bytes_transferred = 0);
 
-  static ssize_t send_n (ACE_HANDLE handle, 
-                         const void *buf, 
-                         size_t len, 
-                         int flags,
-                         const ACE_Time_Value *timeout);
-  // Try to send exactly <len> bytes into <buf> from <handle> (uses
-  // the <ACE_OS::send> call).  The <timeout> indicates how long to
-  // blocking trying to send.  If <timeout> == 0, the caller will
-  // block until action is possible, else will wait until the relative
-  // time specified in *<timeout> elapses).  If <send> blocks for
-  // longer than <timeout> the number of bytes actually sent is
-  // returned with <errno == ETIME>.  If a timeout does not occur,
-  // <send_n> return <len> (i.e., the number of bytes requested to be
-  // sent).
+  extern ACE_Export ssize_t send (ACE_HANDLE handle,
+                                  const void *buf,
+                                  size_t len,
+                                  int flags,
+                                  const ACE_Time_Value *timeout = 0);
 
-  static ssize_t send_n (ACE_HANDLE handle, 
-                         const void *buf, 
-                         size_t len, 
-                         const ACE_Time_Value *timeout);
-  // Try to send exactly <len> bytes into <buf> from <handle> (uses
-  // the <ACE_OS::send> call).  The <timeout> indicates how long to
-  // blocking trying to send.  If <timeout> == 0, the caller will
-  // block until action is possible, else will wait until the relative
-  // time specified in *<timeout> elapses).  If <send> blocks for
-  // longer than <timeout> the number of bytes actually sent is
-  // returned with <errno == ETIME>.  If a timeout does not occur,
-  // <send_n> return <len> (i.e., the number of bytes requested to be
-  // sent).
+#if defined (ACE_HAS_TLI)
 
-  // = Timed Scatter-read and gather-write functions.
+  extern ACE_Export ssize_t t_snd (ACE_HANDLE handle,
+                                   const void *buf,
+                                   size_t len,
+                                   int flags,
+                                   const ACE_Time_Value *timeout = 0);
 
-  static ssize_t writev (ACE_HANDLE handle, 
-                         const struct iovec* iov,
-                         int iovcnt,
-                         const ACE_Time_Value *timeout);
-  static ssize_t writev (ACE_HANDLE handle, 
-                         const struct ACE_IO_Vector *iov,
-                         int iovcnt,
-                         const ACE_Time_Value *timeout);
-  // Send <iovcnt> <iovec> structs to <handle> (uses the
-  // <ACE_OS::writev> call).  If <timeout> == 0, the caller will block
-  // until action is possible, else will wait until the relative time
-  // specified in *<timeout> elapses).  If <writev> times out a -1 is
-  // returned with <errno == ETIME>.  If it succeeds the number of
-  // bytes written is returned.
+#endif /* ACE_HAS_TLI */
 
-  static ssize_t readv (ACE_HANDLE handle,
-                        struct iovec *iov,
-                        int iovcnt,
-                        const ACE_Time_Value *timeout);
-  static ssize_t readv (ACE_HANDLE handle,
-                        struct ACE_IO_Vector *iov,
-                        int iovcnt,
-                        const ACE_Time_Value *timeout);
-  // Read <iovcnt> <iovec> structs from <handle> (uses the
-  // <ACE_OS::readv> call).  If <timeout> == 0, the caller will block
-  // until action is possible, else will wait until the relative time
-  // specified in *<timeout> elapses).  If <readv> times out a -1 is
-  // returned with <errno == ETIME>.  If it succeeds the number of
-  // bytes receieved is returned.
+  extern ACE_Export ssize_t send (ACE_HANDLE handle,
+                                  const void *buf,
+                                  size_t len,
+                                  const ACE_Time_Value *timeout = 0);
 
-  static ssize_t send (ACE_HANDLE handle, size_t n, ...);
-  // Send varargs messages to the <handle> using <writev>.
+  extern ACE_Export ssize_t sendmsg (ACE_HANDLE handle,
+                                     const struct msghdr *msg,
+                                     int flags,
+                                     const ACE_Time_Value *timeout = 0);
 
-  static ssize_t recv (ACE_HANDLE handle, size_t n, ...);
-  // Recv varargs messages to the <handle> using <readv>.
+  extern ACE_Export ssize_t sendto (ACE_HANDLE handle,
+                                    const char *buf,
+                                    int len,
+                                    int flags,
+                                    const struct sockaddr *addr,
+                                    int addrlen,
+                                    const ACE_Time_Value *timeout = 0);
 
-  // = File system I/O functions.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t send_n (ACE_HANDLE handle,
+                  const void *buf,
+                  size_t len,
+                  int flags,
+                  const ACE_Time_Value *timeout = 0,
+                  size_t *bytes_transferred = 0);
 
-  // These encapsulate differences between UNIX and Win32 and also
-  // send and recv exactly n bytes.
+#if defined (ACE_HAS_TLI)
 
-  static ssize_t read_n (ACE_HANDLE handle, 
-                         void *buf, 
-                         size_t len);
-  // Receive <len> bytes into <buf> from <handle> (uses the
-  // <ACE_OS::read> call, which uses the <read> system call on UNIX
-  // and the <ReadFile> call on Win32).  If <handle> is set to
-  // non-blocking mode this call will poll until all <len> bytes are
-  // received.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t t_snd_n (ACE_HANDLE handle,
+                   const void *buf,
+                   size_t len,
+                   int flags,
+                   const ACE_Time_Value *timeout = 0,
+                   size_t *bytes_transferred = 0);
 
-  static ssize_t write_n (ACE_HANDLE handle, 
-                          const void *buf, 
-                          size_t len);
-  // Send <len> bytes from <buf> to <handle> (uses the <ACE_OS::write>
-  // calls, which is uses the <write> system call on UNIX and the
-  // <WriteFile> call on Win32).  If <handle> is set to non-blocking
-  // mode this call will poll until all <len> bytes are sent.
+#endif /* ACE_HAS_TLI */
 
-  // = Socket connection establishment calls.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t send_n (ACE_HANDLE handle,
+                  const void *buf,
+                  size_t len,
+                  const ACE_Time_Value *timeout = 0,
+                  size_t *bytes_transferred = 0);
 
-  static int bind_port (ACE_HANDLE handle,
-                        ACE_UINT32 ip_addr = INADDR_ANY);
-  // Bind a new unused port to <handle>.
+  /// Varargs variant.
+  extern ACE_Export ssize_t send (ACE_HANDLE handle, size_t n, ...);
 
-  static int get_bcast_addr (ACE_UINT32 &bcast_addr,
-                             const char *hostname = 0,
-                             ACE_UINT32 host_addr = 0,
-                             ACE_HANDLE handle = ACE_INVALID_HANDLE);
-  // Get our broadcast address based on our <host_addr>.  If
-  // <hostname> is non-0 we'll use it to determine our IP address.  If
-  // <handle> is not <ACE_INVALID_HANDLE> then we'll use this to
-  // determine our broadcast address, otherwise we'll have to create a
-  // socket internally (and free it).  Returns -1 on failure and 0 on
-  // success.
+  extern ACE_Export ssize_t sendv (ACE_HANDLE handle,
+                                   const iovec *iov,
+                                   int iovcnt,
+                                   const ACE_Time_Value *timeout = 0);
 
-  static int get_ip_interfaces (size_t &count, 
-                                ACE_INET_Addr *&addr_array);
-  // Return count and array of all configured IP interfaces on this
-  // host, rc = 0 on success (count == number of interfaces else -1).
-  // Caller is responsible for calling delete [] on <addr_array>.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t sendv_n (ACE_HANDLE handle,
+                   const iovec *iov,
+                   int iovcnt,
+                   const ACE_Time_Value *timeout = 0,
+                   size_t *bytes_transferred = 0);
 
-  static int count_interfaces (ACE_HANDLE handle,
-                               size_t &how_many);
-  // Helper routine for get_ip_interfaces, differs by UNIX platform so
-  // put into own subroutine.  perform some ioctls to retrieve ifconf
-  // list of ifreq structs.
+  /// Send all the @a message_blocks chained through their @c next and
+  /// @c cont pointers.  This call uses the underlying OS gather-write
+  /// operation to reduce the domain-crossing penalty.
+  extern ACE_Export ssize_t send_n (ACE_HANDLE handle,
+                                    const ACE_Message_Block *message_block,
+                                    const ACE_Time_Value *timeout = 0,
+                                    size_t *bytes_transferred = 0);
 
-  static ACE_HANDLE get_handle (void);
-  // Routine to return a handle from which <ioctl> requests can be
-  // made.  Caller must <close> the handle.
+  // = File system I/O functions (these don't support timeouts).
 
-  static int handle_timed_accept (ACE_HANDLE listener,
-                                  ACE_Time_Value *timeout, 
-                                  int restart);
-  // Wait up to <timeout> amount of time to passively establish a
-  // connection.  This method doesn't perform the <accept>, it just
-  // does the timed wait...
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t read_n (ACE_HANDLE handle,
+                  void *buf,
+                  size_t len,
+                  size_t *bytes_transferred = 0);
 
-  static ACE_HANDLE handle_timed_complete (ACE_HANDLE listener, 
-                                           ACE_Time_Value *timeout,
-                                           int is_tli = 0);
-  // Wait up to <timeout> amount of time to complete an actively
-  // established non-blocking connection.  If <is_tli> is non-0 then
-  // we are being called by a TLI wrapper (which behaves slightly
-  // differently from a socket wrapper).
+  ACE_NAMESPACE_INLINE_FUNCTION
+  ssize_t write_n (ACE_HANDLE handle,
+                   const void *buf,
+                   size_t len,
+                   size_t *bytes_transferred = 0);
 
-  // = Operations on HANDLEs.
+  /// Write all the @a message_blocks chained through their @c next
+  /// and @c cont pointers.  This call uses the underlying OS
+  /// gather-write operation to reduce the domain-crossing penalty.
+  extern ACE_Export ssize_t write_n (ACE_HANDLE handle,
+                                     const ACE_Message_Block *message_block,
+                                     size_t *bytes_transferred = 0);
 
-  static ACE_HANDLE handle_timed_open (ACE_Time_Value *timeout,
-                                       LPCTSTR name,
-                                       int flags, 
-                                       int perms);
-  // Wait up to <timeout> amount of time to actively open a device.
-  // This method doesn't perform the <connect>, it just does the timed
-  // wait...
+  extern ACE_Export ssize_t readv_n (ACE_HANDLE handle,
+                                     iovec *iov,
+                                     int iovcnt,
+                                     size_t *bytes_transferred = 0);
 
-  // = Set/get/clear various flags related to I/O HANDLE.
-  static int set_flags (ACE_HANDLE handle, 
-                        int flags);
-  // Set flags associated with <handle>.
+  extern ACE_Export ssize_t writev_n (ACE_HANDLE handle,
+                                      const iovec *iov,
+                                      int iovcnt,
+                                      size_t *bytes_transferred = 0);
+  //@}
 
-  static int clr_flags (ACE_HANDLE handle, 
-                        int flags);
-  // Clear flags associated with <handle>.
+  /**
+   * Wait up to @a timeout amount of time to passively establish a
+   * connection.  This method doesn't perform the @c accept, it just
+   * does the timed wait.
+   */
+  extern ACE_Export int handle_timed_accept (ACE_HANDLE listener,
+                                             ACE_Time_Value *timeout,
+                                             int restart);
 
-  static int get_flags (ACE_HANDLE handle);
-  // Return the current setting of flags associated with <handle>.
+  /**
+   * Wait up to @a timeout amount of time to complete an actively
+   * established non-blocking connection.  If @a is_tli is non-0 then
+   * we are being called by a TLI wrapper (which behaves slightly
+   * differently from a socket wrapper).
+   */
+  extern ACE_Export ACE_HANDLE handle_timed_complete (
+    ACE_HANDLE listener,
+    const ACE_Time_Value *timeout,
+    int is_tli = 0);
 
-  static int set_handle_limit (int new_limit = -1);
-  // Reset the limit on the number of open handles.  If <new_limit> ==
-  // -1 set the limit to the maximum allowable.  Otherwise, set it to
-  // be the value of <new_limit>.
+  /**
+   * Reset the limit on the number of open handles.  If @a new_limit
+   * == -1 set the limit to the maximum allowable.  Otherwise, set
+   * the limit value to @a new_limit.  If @a increase_limit_only is
+   * non-0 then only allow increases to the limit.
+   */
+  extern ACE_Export int set_handle_limit (int new_limit = -1,
+                                          int increase_limit_only = 0);
 
-  static int max_handles (void);
-  // Returns the maximum number of open handles currently permitted in
-  // this process.  This maximum may be extended using
-  // <ACE::set_handle_limit>.
+  /**
+   * Returns the maximum number of open handles currently permitted in
+   * this process.  This maximum may be extended using
+   * @c ACE::set_handle_limit.
+   */
+  extern ACE_Export int max_handles (void);
 
   // = String functions
 #if !defined (ACE_HAS_WINCE)
-  static char *strenvdup (const char *str);
-  // Return a dynamically allocated duplicate of <str>, substituting
-  // the environment variable if <str[0] == '$'>.  Note that the
-  // pointer is allocated with <ACE_OS::malloc> and must be freed by
-  // <ACE_OS::free>
+  /**
+   * Return a dynamically allocated duplicate of @a str, substituting
+   * the environment variable if @c str[0] @c == @c '$'.  Note that
+   * the pointer is allocated with @c ACE_OS::malloc and must be freed
+   * by @c ACE_OS::free.
+   */
+  extern ACE_Export ACE_TCHAR *strenvdup (const ACE_TCHAR *str);
 #endif /* ACE_HAS_WINCE */
 
-  static char *strecpy (char *s, const char *t);
-  // Copies <t> to <s>, returning a pointer to the end of the copied
-  // region (rather than the beginning, a la <strcpy>.
+  /// Returns a pointer to the "end" of the string, i.e., the character
+  /// past the '\0'.
+  extern ACE_Export const char *strend (const char *s);
 
-  static char *strsplit_r (char *s,
-                           const char *token,
-                           char *&next_start);
-  // Splits string <s> into pieces separated by the string <token>.
-  // <next_start> is an opaque cookie handed back by the call to store
-  // its state for the next invocation, thus making it re-entrant.
-  // This operates very similar to Perl's <split> function except that
-  // it returns pieces one at a time instead of into an array.
+  /// This method is just like @c strdup, except that it uses
+  /// @c operator @c new rather than @c malloc.  If @a s is NULL
+  /// returns NULL rather than segfaulting.
+  extern ACE_Export char *strnew (const char *s);
 
-  static size_t strrepl (char *s, char search, char replace);
-  // Replace all instances of <search> in <s> with <replace>.  Returns
-  // the number of replacements made.
+  /// Delete the memory allocated by @c strnew.
+  ACE_NAMESPACE_INLINE_FUNCTION void strdelete (char *s);
 
-  static const char *execname (const char *pathname);
-  // On Win32 returns <pathname> if it already ends in ".exe,"
-  // otherwise returns a dynamically allocated buffer containing
-  // "<pathname>.exe".  Always returns <pathname> on UNIX.
+  /// Create a fresh new copy of @a str, up to @a n chars long.  Uses
+  /// @c ACE_OS::malloc to allocate the new string.
+  extern ACE_Export char *strndup (const char *str, size_t n);
 
-  static const char *basename (const char *pathname,
-			       char delim);
-  // Returns the "basename" of a <pathname>.
+  /// Create a fresh new copy of @a str, up to @a n chars long.  Uses
+  /// @c ACE_OS::malloc to allocate the new string.
+  extern ACE_Export char *strnnew (const char *str, size_t n);
 
-#if defined (ACE_HAS_UNICODE)
-  // A collection of wide string functions.  See above for details.
+#if defined (ACE_HAS_WCHAR)
+  extern ACE_Export const wchar_t *strend (const wchar_t *s);
 
-  static wchar_t *strecpy (wchar_t *s, const wchar_t *t);
+  extern ACE_Export wchar_t *strnew (const wchar_t *s);
 
-  static wchar_t *strsplit_r (wchar_t *s,
-                              const wchar_t *token,
-                              wchar_t *&next_start);
+  ACE_NAMESPACE_INLINE_FUNCTION void strdelete (wchar_t *s);
 
-  static size_t strrepl (wchar_t *s, wchar_t search, wchar_t replace);
+  extern ACE_Export wchar_t *strndup (const wchar_t *str, size_t n);
 
-  static const wchar_t *execname (const wchar_t *pathname);
+  extern ACE_Export wchar_t *strnnew (const wchar_t *str, size_t n);
 
-  static const wchar_t *basename (const wchar_t *pathname,
-				  wchar_t delim);
-  // Returns the "basename" of a <pathname>.
-#endif /* ACE_HAS_UNICODE */
+#endif /* ACE_HAS_WCHAR */
 
-  static ASYS_TCHAR *timestamp (ASYS_TCHAR date_and_time[],
-                                int time_len);
-  // Returns the current timestamp in the form
-  // "hour:minute:second:microsecond."  The month, day, and year are
-  // also stored in the beginning of the date_and_time array.  Returns
-  // 0 if unsuccessful, else returns pointer to beginning of the
-  // "time" portion of <day_and_time>.
+  /**
+   * On Windows, determines if a specified pathname ends with ".exe"
+   * (not case sensitive). If on Windows and there is no ".exe" suffix,
+   * a new ACE_TCHAR array is allocated and a copy of @c pathname with
+   * the ".exe" suffix is copied into it. In this case, the caller is
+   * responsible for calling delete [] on the returned pointer.
+   *
+   * @param pathname  The name to check for a proper suffix.
+   *
+   * @retval @c pathname if there is a proper suffix for Windows. This is
+   *         always the return value for non-Windows platforms.
+   * @retval If a suffix needs to be added, returns a pointer to new[]
+   *         allocated memory containing the original @c pathname plus
+   *         a ".exe" suffix. The caller is responsible for freeing the
+   *         memory using delete [].
+   */
+  extern ACE_Export const ACE_TCHAR *execname (const ACE_TCHAR *pathname);
 
-  static int daemonize (const char pathname[] = "/",
-                        int close_all_handles = ACE_DEFAULT_CLOSE_ALL_HANDLES);
-  // Become a daemon process.  If <close_all_handles> is non-zero then
-  // all open file handles are closed.
+  /**
+   * Returns the "basename" of a @a pathname separated by @a delim.
+   * For instance, the basename of "/tmp/foo.cpp" is "foo.cpp" when
+   * @a delim is @a '/'.
+   */
+  extern ACE_Export const ACE_TCHAR *basename (const ACE_TCHAR *pathname,
+                                               ACE_TCHAR delim =
+                                               ACE_DIRECTORY_SEPARATOR_CHAR);
 
-  // = Methods for searching and opening shared libraries.
+  /**
+   * Returns the "dirname" of a @a pathname.  For instance, the
+   * dirname of "/tmp/foo.cpp" is "/tmp" when @a delim is @a '/'.  If
+   * @a pathname has no @a delim ".\0" is returned.  This method does
+   * not modify @a pathname and is not reentrant.
+   */
+  extern ACE_Export const ACE_TCHAR *dirname (const ACE_TCHAR *pathname,
+                                              ACE_TCHAR delim =
+                                              ACE_DIRECTORY_SEPARATOR_CHAR);
 
-  static int ldfind (const ASYS_TCHAR *filename, 
-                     ASYS_TCHAR *pathname, 
-                     size_t maxlen);
-  // Finds the file <filename> either using an absolute path or using
-  // a relative path in conjunction with ACE_LD_SEARCH_PATH (e.g.,
-  // $LD_LIBRARY_PATH on UNIX or $PATH on Win32).  This function will
-  // add appropriate suffix (e.g., .dll on Win32 or .so on UNIX)
-  // according to the OS platform.  In addition, this function will
-  // apply the appropriate prefix (e.g., "lib" on UNIX and "" on
-  // Win32) if the <filename> doesn't match directly.
+  /**
+   * Returns the current timestamp in the form
+   * "hour:minute:second:microsecond."  The month, day, and year are
+   * also stored in the beginning of the @a date_and_time array, which
+   * is a user-supplied array of size @a time_len> @c ACE_TCHARs.
+   * Returns 0 if unsuccessful, else returns pointer to beginning of the
+   * "time" portion of @a date_and_time.  If @a
+   * return_pointer_to_first_digit is 0 then return a pointer to the
+   * space before the time, else return a pointer to the beginning of
+   * the time portion.
+   */
+  extern ACE_Export ACE_TCHAR *timestamp (ACE_TCHAR date_and_time[],
+                                          int time_len,
+                                          int return_pointer_to_first_digit =
+                                            0);
 
-  static FILE *ldopen (const ASYS_TCHAR *filename,
-		       const ASYS_TCHAR *type);
-  // Uses <ldopen> to locate and open the appropriate <filename> and
-  // returns a pointer to the file, else it returns a NULL
-  // pointer. <type> specifies how the file should be open.
+  /**
+   * if @a avoid_zombies == 0 call @c ACE_OS::fork directly, else
+   * create an orphan process that's inherited by the init process;
+   * init cleans up when the orphan process terminates so we don't
+   * create zombies.  Returns -1 on failure and either the child PID
+   * on success if @a avoid_zombies == 0 or 1 on success if @a
+   * avoid_zombies != 0 (this latter behavior is a known bug that
+   * needs to be fixed).
+   */
+  extern ACE_Export pid_t fork (
+    const ACE_TCHAR *program_name = ACE_LIB_TEXT ("<unknown>"),
+    int avoid_zombies = 0);
 
-  // = Shield us from Win32's inability to select on STDIN.
+  /**
+   * Become a daemon process using the algorithm in Richard Stevens
+   * "Advanced Programming in the UNIX Environment."  If
+   * @a close_all_handles is non-zero then all open file handles are
+   * closed.
+   */
+  extern ACE_Export int daemonize (
+    const ACE_TCHAR pathname[] = ACE_LIB_TEXT ("/"),
+    int close_all_handles = ACE_DEFAULT_CLOSE_ALL_HANDLES,
+    const ACE_TCHAR program_name[] = ACE_LIB_TEXT ("<unknown>"));
 
-  // = Miscelleous functions.
-  static size_t round_to_pagesize (off_t length);
-  // Rounds the request to a multiple of the page size.
+  // = Miscellaneous functions.
+  /// Rounds the request to a multiple of the page size.
+  extern ACE_Export size_t round_to_pagesize (off_t len);
 
-  static int format_hexdump (const char *buffer, int size,
-                             ASYS_TCHAR *obuf, int obuf_sz);
-  // Format buffer into printable format.  This is useful for
-  // debugging.
+  /// Rounds the request to a multiple of the allocation granularity.
+  extern ACE_Export size_t round_to_allocation_granularity (off_t len);
 
-  static u_long hash_pjw (const char *str);
-  // Computes the hash value of <str> using the ``Hash PJW'' routine.
+  // @@ UNICODE what about buffer?
+  /// Format buffer into printable format.  This is useful for
+  /// debugging.
+  extern ACE_Export size_t format_hexdump (const char *buffer, size_t size,
+                                           ACE_TCHAR *obuf, size_t obuf_sz);
 
-  static u_long hash_pjw (const char *str, size_t len);
-  // Computes the hash value of <str> using the ``Hash PJW'' routine.
+  /// Computes the hash value of {str} using the "Hash PJW" routine.
+  extern ACE_Export u_long hash_pjw (const char *str);
 
-  static u_long hash_pjw (const ACE_USHORT16 *str);
-  // Computes the hash value of <str> using the ``Hash PJW'' routine
-  // (works for UNICODE strings).
+  /// Computes the hash value of {str} using the "Hash PJW" routine.
+  extern ACE_Export u_long hash_pjw (const char *str, size_t len);
 
-  static u_long hash_pjw (const ACE_USHORT16 *str, size_t len);
-  // Computes the hash value of <str> using the ``Hash PJW'' routine
-  // (works for UNICODE strings).
+#if defined (ACE_HAS_WCHAR)
+  /// Computes the hash value of {str} using the "Hash PJW" routine.
+  extern ACE_Export u_long hash_pjw (const wchar_t *str);
 
-  static u_long crc32 (const char* str);
-  // Computes the ISO 8802-3 standard 32 bits CRC for the string
-  // (not for a file).
+  /// Computes the hash value of {str} using the "Hash PJW" routine.
+  extern ACE_Export u_long hash_pjw (const wchar_t *str, size_t len);
+#endif /* ACE_HAS_WCHAR */
 
-  static u_long is_prime (const u_long n,
-                          const u_long min_factor,
-                          const u_long max_factor);
-  // Function that can burn up noticeable CPU time:  brute-force
-  // determination of whether number "n" is prime.  Returns 0 if
-  // it is prime, or the smallest factor if it is not prime.  min_factor
-  // and max_factor can be used to partition the work among threads.
-  // For just one thread, typical values are 2 and n/2.
+  /// Computes CRC-CCITT for the string.
+  extern ACE_Export ACE_UINT16 crc_ccitt(const char *str);
 
-  static int map_errno (int error);
-  // Map troublesome win32 errno values to values that standard C
-  // strerr function understands.  Thank you Microsoft.
+  /// Computes CRC-CCITT for the buffer.
+  extern ACE_Export ACE_UINT16 crc_ccitt(const void *buf, size_t len,
+           ACE_UINT16 crc = 0);
 
-  static const ASYS_TCHAR *sock_error (int error);
-  // Returns a string containing the error message corresponding to a
-  // WinSock error.  This works around an omission in the Win32 API...
+  /// Computes CRC-CCITT for the @ len iovec buffers.
+  extern ACE_Export ACE_UINT16 crc_ccitt(const iovec *iov, int len,
+           ACE_UINT16 crc = 0);
 
-  static int process_active (pid_t pid);
-  // Checks if process with <pid> is still alive.  Returns 1 if it is
-  // still alive, 0 if it isn't alive, and -1 if something weird
-  // happened.
+  /// Computes the ISO 8802-3 standard 32 bits CRC for the string.
+  extern ACE_Export ACE_UINT32 crc32 (const char *str);
 
-  static int terminate_process (pid_t pid);
-  // Terminate the process with id <pid>.  Note that this call is
-  // potentially dangerous to use since the process being terminated
-  // may not have a chance to cleanup before it shuts down.
+  /// Computes the ISO 8802-3 standard 32 bits CRC for the buffer.
+  extern ACE_Export ACE_UINT32 crc32 (const void *buf, size_t len,
+              ACE_UINT32 crc = 0);
 
-  static void unique_name (const void *object,
-                           LPTSTR name, 
-                           size_t length);
-  // This method uses process id and object pointer to come up with a
-  // machine wide unique name.  The process ID will provide uniqueness
-  // between processes on the same machine. The "this" pointer of the
-  // <object> will provide uniqueness between other "live" objects in
-  // the same process. The uniqueness of this name is therefore only
-  // valid for the life of <object>.
+  /// Computes the ISO 8802-3 standard 32 bits CRC for the
+  /// @ len iovec buffers.
+  extern ACE_Export ACE_UINT32 crc32 (const iovec *iov, int len,
+              ACE_UINT32 crc = 0);
 
-  static u_long log2 (u_long num);
-  // Computes the base 2 logarithm of <num>.
+  /// Euclid's greatest common divisor algorithm.
+  extern ACE_Export u_long gcd (u_long x, u_long y);
 
-  static char nibble2hex (u_int n);
-  // Hex conversion utility.
+  /// Calculates the minimum enclosing frame size for the given values.
+  extern ACE_Export u_long minimum_frame_size (u_long period1, u_long period2);
 
-  static u_char hex2byte (char c);
-  // Convert a hex character to its byte representation.
+  /**
+   * Function that can burn up noticeable CPU time:  brute-force
+   * determination of whether number @a n is prime.  Returns 0 if
+   * it is prime, or the smallest factor if it is not prime.
+   * @a min_factor and @a max_factor can be used to partition the work
+   * among threads. For just one thread, typical values are 2 and
+   * n/2.
+   */
+  extern ACE_Export u_long is_prime (const u_long n,
+                                     const u_long min_factor,
+                                     const u_long max_factor);
 
-private:
-  static int enter_recv_timedwait (ACE_HANDLE handle,
-                                   const ACE_Time_Value *timeout,
-                                   int &val);
-  // Wait for <timeout> before proceeding to a <recv> operation.
-  // <val> keeps track of whether we're in non-blocking mode or not.
+  /// Map troublesome win32 errno values to values that standard C
+  /// strerr function understands.  Thank you Microsoft.
+  extern ACE_Export int map_errno (int error);
 
-  static void leave_recv_timedwait (ACE_HANDLE handle,
-                                    const ACE_Time_Value *timeout,
-                                    int val);
-  // Cleanup after a <recv> operation (e.g., restore the appropriate
-  // non-blocking status of <handle>).
+  /// Returns a string containing the error message corresponding to a
+  /// WinSock error.  This works around an omission in the Win32 API.
+  /// @internal
+  extern ACE_Export const ACE_TCHAR * sock_error (int error);
 
-  static int enter_send_timedwait (ACE_HANDLE handle,
-                                   const ACE_Time_Value* timeout,
-                                   int &val);
-  // Wait for <timeout> before proceeding to a <send> operation.
-  // <val> keeps track of whether we're in non-blocking mode or not.
+  /// Determins whether the given error code corresponds to to a
+  /// WinSock error. If so returns true, false otherwise.
+  /// @internal
+  extern ACE_Export bool is_sock_error (int error);
 
-  static void leave_send_timedwait (ACE_HANDLE handle,
-                                    const ACE_Time_Value *timeout,
-                                    int val);
-  // Cleanup after the <send> operation (e.g., restore the appropriate
-  // non-blocking status of <handle>).
+  /**
+   * Checks if process with {pid} is still alive.  Returns 1 if it is
+   * still alive, 0 if it isn't alive, and -1 if something weird
+   * happened.
+   */
+  extern ACE_Export int process_active (pid_t pid);
 
-  static size_t pagesize_;
-  // Size of a VM page.
+  /**
+   * Terminate the process abruptly with id @a pid.  On Win32 platforms
+   * this uses {TerminateProcess} and on POSIX platforms is uses
+   * {kill} with the -9 (SIGKILL) signal, which cannot be caught or
+   * ignored.  Note that this call is potentially dangerous to use
+   * since the process being terminated may not have a chance to
+   * cleanup before it shuts down.
+   */
+  extern ACE_Export int terminate_process (pid_t pid);
 
-  static u_long crc_table_[];
-  // CRC table.
+  /**
+   * This method uses process id and object pointer to come up with a
+   * machine wide unique name.  The process ID will provide uniqueness
+   * between processes on the same machine. The "this" pointer of the
+   * {object} will provide uniqueness between other "live" objects in
+   * the same process. The uniqueness of this name is therefore only
+   * valid for the life of {object}.
+   */
+  ACE_NAMESPACE_INLINE_FUNCTION void unique_name (const void *object,
+                                                  ACE_TCHAR *name,
+                                                  size_t length);
 
-  static const char hex_chars_[];
-  // Hex characters.
-};
+  /// Computes the base 2 logarithm of {num}.
+  ACE_NAMESPACE_INLINE_FUNCTION u_long log2 (u_long num);
 
-#if !defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/ACE.i"
-#endif
+  /// Hex conversion utility.
+  ACE_NAMESPACE_INLINE_FUNCTION ACE_TCHAR nibble2hex (u_int n);
+
+  /// Convert a hex character to its byte representation.
+  ACE_NAMESPACE_INLINE_FUNCTION u_char hex2byte (ACE_TCHAR c);
+
+  // = Set/get the debug level.
+  extern ACE_Export bool debug (void);
+  extern ACE_Export void debug (bool onoff);
+
+  /// Wrapper facade for @c select that uses @c ACE_Handle_Sets.
+  extern ACE_Export int select (int width,
+                                ACE_Handle_Set *readfds,
+                                ACE_Handle_Set *writefds = 0,
+                                ACE_Handle_Set *exceptfds = 0,
+                                const ACE_Time_Value *timeout = 0);
+
+  /// Wrapper facade for the most common use of @c select that uses
+  /// @c ACE_Handle_Sets.
+  extern ACE_Export int select (int width,
+                                ACE_Handle_Set &readfds,
+                                const ACE_Time_Value *timeout = 0);
+
+  /// Timed wait for handle to get read ready.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  int handle_read_ready (ACE_HANDLE handle,
+                         const ACE_Time_Value *timeout);
+
+  /// Timed wait for handle to get write ready.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  int handle_write_ready (ACE_HANDLE handle,
+                          const ACE_Time_Value *timeout);
+
+  /// Timed wait for handle to get exception ready.
+  ACE_NAMESPACE_INLINE_FUNCTION
+  int handle_exception_ready (ACE_HANDLE handle,
+                              const ACE_Time_Value *timeout);
+
+  /// Timed wait for handle to get read, write, or exception ready.
+  extern ACE_Export int handle_ready (ACE_HANDLE handle,
+                                      const ACE_Time_Value *timeout,
+                                      int read_ready,
+                                      int write_ready,
+                                      int exception_ready);
+
+  /// Wait for @a timeout before proceeding to a @c recv operation.
+  /// @a val keeps track of whether we're in non-blocking mode or
+  /// not.
+  extern ACE_Export int enter_recv_timedwait (ACE_HANDLE handle,
+                                              const ACE_Time_Value *timeout,
+                                              int &val);
+
+  /// Wait for @a timeout before proceeding to a @c send operation.
+  /// @a val keeps track of whether we're in non-blocking mode or
+  /// not.
+  extern ACE_Export int enter_send_timedwait (ACE_HANDLE handle,
+                                              const ACE_Time_Value* timeout,
+                                              int &val);
+
+  /// This makes sure that @a handle is set into non-blocking mode.
+  /// @a val keeps track of whether were in non-blocking mode or not.
+  extern ACE_Export void record_and_set_non_blocking_mode (ACE_HANDLE handle,
+                                                           int &val);
+
+  /// Cleanup after a timed operation, restore the appropriate
+  /// non-blocking status of @a handle.
+  extern ACE_Export void restore_non_blocking_mode (ACE_HANDLE handle,
+                                                    int val);
+
+  // private:
+  //   These functions aren't meant to be used internally, so they are
+  //   not exported.
+
+  //
+  // = Recv_n helpers
+  //
+
+  ACE_NAMESPACE_INLINE_FUNCTION ssize_t recv_i (ACE_HANDLE handle,
+                                                void *buf,
+                                                size_t len);
+
+  extern ACE_Export ssize_t recv_n_i (ACE_HANDLE handle,
+                                      void *buf,
+                                      size_t len,
+                                      int flags,
+                                      size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t recv_n_i (ACE_HANDLE handle,
+                                      void *buf,
+                                      size_t len,
+                                      int flags,
+                                      const ACE_Time_Value *timeout,
+                                      size_t *bytes_transferred);
+
+#if defined (ACE_HAS_TLI)
+
+  extern ACE_Export ssize_t t_rcv_n_i (ACE_HANDLE handle,
+                                       void *buf,
+                                       size_t len,
+                                       int *flags,
+                                       size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t t_rcv_n_i (ACE_HANDLE handle,
+                                       void *buf,
+                                       size_t len,
+                                       int *flags,
+                                       const ACE_Time_Value *timeout,
+                                       size_t *bytes_transferred);
+
+#endif /* ACE_HAS_TLI */
+
+  extern ACE_Export ssize_t recv_n_i (ACE_HANDLE handle,
+                                      void *buf,
+                                      size_t len,
+                                      size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t recv_n_i (ACE_HANDLE handle,
+                                      void *buf,
+                                      size_t len,
+                                      const ACE_Time_Value *timeout,
+                                      size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t recvv_n_i (ACE_HANDLE handle,
+                                       iovec *iov,
+                                       int iovcnt,
+                                       size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t recvv_n_i (ACE_HANDLE handle,
+                                       iovec *iov,
+                                       int iovcnt,
+                                       const ACE_Time_Value *timeout,
+                                       size_t *bytes_transferred);
+
+  //
+  // = Send_n helpers
+  //
+
+  ACE_NAMESPACE_INLINE_FUNCTION ssize_t send_i (ACE_HANDLE handle,
+                                                const void *buf,
+                                                size_t len);
+
+  extern ACE_Export ssize_t send_n_i (ACE_HANDLE handle,
+                                      const void *buf,
+                                      size_t len,
+                                      int flags,
+                                      size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t send_n_i (ACE_HANDLE handle,
+                                      const void *buf,
+                                      size_t len,
+                                      int flags,
+                                      const ACE_Time_Value *timeout,
+                                      size_t *bytes_transferred);
+
+#if defined (ACE_HAS_TLI)
+
+  extern ACE_Export ssize_t t_snd_n_i (ACE_HANDLE handle,
+                                       const void *buf,
+                                       size_t len,
+                                       int flags,
+                                       size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t t_snd_n_i (ACE_HANDLE handle,
+                                       const void *buf,
+                                       size_t len,
+                                       int flags,
+                                       const ACE_Time_Value *timeout,
+                                       size_t *bytes_transferred);
+
+#endif /* ACE_HAS_TLI */
+
+  extern ACE_Export ssize_t send_n_i (ACE_HANDLE handle,
+                                      const void *buf,
+                                      size_t len,
+                                      size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t send_n_i (ACE_HANDLE handle,
+                                      const void *buf,
+                                      size_t len,
+                                      const ACE_Time_Value *timeout,
+                                      size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t sendv_n_i (ACE_HANDLE handle,
+                                       const iovec *iov,
+                                       int iovcnt,
+                                       size_t *bytes_transferred);
+
+  extern ACE_Export ssize_t sendv_n_i (ACE_HANDLE handle,
+                                       const iovec *iov,
+                                       int iovcnt,
+                                       const ACE_Time_Value *timeout,
+                                       size_t *bytes_transferred);
+
+}
+
+// Close versioned namespace, if enabled by the user.
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#if defined (__ACE_INLINE__)
+#include "ace/ACE.inl"
+#endif /* __ACE_INLINE__ */
+
+#if defined (acelog2)
+# define log2 acelog2
+#endif /* acelog2 */
+
+#include /**/ "ace/post.h"
 
 #endif  /* ACE_ACE_H */

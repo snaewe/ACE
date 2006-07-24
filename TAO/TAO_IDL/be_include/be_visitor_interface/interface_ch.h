@@ -19,7 +19,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_INTERFACE_INTERFACE_CH_H_)
+#ifndef _BE_INTERFACE_INTERFACE_CH_H_
 #define _BE_INTERFACE_INTERFACE_CH_H_
 
 // we need derived interface visitors for the client and server header files. For
@@ -45,6 +45,17 @@ public:
   virtual int visit_interface (be_interface *node);
   // set the right context and make a visitor
 
+  static int gen_abstract_ops_helper (be_interface *node,
+                                      be_interface *base,
+                                      TAO_OutStream *os);
+  // Helper to generate the declarations for the operations
+  // of any abstract parents we may have.
+private:
+  /// Helper to generate declarations for _narrow () and
+  /// _unchecked_narrow ()
+  bool gen_xxx_narrow (const char *n,
+                       be_interface *node,
+                       TAO_OutStream *os);
 };
 
 #endif /* _BE_INTERFACE_INTERFACE_CH_H_ */

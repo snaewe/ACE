@@ -1,49 +1,75 @@
 // $Id$
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+// ============================================================================
+//
+// = LIBRARY
+//    TAO IDL
+//
+// = FILENAME
+//    be_factory.cpp
+//
+// = DESCRIPTION
+//    Extension of class AST_Factory that provides additional means for C++
+//    mapping.
+//
+// = AUTHOR
+//    Copyright 1994-1995 by Sun Microsystems, Inc.
+//    and
+//    Boris Kolpackov <bosk@ipmce.ru>
+//
+// ============================================================================
 
-#include        "be_sunsoft.h"
+#include "be_factory.h"
+#include "be_visitor.h"
 
-ACE_RCSID(be, be_factory, "$Id$")
+ACE_RCSID (be, 
+           be_factory, 
+           "$Id$")
 
-// destructor
-TAO_Visitor_Factory::~TAO_Visitor_Factory (void)
+be_factory::be_factory (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    UTL_Scope (),
+    AST_Factory (),
+    be_scope (),
+    be_decl ()
 {
 }
 
-// constructor
-TAO_OutStream_Factory::TAO_OutStream_Factory (void)
-  : strm_type_ (TAO_OutStream_Factory::TAO_SUNSOFT)
+be_factory::be_factory (UTL_ScopedName *n)
+  : COMMON_Base (1,
+                 0), //@@ Always local, never abstract
+    AST_Decl (AST_Decl::NT_factory,
+              n),
+    UTL_Scope (AST_Decl::NT_factory),
+    AST_Factory (n),
+    be_scope (AST_Decl::NT_factory),
+    be_decl (AST_Decl::NT_factory,
+             n)
 {
 }
 
-// destructor
-TAO_OutStream_Factory::~TAO_OutStream_Factory (void)
+be_factory::~be_factory (void)
 {
 }
 
-// set the type of specialized o/p stream we want
+void
+be_factory::destroy (void)
+{
+  // Call the destroy methods of our base classes.
+  this->be_scope::destroy ();
+  this->be_decl::destroy ();
+  
+  this->AST_Factory::destroy ();
+}
+
 int
-TAO_OutStream_Factory::set_stream_type
-(TAO_OutStream_Factory::TAO_OutStream_Type t)
+be_factory::accept (be_visitor *visitor)
 {
-  this->strm_type_ = t;
-  return 0;
+  return visitor->visit_factory (this);
 }
 
-// factory method
-TAO_OutStream *
-TAO_OutStream_Factory::make_outstream (void)
-{
-  switch (this->strm_type_)
-    {
-    case TAO_OutStream_Factory::TAO_SUNSOFT:
-      return new TAO_SunSoft_OutStream ();
-    case TAO_OutStream_Factory::TAO_FLICK:
-      return (TAO_OutStream *)0;  // not implemented as yet
-    default:
-      return (TAO_OutStream *)0;
-    }
-}
+// Narrowing
+IMPL_NARROW_METHODS3 (be_factory, AST_Factory, be_scope, be_decl)
+IMPL_NARROW_FROM_DECL (be_factory)
+IMPL_NARROW_FROM_SCOPE (be_factory)

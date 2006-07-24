@@ -62,48 +62,73 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_ATTRIBUTE_AST_ATTRIBUTE_HH
 #define _AST_ATTRIBUTE_AST_ATTRIBUTE_HH
 
-// Representation of attribute declaration:
-//
-// An attribute is a field with a readonly property
+#include "ast_field.h"
+#include "utl_scoped_name.h"
 
-/*
-** DEPENDENCIES: ast_field.hh, ast_type.hh, utl_scoped_name.hh,
-**		 utl_strlist.hh, ast_decl.hh
-**
-** USE: Included from ast.h
-*/
+class UTL_ExceptList;
+class UTL_NameList;
 
-class	AST_Attribute : public virtual AST_Field
+class TAO_IDL_FE_Export AST_Attribute : public virtual AST_Field
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_Attribute();
-  AST_Attribute(idl_bool readonly,
-		AST_Type *ft,
-		UTL_ScopedName *n,
-		UTL_StrList *p);
-  virtual ~AST_Attribute() {}
+  // Constructor(s).
+  AST_Attribute (void);
 
-  // Data Accessors
-  idl_bool readonly();
+  AST_Attribute (bool readonly,
+                 AST_Type *ft,
+                 UTL_ScopedName *n,
+                 bool local,
+                 bool abstract);
 
-  // Narrowing
+  // Destructor.
+  virtual ~AST_Attribute (void);
+
+  // Data Accessors.
+
+  bool readonly (void) const;
+  UTL_ExceptList *get_get_exceptions (void) const;
+  UTL_ExceptList *get_set_exceptions (void) const;
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Attribute, AST_Field);
   DEF_NARROW_FROM_DECL(AST_Attribute);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
+
+  // Methods to add exceptions directly, used when copying node.
+  UTL_ExceptList *be_add_get_exceptions (UTL_ExceptList *t);
+  UTL_ExceptList *be_add_set_exceptions (UTL_ExceptList *t);
 
 private:
-  // Data
-  const idl_bool		pd_readonly;	// Is attribute read-only?
+  // Data.
+
+  const bool pd_readonly;
+  // Is attribute read-only?
+
+  UTL_ExceptList *pd_get_exceptions;
+  UTL_ExceptList *pd_set_exceptions;
+
+  // Operations.
+
+  // Scope Management Protocol.
+
+  friend int tao_yyparse (void);
+  virtual UTL_NameList *fe_add_get_exceptions (UTL_NameList *e);
+  virtual UTL_NameList *fe_add_set_exceptions (UTL_NameList *e);
 };
 
 #endif           // _AST_ATTRIBUTE_AST_ATTRIBUTE_HH

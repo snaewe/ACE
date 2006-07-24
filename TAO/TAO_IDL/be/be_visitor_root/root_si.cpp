@@ -18,14 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_root.h"
-
-ACE_RCSID(be_visitor_root, root_si, "$Id$")
-
+ACE_RCSID (be_visitor_root, 
+           root_si, 
+           "$Id$")
 
 // ***********************************************
 // Root visitor for server inline
@@ -44,22 +39,27 @@ int
 be_visitor_root_si::init (void)
 {
   // first open the file for writing
-  if (tao_cg->start_server_inline (idl_global->be_get_server_inline_fname ())
-      == -1)
+  if (tao_cg->start_server_inline (be_global->be_get_server_inline_fname ())
+        == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_root_si::init - "
-                         "server inline open failed\n"), -1);
+                         "server inline open failed\n"), 
+                        -1);
     }
 
-  if (tao_cg->start_server_template_inline
-      (idl_global->be_get_server_template_inline_fname ())
-      == -1)
+  if (be_global->gen_tie_classes ())
     {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_visitor_root_si::init - "
-                         "Error opening server template inline file\n"),
-                        -1);
+      if (tao_cg->start_server_template_inline (
+              be_global->be_get_server_template_inline_fname ()
+            )
+          == -1)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_root_si::init - "
+                             "Error opening server template inline file\n"),
+                            -1);
+        }
     }
 
   // init stream

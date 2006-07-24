@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,45 +62,58 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_INTERFACE_FWD_AST_INTERFACE_FWD_HH
 #define _AST_INTERFACE_FWD_AST_INTERFACE_FWD_HH
 
-// Representation of a forward interface declaration
+#include "ast_type.h"
 
-/*
-** DEPENDENCIES: ast_decl.hh, ast_interface.hh, utl_scoped_name.hh,
-**		 utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+class AST_Interface;
 
-class	AST_InterfaceFwd : public virtual AST_Type
+// Representation of a forward interface declaration.
+
+class TAO_IDL_FE_Export AST_InterfaceFwd : public virtual AST_Type
 {
 public:
-  // Operations
+  AST_InterfaceFwd (void);
 
-  // Constructor(s)
-  AST_InterfaceFwd();
-  AST_InterfaceFwd(UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_InterfaceFwd() {}
+  AST_InterfaceFwd (AST_Interface *dummy,
+                    UTL_ScopedName *n);
 
-  // Data Accessors
-  AST_Interface	*full_definition();
-  void set_full_definition(AST_Interface *nfd);
+  virtual ~AST_InterfaceFwd (void);
 
-  // Narrowing
+  AST_Interface *full_definition (void);
+  void set_full_definition (AST_Interface *nfd);
+
+  virtual bool is_defined (void);
+  void set_as_defined (void);
+
+  virtual bool is_local (void);
+  virtual bool is_valuetype (void);
+  virtual bool is_abstract_valuetype (void);
+  
+  bool full_def_seen (void);
+
+  // Cleanup function.
+  virtual void destroy (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_InterfaceFwd, AST_Type);
   DEF_NARROW_FROM_DECL(AST_InterfaceFwd);
 
-  // AST Dumping
-  virtual void		dump(ostream &);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
 
 private:
-  // Data
-  AST_Interface		*pd_full_definition;	// The interface this is a
-						// forward declaration of
+  AST_Interface *pd_full_definition;
+  // The interface this is a forward declaration of.
+  
+  bool is_defined_;
+  // Checking the member above isn't good enough.
 };
 
 #endif           // _AST_INTERFACE_FWD_AST_INTERFACE_FWD_HH

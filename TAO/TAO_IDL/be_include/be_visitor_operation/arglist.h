@@ -19,14 +19,14 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_OPERATION_ARGLIST_H_)
+#ifndef _BE_VISITOR_OPERATION_ARGLIST_H_
 #define _BE_VISITOR_OPERATION_ARGLIST_H_
 
 // ******************************************************************************
 // Operation visitor for argument list - generates parameters in the signature
 // ******************************************************************************
 
-class be_visitor_operation_arglist : public be_visitor_scope
+class be_visitor_operation_arglist : public be_visitor_operation
 {
   //
   // = TITLE
@@ -43,12 +43,14 @@ public:
   ~be_visitor_operation_arglist (void);
   // destructor
 
-  int visit_operation (be_operation *node);
+  virtual int visit_operation (be_operation *node);
   // visit the operation
 
-  int visit_argument (be_argument *node);
+  virtual int visit_argument (be_argument *node);
   // visit each argument
 
+  virtual int post_process (be_decl *);
+  // stuff to o/p after each element of the scope is handled
 };
 
 #endif /* _BE_VISITOR_OPERATION_ARGLIST_H_ */

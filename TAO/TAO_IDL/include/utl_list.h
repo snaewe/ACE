@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -67,84 +67,75 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 #ifndef _UTL_LIST_UTL_LIST_HH
 #define _UTL_LIST_UTL_LIST_HH
 
-// utl_list.hh
-//
-// General single-linked lists
-
-/*
-** DEPENDENCIES: NONE
-**
-** USE: Included from util.hh
-*/
+// General single-linked list.
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-// Forward declare active iterator for UTL_List
-class	UTL_ListActiveIterator;
+#include "TAO_IDL_FE_Export.h"
 
-class	UTL_List
+
+// Forward declare active iterator for UTL_List.
+class  UTL_ListActiveIterator;
+
+class TAO_IDL_FE_Export UTL_List
 {
 public:
-  // Operations
+  UTL_List (UTL_List *c);
 
-  // Constructor(s)
-  UTL_List(UTL_List *c);
+  virtual ~UTL_List (void);
 
-  // Smash last cdr pointer in "this" with l
-  void			nconc(UTL_List *l);
+  // Smash last cdr pointer in "this" with l.
+  void nconc (UTL_List *l);
 
-  // Copy the list starting at "this"
-  virtual UTL_List	*copy();
+  // Copy the list starting at "this".
+  virtual UTL_List *copy (void);
 
-  // Get next list
-  UTL_List		*tail();
+  // Get next list.
+  UTL_List *tail (void);
 
   // Set next list
-  void			set_tail(UTL_List *l);
+  void set_tail (UTL_List *l);
 
   // How long is this list?
-  long			length();
+  long length (void);
+
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  UTL_List		*pd_cdr_data;	// The next list
+  // The next list.
+  UTL_List *pd_cdr_data;
 
   // Operations
-  long			list_length(long n); // How long is it?
+  long list_length (long n);
 
-  // Friend class
-  friend class		UTL_ListActiveIterator; // Friend class
-
+  // Friend class.
+  friend class UTL_ListActiveIterator;
+  friend class UTL_ExceptList;
 };
 
-// Active iterator for lists
-class	UTL_ListActiveIterator
+// Active iterator for lists.
+class TAO_IDL_FE_Export UTL_ListActiveIterator
 {
 public:
-  // Operations
 
-  // Constructor(s)
-  UTL_ListActiveIterator(UTL_List *s);	
+  UTL_ListActiveIterator (UTL_List *s);
 
-  // Get next list
-  virtual void		next();
+  virtual ~UTL_ListActiveIterator (void) {}
+
+  // Get next list.
+  virtual void next (void);
 
   // Are we at the end of this list?
-  virtual long		is_done();
+  virtual bool is_done (void);
 
 protected:
-  // Data
-  UTL_List		*source;		// On what to iterate?
+  // On what to iterate?
+  UTL_List *source;
 };
 
 #endif           // _UTL_LIST_UTL_LIST_HH

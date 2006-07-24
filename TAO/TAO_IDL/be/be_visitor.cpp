@@ -21,12 +21,12 @@
 //
 // ============================================================================
 
-#include "idl.h"
-#include "be.h"
 #include "be_visitor.h"
+#include "ace/config-all.h"
 
-ACE_RCSID(be, be_visitor, "$Id$")
-
+ACE_RCSID (be, 
+           be_visitor, 
+           "$Id$")
 
 be_visitor::be_visitor (void)
 {
@@ -42,7 +42,7 @@ int be_visitor::visit_decl (be_decl *)
   return 0;
 }
 
-int be_visitor::visit_scope (be_scope *node)
+int be_visitor::visit_scope (be_scope *)
 {
   return 0;
 }
@@ -72,7 +72,57 @@ int be_visitor::visit_interface_fwd (be_interface_fwd *)
   return 0;
 }
 
+int be_visitor::visit_valuebox (be_valuebox *)
+{
+  return 0;
+}
+
+int be_visitor::visit_valuetype (be_valuetype *)
+{
+  return 0;
+}
+
+int be_visitor::visit_valuetype_fwd (be_valuetype_fwd *)
+{
+  return 0;
+}
+
+int be_visitor::visit_eventtype (be_eventtype *)
+{
+  return 0;
+}
+
+int be_visitor::visit_eventtype_fwd (be_eventtype_fwd *)
+{
+  return 0;
+}
+
+int be_visitor::visit_component (be_component *)
+{
+  return 0;
+}
+
+int be_visitor::visit_component_fwd (be_component_fwd *)
+{
+  return 0;
+}
+
+int be_visitor::visit_home (be_home *)
+{
+  return 0;
+}
+
+int be_visitor::visit_factory (be_factory *)
+{
+  return 0;
+}
+
 int be_visitor::visit_structure (be_structure *)
+{
+  return 0;
+}
+
+int be_visitor::visit_structure_fwd (be_structure_fwd *)
 {
   return 0;
 }
@@ -113,6 +163,11 @@ int be_visitor::visit_attribute (be_attribute *)
 }
 
 int be_visitor::visit_union (be_union *)
+{
+  return 0;
+}
+
+int be_visitor::visit_union_fwd (be_union_fwd *)
 {
   return 0;
 }
@@ -166,3 +221,4 @@ int be_visitor::visit_native (be_native *)
 {
   return 0;
 }
+

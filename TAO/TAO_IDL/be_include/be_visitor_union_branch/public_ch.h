@@ -21,7 +21,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_UNION_BRANCH_PUBLIC_CH_H_)
+#ifndef _BE_VISITOR_UNION_BRANCH_PUBLIC_CH_H_
 #define _BE_VISITOR_UNION_BRANCH_PUBLIC_CH_H_
 
 class be_visitor_union_branch_public_ch : public be_visitor_decl
@@ -59,6 +59,15 @@ public:
   virtual int visit_interface_fwd (be_interface_fwd *node);
   // visit interface forward type
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit valuebox type
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit valuetype type
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
+  // visit valuetype forward type
+
   virtual int visit_predefined_type (be_predefined_type *node);
   // visit predefined type
 
@@ -76,7 +85,6 @@ public:
 
   virtual int visit_union (be_union *node);
   // visit union type
-
 };
 
 #endif /* _BE_VISITOR_UNION_BRANCH_PUBLIC_CH_H_ */

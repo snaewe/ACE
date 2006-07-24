@@ -4,43 +4,31 @@
 // All Rights Reserved
 // ORB:		Principal identifier pseudo-objref
 
-#include "tao/corba.h"
+#include "tao/Principal.h"
+#include "tao/CDR.h"
 
 #if !defined (__ACE_INLINE__)
 #include "tao/Principal.i"
 #endif /* __ACE_INLINE__ */
 
-ACE_RCSID(tao, Principal, "$Id$")
+ACE_RCSID (tao,
+           Principal,
+           "$Id$")
 
-CORBA_Principal::CORBA_Principal (void)
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+CORBA::Principal::Principal (void)
+  : refcount_ (1)
 {
 }
 
-CORBA::ULong
-CORBA_Principal::_incr_refcnt (void)
-{
-  return this->refcount_++;
-}
-
-CORBA::ULong
-CORBA_Principal::_decr_refcnt (void)
-{
-  {
-    this->refcount_--;
-    if (this->refcount_ != 0)
-      return this->refcount_;
-  }
-
-  delete this;
-  return 0;
-}
-
-CORBA_Principal::~CORBA_Principal (void)
+CORBA::Principal::~Principal (void)
 {
 }
 
-CORBA_Boolean
-operator<< (TAO_OutputCDR& cdr, CORBA_Principal* x)
+CORBA::Boolean
+operator<< (TAO_OutputCDR & cdr, CORBA::Principal * x)
 {
   if (x != 0)
     {
@@ -52,23 +40,28 @@ operator<< (TAO_OutputCDR& cdr, CORBA_Principal* x)
     {
       cdr.write_ulong (0);
     }
-  return cdr.good_bit ();
+
+  return (CORBA::Boolean) cdr.good_bit ();
 }
 
-CORBA_Boolean
-operator>> (TAO_InputCDR& cdr, CORBA_Principal*& x)
+CORBA::Boolean
+operator>> (TAO_InputCDR & cdr, CORBA::Principal *& x)
 {
   CORBA::ULong length;
   cdr.read_ulong (length);
+
   if (length == 0 || !cdr.good_bit ())
     {
       x = 0;
     }
   else
     {
-      ACE_NEW_RETURN (x, CORBA::Principal, CORBA::B_FALSE);
+      ACE_NEW_RETURN (x, CORBA::Principal, 0);
       x->id.length (length);
       cdr.read_octet_array (x->id.get_buffer (), length);
     }
-  return cdr.good_bit ();
+
+  return (CORBA::Boolean) cdr.good_bit ();
 }
+
+TAO_END_VERSIONED_NAMESPACE_DECL

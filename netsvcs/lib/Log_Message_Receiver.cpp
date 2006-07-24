@@ -3,27 +3,28 @@
 #if !defined (LOG_MESSAGE_RECEIVER_CPP)
 #define LOG_MESSAGE_RECEIVER_CPP
 
-#include "ace/Synch.h"
-#include "ace/Synch_T.h"
+#include "ace/Log_Msg.h"
 #include "Log_Message_Receiver.h"
 
 ACE_RCSID(lib, Log_Message_Receiver, "$Id$")
 
 // Type based log message receiver
 template<ACE_SYNCH_DECL> void
-Static_Log_Message_Receiver<ACE_SYNCH_USE>::log_record (char const *hostname,
-						      ACE_Log_Record &record)
+Static_Log_Message_Receiver<ACE_SYNCH_USE>::log_record (const ACE_TCHAR *hostname,
+                                                        ACE_Log_Record &record)
 {
 #if defined (ACE_HAS_THREADS)
     static ACE_SYNCH_MUTEX_T lock_;
-    ACE_Guard<ACE_SYNCH_MUTEX_T> guard (lock_);
+    ACE_GUARD (ACE_SYNCH_MUTEX_T, guard, lock_);
 #endif /* ACE_HAS_THREADS */
 
-  record.print (hostname, 0, stderr);
+  record.print (hostname,
+                ACE_Log_Msg::instance ()->flags (),
+                stderr);
 }
 
 template<ACE_SYNCH_DECL> void
-Static_Log_Message_Receiver<ACE_SYNCH_USE>::log_output (char const *hostname,
+Static_Log_Message_Receiver<ACE_SYNCH_USE>::log_output (const ACE_TCHAR *hostname,
                                                         ACE_Log_Record &record,
                                                         ostream *outputfile)
 {
@@ -31,9 +32,11 @@ Static_Log_Message_Receiver<ACE_SYNCH_USE>::log_output (char const *hostname,
     {
 #if defined (ACE_HAS_THREADS)
       static ACE_SYNCH_MUTEX_T lock_;
-      ACE_Guard<ACE_SYNCH_MUTEX_T> guard (lock_);
+      ACE_GUARD (ACE_SYNCH_MUTEX_T, guard, lock_);
 #endif /* ACE_HAS_THREADS */
-      record.print (hostname, 0, *outputfile);
+      record.print (hostname,
+                    ACE_Log_Msg::instance ()->flags (),
+                    *outputfile);
     }
 }
 
@@ -64,29 +67,38 @@ Log_Message_Receiver_Impl<ACE_SYNCH_USE>::attach (Log_Message_Receiver_Impl<ACE_
   ACE_ASSERT (body != 0);
 
 #if defined (ACE_HAS_THREADS)
-  #if !defined (ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES)
+#  if !defined (ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES)
   Guard guard (copy_lock_);
-  #else
+  if (guard.locked () == 0)
+    return 0;
+#  else
   // Use the "body"s print lock as copy lock.
-  ACE_Guard<ACE_SYNCH_MUTEX> guard (global_copy_lock_);
-  #endif /* ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES */
+  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX,
+                    guard,
+                    global_copy_lock_,
+                    0);
+#  endif /* ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES */
 #endif /* ACE_HAS_THREADS */
   ++body->count_;
   return body;
 }
 
 template<ACE_SYNCH_DECL> void
-Log_Message_Receiver_Impl<ACE_SYNCH_USE>::detach(Log_Message_Receiver_Impl<ACE_SYNCH_USE> *body)
+Log_Message_Receiver_Impl<ACE_SYNCH_USE>::detach (Log_Message_Receiver_Impl<ACE_SYNCH_USE> *body)
 {
   ACE_ASSERT (body != 0);
 
 #if defined (ACE_HAS_THREADS)
-  #if !defined (ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES)
+#  if !defined (ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES)
   Guard guard (copy_lock_);
-  #else
+  if (guard.locked () == 0)
+    return;
+#  else
   // Use the "body"s print lock as copy lock.
-  ACE_Guard<ACE_SYNCH_MUTEX> guard (global_copy_lock_);
-  #endif /* ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES */
+  ACE_GUARD (ACE_SYNCH_MUTEX,
+             guard,
+             global_copy_lock_);
+#  endif /* ACE_LACKS_STATIC_DATA_MEMBER_TEMPLATES */
 #endif /* ACE_HAS_THREADS */
   if (body->count_-- == 0)
     delete body;
@@ -94,22 +106,26 @@ Log_Message_Receiver_Impl<ACE_SYNCH_USE>::detach(Log_Message_Receiver_Impl<ACE_S
 
 // Type based log message receiver
 template<ACE_SYNCH_DECL> void
-Log_Message_Receiver_Impl<ACE_SYNCH_USE>::log_record (char const *hostname,
-						    ACE_Log_Record &record)
+Log_Message_Receiver_Impl<ACE_SYNCH_USE>::log_record (const ACE_TCHAR *hostname,
+                                                      ACE_Log_Record &record)
 {
-  ACE_MT (Guard guard (print_lock_));
-  record.print (hostname, 0, stderr);
+  ACE_MT (ACE_GUARD (ACE_SYNCH_MUTEX_T, guard, print_lock_));
+  record.print (hostname,
+                ACE_Log_Msg::instance ()->flags (),
+                stderr);
 }
 
 template<ACE_SYNCH_DECL> void
-Log_Message_Receiver_Impl<ACE_SYNCH_USE>::log_output (char const *hostname,
+Log_Message_Receiver_Impl<ACE_SYNCH_USE>::log_output (const ACE_TCHAR *hostname,
                                                       ACE_Log_Record &record,
                                                       ostream *outputfile)
 {
   if (outputfile != 0)
     {
-      ACE_MT (Guard guard (print_lock_));
-      record.print (hostname, 0, *outputfile);
+      ACE_MT (ACE_GUARD (ACE_SYNCH_MUTEX_T, guard, print_lock_));
+      record.print (hostname,
+                    ACE_Log_Msg::instance ()->flags (),
+                    *outputfile);
     }
 }
 
@@ -136,15 +152,15 @@ Log_Message_Receiver<ACE_SYNCH_USE>::Log_Message_Receiver
 
 // Type based log message receiver
 template<ACE_SYNCH_DECL> void
-Log_Message_Receiver<ACE_SYNCH_USE>::log_record(char const *hostname,
-                                              ACE_Log_Record &record)
+Log_Message_Receiver<ACE_SYNCH_USE>::log_record(const ACE_TCHAR *hostname,
+                                                ACE_Log_Record &record)
 {
   ACE_ASSERT (receiver_impl_ != 0);
   receiver_impl_->log_record (hostname, record);
 }
 
 template<ACE_SYNCH_DECL> void
-Log_Message_Receiver<ACE_SYNCH_USE>::log_output(char const *hostname,
+Log_Message_Receiver<ACE_SYNCH_USE>::log_output(const ACE_TCHAR *hostname,
                                                 ACE_Log_Record &record,
                                                 ostream *outputfile)
 {

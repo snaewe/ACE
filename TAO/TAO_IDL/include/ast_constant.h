@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,10 +62,14 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_CONSTANT_AST_CONSTANT_HH
 #define _AST_CONSTANT_AST_CONSTANT_HH
+
+#include "ast_expression.h"
+#include "ast_decl.h"
+#include "global_extern.h"
 
 // Representation of constant declaration:
 //
@@ -77,41 +81,61 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 // parameter. This constructor is used from AST_EnumVal, which is
 // just a glorified AST_Constant
 
-/*
-** DEPENDENCIES: ast_decl.hh, ast_expression.hh, utl_scoped_name.hh,
-**		 utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
-
-class	AST_Constant : public virtual AST_Decl
+class TAO_IDL_FE_Export AST_Constant : public virtual AST_Decl
 {
 public:
-  // Operations
+  AST_Constant (void);
 
-  // Constructor(s)
-  AST_Constant();
-  AST_Constant(AST_Expression::ExprType et, AST_Decl::NodeType nt,
-	       AST_Expression *ev, UTL_ScopedName *n, UTL_StrList *p);
-  AST_Constant(AST_Expression::ExprType et, AST_Expression *ev,
-	       UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Constant() {}
+  AST_Constant (AST_Expression::ExprType et,
+                AST_Decl::NodeType nt,
+                AST_Expression *ev,
+                UTL_ScopedName *n);
 
-  // Data Accessors
-  AST_Expression *constant_value();
-  AST_Expression::ExprType et();
+  AST_Constant (AST_Expression::ExprType et,
+                AST_Expression *ev,
+                UTL_ScopedName *n);
+
+  virtual ~AST_Constant (void);
+
+  // Data Accessors.
+  AST_Expression *constant_value (void);
+  AST_Expression::ExprType et (void);
+
+  // Accessors for the private member.
+  bool ifr_added (void);
+  void ifr_added (bool val);
+
+  const char *exprtype_to_string (void);
+  // Returns the appropriate type.
+
+  static const char *exprtype_to_string (AST_Expression::ExprType et);
+  // For use with ORBs without the CORBA namespace.
+
+  UTL_ScopedName *enum_full_name (void);
+  // If our type is enum, we have to generate the scoped name.
 
   // Narrowing
   DEF_NARROW_METHODS1(AST_Constant, AST_Decl);
   DEF_NARROW_FROM_DECL(AST_Constant);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
 
-private:
-  // Data
-  AST_Expression		*pd_constant_value;	// The value
-  AST_Expression::ExprType	pd_et;			// Its expr type
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+  // Cleanup.
+  virtual void destroy (void);
+
+protected:
+  AST_Expression *pd_constant_value;
+  // The value.
+
+  AST_Expression::ExprType pd_et;
+  // Its expression type.
+
+  bool ifr_added_;
+  // Has this node been added to the IFR?
 };
 
 #endif           // _AST_CONSTANT_AST_CONSTANT_HH

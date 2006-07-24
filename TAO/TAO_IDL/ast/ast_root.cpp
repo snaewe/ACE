@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,107 +62,214 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_root.cc - Implementation of class AST_Root
- *
- * AST_Root nodes represent the roots of ASTs.
- * AST_Root is a subclass of AST_Module, and is defined to allow BEs
- * to subclass it to associate their own information with an entire
- * AST.
- */
+// AST_Root nodes represent the roots of ASTs.
+// AST_Root is a subclass of AST_Module, and is defined to allow BEs
+// to subclass it to associate their own information with an entire
+// AST.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_root.h"
+#include "ast_sequence.h"
+#include "ast_string.h"
+#include "ast_array.h"
+#include "ast_visitor.h"
+#include "utl_identifier.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_Memory.h"
 
-ACE_RCSID(ast, ast_root, "$Id$")
+ACE_RCSID (ast,
+           ast_root,
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_Root::AST_Root()
+AST_Root::AST_Root (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    UTL_Scope (),
+    AST_Module ()
 {
 }
 
-AST_Root::AST_Root(UTL_ScopedName *n, UTL_StrList *p)
-	: AST_Decl(AST_Decl::NT_module, n, p),
-	  UTL_Scope(AST_Decl::NT_module)
+AST_Root::AST_Root (UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_root,
+              n),
+    UTL_Scope (AST_Decl::NT_root),
+    AST_Module (n)
 {
 }
 
-/*
- * Private operations
- */
+AST_Root::~AST_Root (void)
+{
+}
 
-/*
- * Public operations
- */
+// Overrides the one in UTL_Scope - this one doesn't
+// count the predefined types.
+unsigned long
+AST_Root::nmembers (void)
+{
+  unsigned long retval = 0;
 
-/*
- * Add protocol
- */
+  for (UTL_ScopeActiveIterator si (this, UTL_Scope::IK_decls);
+        !si.is_done ();
+        si.next ())
+    {
+      if (si.item ()->node_type () == AST_Decl::NT_pre_defined)
+        {
+          continue;
+        }
 
-/*
- * Add this AST_Sequence to the locally defined types in this scope
- */
+      ++retval;
+    }
+
+  return retval;
+}
+
+// Add this AST_Sequence to the locally defined types in this scope.
 AST_Sequence *
-AST_Root::fe_add_sequence(AST_Sequence *t)
+AST_Root::fe_add_sequence (AST_Sequence *t)
 {
-  if (t == NULL)
-    return NULL;
-  t->set_name(new UTL_ScopedName(new Identifier("local type", 1, 0, I_FALSE),
-				 NULL));
-  add_to_local_types(t);
+  if (t == 0)
+    {
+      return 0;
+    }
+
+  Identifier *id = 0;
+  ACE_NEW_RETURN (id,
+                  Identifier ("local type"),
+                  0);
+
+  UTL_ScopedName *sn = 0;
+  ACE_NEW_RETURN (sn,
+                  UTL_ScopedName (id,
+                                  0),
+                  0);
+
+  t->set_name (sn);
+  this->add_to_local_types (t);
   return t;
 }
 
-/*
- * Add this AST_String to the locally defined types in this scope
- */
+// Add this AST_String to the locally defined types in this scope.
 AST_String *
-AST_Root::fe_add_string(AST_String *t)
+AST_Root::fe_add_string (AST_String *t)
 {
-  if (t == NULL)
-    return NULL;
-  t->set_name(new UTL_ScopedName(new Identifier("local type", 1, 0, I_FALSE),
-				 NULL));
-  add_to_local_types(t);
+  if (t == 0)
+    {
+      return 0;
+    }
 
+  Identifier *id = 0;
+  ACE_NEW_RETURN (id,
+                  Identifier ("local type"),
+                  0);
+
+  UTL_ScopedName *sn = 0;
+  ACE_NEW_RETURN (sn,
+                  UTL_ScopedName (id,
+                                  0),
+                  0);
+
+  t->set_name (sn);
+  this->add_to_local_types (t);
   return t;
 }
 
-/*
- * Add this AST_Array to the locally defined types in this scope
- */
+// Add this AST_Array to the locally defined types in this scope.
 AST_Array *
-AST_Root::fe_add_array(AST_Array *t)
+AST_Root::fe_add_array (AST_Array *t)
 {
-  if (t == NULL)
-    return NULL;
-  t->set_name(new UTL_ScopedName(new Identifier("local type",1,0,I_FALSE),
-				 NULL));
-  add_to_local_types(t);
+  if (t == 0)
+    {
+      return 0;
+    }
 
+  Identifier *id = 0;
+  ACE_NEW_RETURN (id,
+                  Identifier ("local type"),
+                  0);
+
+  UTL_ScopedName *sn = 0;
+  ACE_NEW_RETURN (sn,
+                  UTL_ScopedName (id,
+                                  0),
+                  0);
+
+  t->set_name (sn);
+  this->add_to_local_types (t);
   return t;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
+// Redefinition of inherited virtual operations.
 
-/*
- * Dump this AST_Root node to the ostream o
- */
+// Dump this AST_Root node to the ostream o.
 void
-AST_Root::dump(ostream &o)
+AST_Root::dump (ACE_OSTREAM_TYPE &o)
 {
-  UTL_Scope::dump(o);
+  UTL_Scope::dump (o);
 }
 
-/*
- * Narrowing methods
- */
+int
+AST_Root::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_root (this);
+}
+
+void
+AST_Root::destroy ()
+{
+  long i = 0;
+  long j = 0;
+  AST_Decl *d = 0;
+
+  // Just destroy and delete the non-predefined types in the
+  // scope, in case we are processing multiple IDL files.
+  // Final cleanup will be done in fini().
+  for (i = this->pd_decls_used; i > 0; --i)
+    {
+      d = this->pd_decls[i - 1];
+
+      // We want to keep the predefined types we add to global
+      // scope around and not add them each time.
+      if (d->node_type () == AST_Decl::NT_pre_defined)
+        {
+          j = i;
+          break;
+        }
+
+      d->destroy ();
+      delete d;
+      d = 0;
+      --this->pd_decls_used;
+    }
+
+  // This array of pointers holds references, no need
+  // for destruction. The array itself will be cleaned
+  // up when AST_Root::fini() calls UTL_Scope::destroy ().
+  for (i = this->pd_referenced_used; i > j; --i)
+    {
+      this->pd_referenced[i - 1] = 0;
+      --this->pd_referenced_used;
+    }
+
+  for (i = this->pd_name_referenced_used; i > j; --i)
+    {
+      Identifier *id = this->pd_name_referenced[i - 1];
+      id->destroy ();
+      delete id;
+      id = 0;
+      --this->pd_name_referenced_used;
+    }
+}
+
+void
+AST_Root::fini (void)
+{
+  this->UTL_Scope::destroy ();
+  this->AST_Decl::destroy ();
+}
+
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_Root, AST_Module)
 IMPL_NARROW_FROM_DECL(AST_Root)
 IMPL_NARROW_FROM_SCOPE(AST_Root)

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,75 +62,262 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_attribute.cc - Implementation of class AST_Attribute.cc
- *
- * AST_Attribute nodes denote IDL attribute declarations.
- * AST_Attribute nodes are AST_Fields with a readonly indication.
- * Hence they have a name (an UTL_ScopedName), a type (a subtype
- * of AST_Type) and a boolean indicating whether the attribute is
- * readonly.
- */
+// AST_Attribute nodes denote IDL attribute declarations.
+// AST_Attribute nodes are AST_Fields with a readonly indication.
+// Hence they have a name (an UTL_ScopedName), a type (a subtype
+// of AST_Type) and a boolean indicating whether the attribute is
+// readonly.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_attribute.h"
+#include "ast_exception.h"
+#include "ast_visitor.h"
+#include "utl_namelist.h"
+#include "utl_exceptlist.h"
+#include "utl_scope.h"
+#include "utl_err.h"
+#include "global_extern.h"
 
-ACE_RCSID(ast, ast_attribute, "$Id$")
+ACE_RCSID (ast,
+           ast_attribute,
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_Attribute::AST_Attribute()
-	     : pd_readonly(I_TRUE)
+// Constructor(s) and destructor.
+AST_Attribute::AST_Attribute (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Field (),
+    pd_readonly (true),
+    pd_get_exceptions (0),
+    pd_set_exceptions (0)
 {
 }
 
-AST_Attribute::AST_Attribute(idl_bool ro,
-			     AST_Type *ft,
-			     UTL_ScopedName *n,
-			     UTL_StrList *p)
-	     : AST_Field(AST_Decl::NT_attr, ft, n, p),
-	       AST_Decl(AST_Decl::NT_attr, n, p),
-	       pd_readonly(ro)
+AST_Attribute::AST_Attribute (bool ro,
+                              AST_Type *ft,
+                              UTL_ScopedName *n,
+                              bool local,
+                              bool abstract)
+  : COMMON_Base (local,
+                 abstract),
+    AST_Decl (AST_Decl::NT_attr,
+              n),
+    AST_Field (AST_Decl::NT_attr,
+               ft,
+               n),
+    pd_readonly (ro),
+    pd_get_exceptions (0),
+    pd_set_exceptions (0)
 {
 }
 
-/*
- * Private operations
- */
+AST_Attribute::~AST_Attribute (void)
+{
+}
 
-/*
- * Public operations
- */
+// Redefinition of inherited virtual operations.
 
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_Attribute to the ostream o
- */
+// Dump this AST_Attribute to the ostream o.
 void
-AST_Attribute::dump(ostream &o)
+AST_Attribute::dump (ACE_OSTREAM_TYPE &o)
 {
-  o << (pd_readonly == I_TRUE ? "readonly" : "") << " attribute ";
-  AST_Field::dump(o);
+  this->dump_i (o, (this->pd_readonly == true ?
+                    "readonly attribute " : "attribute "));
+  AST_Field::dump (o);
 }
 
-/*
- * Data accessors
- */
-
-idl_bool
-AST_Attribute::readonly()
+int
+AST_Attribute::ast_accept (ast_visitor *visitor)
 {
-  return pd_readonly;
+  return visitor->visit_attribute (this);
 }
 
-/*
- * Narrowing methods
- */
+void
+AST_Attribute::destroy (void)
+{
+  // No need to delete our exception lists, the
+  // destroy() method does it. The UTL_ExceptList
+  // destroy() method does NOT delete the contained
+  // exception nodes.
+
+  if (this->pd_get_exceptions != 0)
+    {
+      this->pd_get_exceptions->destroy ();
+      this->pd_get_exceptions = 0;
+    }
+  
+  if (this->pd_set_exceptions != 0)
+    {
+      this->pd_set_exceptions->destroy ();
+      this->pd_set_exceptions = 0;
+    }
+
+  this->AST_Field::destroy ();
+}
+
+UTL_ExceptList *
+AST_Attribute::be_add_get_exceptions (UTL_ExceptList *t)
+{
+  if (this->pd_get_exceptions != 0)
+    {
+      idl_global->err ()->error1 (UTL_Error::EIDL_ILLEGAL_RAISES,
+                                  this);
+    }
+  else
+    {
+      this->pd_get_exceptions = t;
+    }
+
+  return this->pd_get_exceptions;
+}
+
+UTL_ExceptList *
+AST_Attribute::be_add_set_exceptions (UTL_ExceptList *t)
+{
+  if (this->pd_set_exceptions != 0)
+    {
+      idl_global->err ()->error1 (UTL_Error::EIDL_ILLEGAL_RAISES,
+                                  this);
+    }
+  else
+    {
+      this->pd_set_exceptions = t;
+    }
+
+  return this->pd_set_exceptions;
+}
+
+// Data accessors.
+
+bool
+AST_Attribute::readonly (void) const
+{
+  return this->pd_readonly;
+}
+
+UTL_ExceptList *
+AST_Attribute::get_get_exceptions (void) const
+{
+  return this->pd_get_exceptions;
+}
+
+UTL_ExceptList *
+AST_Attribute::get_set_exceptions (void) const
+{
+  return this->pd_set_exceptions;
+}
+
+// NOTE: No attempt is made to ensure that exceptions are mentioned
+//       only once..
+UTL_NameList *
+AST_Attribute::fe_add_get_exceptions (UTL_NameList *t)
+{
+  UTL_ScopedName *nl_n = 0;
+  AST_Exception *fe = 0;
+  AST_Decl *d = 0;
+
+  this->pd_get_exceptions = 0;
+
+  for (UTL_NamelistActiveIterator nl_i (t); !nl_i.is_done (); nl_i.next ())
+    {
+      nl_n = nl_i.item ();
+
+      d = this->defined_in ()->lookup_by_name (nl_n,
+                                               true);
+
+      if (d == 0 || d->node_type() != AST_Decl::NT_except)
+        {
+          idl_global->err ()->lookup_error (nl_n);
+          return 0;
+        }
+
+      fe = AST_Exception::narrow_from_decl (d);
+
+      if (fe == 0)
+        {
+          idl_global->err ()->error1 (UTL_Error::EIDL_ILLEGAL_RAISES,
+                                       this);
+          return 0;
+        }
+
+      if (this->pd_get_exceptions == 0)
+        {
+          ACE_NEW_RETURN (this->pd_get_exceptions,
+                          UTL_ExceptList (fe,
+                                          0),
+                          0);
+        }
+      else
+        {
+          UTL_ExceptList *el = 0;
+          ACE_NEW_RETURN (el,
+                          UTL_ExceptList (fe,
+                                          0),
+                          0);
+
+          this->pd_get_exceptions->nconc (el);
+        }
+    }
+
+  return t;
+}
+
+// NOTE: No attempt is made to ensure that exceptions are mentioned
+//       only once..
+UTL_NameList *
+AST_Attribute::fe_add_set_exceptions (UTL_NameList *t)
+{
+  UTL_ScopedName *nl_n = 0;
+  AST_Exception *fe = 0;
+  AST_Decl *d = 0;
+
+  this->pd_set_exceptions = 0;
+
+  for (UTL_NamelistActiveIterator nl_i (t); !nl_i.is_done (); nl_i.next ())
+    {
+      nl_n = nl_i.item ();
+
+      d = this->defined_in ()->lookup_by_name (nl_n,
+                                               true);
+
+      if (d == 0 || d->node_type() != AST_Decl::NT_except)
+        {
+          idl_global->err ()->lookup_error (nl_n);
+          return 0;
+        }
+
+      fe = AST_Exception::narrow_from_decl (d);
+
+      if (fe == 0)
+        {
+          idl_global->err ()->error1 (UTL_Error::EIDL_ILLEGAL_RAISES,
+                                       this);
+          return 0;
+        }
+
+      if (this->pd_set_exceptions == 0)
+        {
+          ACE_NEW_RETURN (this->pd_set_exceptions,
+                          UTL_ExceptList (fe,
+                                          0),
+                          0);
+        }
+      else
+        {
+          UTL_ExceptList *el = 0;
+          ACE_NEW_RETURN (el,
+                          UTL_ExceptList (fe,
+                                          0),
+                          0);
+
+          this->pd_set_exceptions->nconc (el);
+        }
+    }
+
+  return t;
+}
+
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_Attribute, AST_Field)
 IMPL_NARROW_FROM_DECL(AST_Attribute)

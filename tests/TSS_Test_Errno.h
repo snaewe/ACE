@@ -1,7 +1,26 @@
 /* -*- C++ -*- */
 // $Id$
 
+// ============================================================================
+//
+// = FILENAME
+//    TSS_Test_Errno.h
+//
+// = DESCRIPTION
+//    This file contains the definition of Errno.  Some compilers need
+//    it in a .h file for template instantiation (such as AIX C Set
+//    ++).
+//
+// = AUTHOR
+//    Douglas C. Schmidt <schmidt@cs.wustl.edu>
+//
+// ============================================================================
+
+#include "ace/Guard_T.h"
+#include "ace/Thread_Mutex.h"
+
 class Errno
+{
   // = TITLE
   //    Define a simple Errno abstraction
   //
@@ -9,8 +28,18 @@ class Errno
   //    This class gets its own header file to work around AIX C++
   //    compiler "features" related to template instantiation...  It is
   //    only used by TSS_Test.cpp.
-{
 public:
+  Errno()
+  {
+    ACE_MT (ACE_GUARD (ACE_Thread_Mutex, ace_Mon, *Errno::lock_));
+    created_ += 1;
+  }
+  ~Errno()
+  {
+    ACE_MT (ACE_GUARD (ACE_Thread_Mutex, ace_Mon, *Errno::lock_));
+    deleted_ += 1;
+  }
+
   int error (void) { return this->errno_; }
   void error (int i) { this->errno_ = i; }
 
@@ -33,10 +62,20 @@ public:
     return 0;
   }
 
+  static int created (void)
+  {
+    return created_;
+  }
+
+  static int deleted (void)
+  {
+    return deleted_;
+  }
+
 #if defined (ACE_HAS_THREADS)
   static
   ACE_Thread_Mutex *
-  allocate_lock ()
+  allocate_lock (void)
   {
     ACE_NEW_RETURN (Errno::lock_, ACE_Thread_Mutex, 0);
     return Errno::lock_;
@@ -54,6 +93,8 @@ private:
   int lineno_;
 
   static int flags_;
+  static int created_;
+  static int deleted_;
 #if defined (ACE_HAS_THREADS)
   // flags_ needs a lock.
   static ACE_Thread_Mutex *lock_;

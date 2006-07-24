@@ -1,6 +1,10 @@
 /* -*- C++ -*- */
 // $Id$
 
-#include "ace/OS.h"
+#include "ace/config-all.h"
 
-static const char *rendezvous = ACE_DEFAULT_RENDEZVOUS;
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+static const ACE_TCHAR *rendezvous = ACE_DEFAULT_RENDEZVOUS;

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,52 +62,51 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _FE_DECLARATOR_FE_DECLARATOR_HH
 #define _FE_DECLARATOR_FE_DECLARATOR_HH
 
-// FE_Declarator.h
-//
-// FE internal class for storing interim declaration statements
+#include "utl_scoped_name.h"
 
-/*
-** DEPENDENCIES: utl_scoped_name.hh, ast_decl.hh
-**
-** USE: Included from fe.hh
-*/
+class AST_Decl;
+class AST_Type;
 
-class	FE_Declarator
+class FE_Declarator
 {
 public:
-  // Enum to denote types of declarators
-  enum DeclaratorType {
-        FD_simple		// Simple declarator
-      , FD_complex		// Complex declarator (complex_part field used)
+  // Enum to denote types of declarators.
+  enum DeclaratorType
+  {
+    FD_simple,  // Simple declarator
+    FD_complex  // Complex declarator (complex_part field used)
   };
 
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  FE_Declarator(UTL_ScopedName *n, DeclaratorType dt, AST_Decl *cp);
-  virtual ~FE_Declarator() {}
+  // Constructor and destructor.
+  FE_Declarator (UTL_ScopedName *n,
+                 DeclaratorType dt,
+                 AST_Decl *cp);
+  virtual ~FE_Declarator (void) {}
 
-  // Data Accessors
-  AST_Decl *complex_part();
-  UTL_ScopedName *name();
-  DeclaratorType decl_type();
+  // Data Accessors.
+  AST_Decl *complex_part (void);
+  UTL_ScopedName *name (void);
+  DeclaratorType decl_type (void);
 
-  // Other Operations
+  // Other Operations.
 
   // Compose an FE_Declarator into an AST_Type once all the needed information
-  // is available
-  AST_Type		*compose(AST_Decl* tc);
+  // is available.
+  AST_Type *compose (AST_Decl* tc);
+  virtual void destroy (void);
 
 private:
-  // Data
-  AST_Decl		*pd_complex_part;	// If a complex declarator
-  UTL_ScopedName	*pd_name;		// The name if complex
-  DeclaratorType	pd_decl_type;		// Whether complex or simple
+  // Data.
+  AST_Decl *pd_complex_part;       // If a complex declarator
+  UTL_ScopedName *pd_name;         // The name if complex
+  DeclaratorType pd_decl_type;     // Whether complex or simple
 };
 
 #endif           // _FE_DECLARATOR_FE_DECLARATOR_HH

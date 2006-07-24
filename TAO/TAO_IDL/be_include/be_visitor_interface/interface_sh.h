@@ -19,7 +19,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_INTERFACE_INTERFACE_SH_H_)
+#ifndef _BE_INTERFACE_INTERFACE_SH_H_
 #define _BE_INTERFACE_INTERFACE_SH_H_
 
 class be_visitor_interface_sh : public be_visitor_interface
@@ -35,12 +35,22 @@ class be_visitor_interface_sh : public be_visitor_interface
 public:
   be_visitor_interface_sh (be_visitor_context *ctx);
   // constructor
-
+  
   ~be_visitor_interface_sh (void);
   // destructor
-
+  
   virtual int visit_interface (be_interface *node);
   // set the right context and make a visitor
+    
+  static int gen_abstract_ops_helper (be_interface *node,
+                                      be_interface *base,
+                                      TAO_OutStream *os);
+  // Helper to generate the declarations for the operations
+  // of any abstract parents we may have.
+
+protected:
+  virtual void this_method (be_interface *node);
+  virtual int generate_amh_classes (be_interface *node);
 };
 
 #endif /* _BE_INTERFACE_INTERFACE_SH_H_ */

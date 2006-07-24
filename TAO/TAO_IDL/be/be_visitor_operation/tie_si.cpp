@@ -18,21 +18,17 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_operation.h"
-
-ACE_RCSID(be_visitor_operation, tie_si, "$Id$")
-
+ACE_RCSID (be_visitor_operation,
+           tie_si,
+           "$Id$")
 
 // ************************************************************
-// Operation visitor for server inline for TIE class operations
+// Operation visitor for server inline for TIE class operations.
 // ************************************************************
 
-be_visitor_operation_tie_si::be_visitor_operation_tie_si
-(be_visitor_context *ctx)
+be_visitor_operation_tie_si::be_visitor_operation_tie_si (
+    be_visitor_context *ctx
+  )
   : be_visitor_scope (ctx)
 {
 }
@@ -45,8 +41,7 @@ int be_visitor_operation_tie_si::visit_operation (be_operation *node)
 {
   TAO_OutStream *os = this->ctx_->stream ();
 
-  be_interface *intf = 
-    this->ctx_->interface ();
+  be_interface *intf = this->ctx_->interface ();
 
   if (!intf)
     {
@@ -57,8 +52,9 @@ int be_visitor_operation_tie_si::visit_operation (be_operation *node)
                         -1);
     }
 
-  // retrieve the operation return type
+  // Retrieve the operation return type.
   be_type *bt = be_type::narrow_from_decl (node->return_type ());
+
   if (!bt)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
@@ -68,92 +64,101 @@ int be_visitor_operation_tie_si::visit_operation (be_operation *node)
                         -1);
     }
 
-  os->indent ();
-  *os << "template <class T> ACE_INLINE\n";
+  // Although unlikely it is possible that the 'T' in 'template class<T>' will
+  // conflict with an argument name...
+  ACE_CString template_name ("T");
+  bool template_name_ok = false;
 
-  // generate the return type mapping (same as in the header file)
-  be_visitor_context ctx (*this->ctx_);
-  ctx.state (TAO_CodeGen::TAO_OPERATION_RETTYPE_OTHERS);
-  be_visitor *visitor = tao_cg->make_visitor (&ctx);
-
-  if (!visitor)
+  while (!template_name_ok)
     {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "be_visitor_operation_tie_si::"
-                         "visit_operation - "
-                         "Bad visitor for return type\n"),
-                        -1);
+      template_name_ok = true;
+
+      for (UTL_ScopeActiveIterator si (node, UTL_Scope::IK_decls);
+          ! si.is_done () && template_name_ok;
+          si.next ())
+        {
+          // Check for conflicts between the arg name and the proposed template
+          // class identifier
+          AST_Argument *arg =
+            AST_Argument::narrow_from_decl (si.item ());
+
+          if (! ACE_OS::strcmp (arg->local_name ()->get_string (),
+                                template_name.c_str ()))
+            {
+              // clash !
+              template_name_ok = false;
+            }
+        }
+
+      if (! template_name_ok)
+        {
+          // We had a clash - postfix an underscore and try again
+          template_name += "_";
+        }
     }
 
-  if (bt->accept (visitor) == -1)
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from " << be_nl
+      << "// " << __FILE__ << ":" << __LINE__ << be_nl << be_nl;
+
+  *os << "template <class " << template_name.c_str () << "> ACE_INLINE\n";
+
+  // Generate the return type mapping (same as in the header file).
+  be_visitor_context ctx (*this->ctx_);
+  be_visitor_operation_rettype oro_visitor (&ctx);
+
+  if (bt->accept (&oro_visitor) == -1)
     {
-      delete visitor;
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_operation_tie_si::"
                          "visit_operation - "
                          "codegen for return type failed\n"),
                         -1);
     }
-  delete visitor;
 
-  *os << " " << intf->full_skel_name () << "_tie<T>::"
+  *os << " " << intf->full_skel_name () << "_tie<" << template_name.c_str () << ">::"
       << node->local_name () << " ";
 
   // STEP 4: generate the argument list with the appropriate mapping (same as
   // in the header file)
   ctx = *this->ctx_;
-  ctx.state (TAO_CodeGen::TAO_OPERATION_ARGLIST_OTHERS);
-  visitor = tao_cg->make_visitor (&ctx);
-  if (!visitor)
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "be_visitor_operation_cs::"
-                         "visit_operation - "
-                         "Bad visitor for argument list\n"),
-                        -1);
-    }
+  be_visitor_operation_arglist oao_visitor (&ctx);
 
-  if (node->accept (visitor) == -1)
+  if (node->accept (&oao_visitor) == -1)
     {
-      delete visitor;
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_operation_cs::"
                          "visit_operation - "
                          "codegen for argument list failed\n"),
                         -1);
     }
-  delete visitor;
 
-  *os << "{" << be_idt << "\n";
+  *os << be_nl << "{" << be_idt_nl;
 
-  os->indent ();
-  if (bt->node_type () != AST_Decl::NT_pre_defined
-      || be_predefined_type::narrow_from_decl (bt)->pt () != AST_PredefinedType::PT_void)
+  be_predefined_type *pdt = be_predefined_type::narrow_from_decl (bt);
+
+  if (pdt == 0 || pdt->pt () != AST_PredefinedType::PT_void)
     {
       *os << "return ";
     }
 
-  *os << "this->ptr_->" << node->local_name () << " (" << be_idt << "\n";
+  *os << "this->ptr_->" << node->local_name () << " (" << be_idt;
 
   ctx = *this->ctx_;
   ctx.state (TAO_CodeGen::TAO_OPERATION_COLLOCATED_ARG_UPCALL_SS);
-  visitor = tao_cg->make_visitor (&ctx);
-  if (!visitor || (node->accept (visitor) == -1))
+  be_visitor_operation_argument ocau_visitor (&ctx);
+
+  if (node->accept (&ocau_visitor) == -1)
     {
-      delete visitor;
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_operation_ss::"
                          "visit_operation - "
                          "codegen for making upcall failed\n"),
                         -1);
     }
-  // last argument is the environment
-  if (node->argument_count () > 0)
-    *os << ",\n";
-  os->indent ();
-  *os << "_tao_environment" << be_uidt_nl
-      << ");" << be_uidt_nl
-      << "}\n\n";
+
+  *os << be_uidt_nl;
+  *os << ");" << be_uidt_nl;
+  *os << "}";
 
   return 0;
 }

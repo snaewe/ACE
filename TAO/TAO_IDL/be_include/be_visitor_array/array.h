@@ -18,7 +18,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_ARRAY_ARRAY_H_)
+#ifndef _BE_VISITOR_ARRAY_ARRAY_H_
 #define _BE_VISITOR_ARRAY_ARRAY_H_
 
 // ************************************************************
@@ -56,6 +56,15 @@ public:
   virtual int visit_interface_fwd (be_interface_fwd *node);
   // visit an interface forward node
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit a valuebox
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit a valuetype
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
+  // visit a valuetype forward node
+
   virtual int visit_predefined_type (be_predefined_type *node);
   // visit a predefined type node
 
@@ -77,6 +86,9 @@ public:
 protected:
 
   int visit_node (be_type *);
+  // helper that does the common job
+
+  int emit_common (be_type *node);
   // helper that does the common job
 
 };

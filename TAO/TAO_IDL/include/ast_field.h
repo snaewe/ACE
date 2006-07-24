@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,13 +62,13 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_FIELD_AST_FIELD_HH
 #define _AST_FIELD_AST_FIELD_HH
 
-// Representation of a generic field
-//
+// Representation of a generic field.
+
 // Used as member in structures, exceptions and unions, and as a base
 // type for attributes and arguments to operations
 //
@@ -76,44 +76,75 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 // is used directly inside a structure, the second when it is used as
 // the base type for attributes and operations.
 
-/*
-** DEPENDENCIES: ast_decl.hh, ast_type.hh, utl_scoped_name.hh, utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
+#include "ast_decl.h"
+#include "utl_scoped_name.h"
 
-#include	"idl_fwd.h"
-#include	"idl_narrow.h"
-#include	"ast_decl.h"
+class AST_Type;
 
-
-class	AST_Field : public virtual AST_Decl
+class TAO_IDL_FE_Export AST_Field : public virtual AST_Decl
 {
 public:
-  // Operations
+  enum Visibility
+    {
+      vis_NA,
+      vis_PUBLIC,
+      vis_PRIVATE
+    };
 
-  // Constructor(s)
-  AST_Field();
-  AST_Field(AST_Type *field_type,
-	    UTL_ScopedName *n, UTL_StrList *p);
-  AST_Field(AST_Decl::NodeType nt, AST_Type *field_type,
-	    UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Field() {}
+  // Operations.
 
-  // Data Accessors
-  AST_Type *field_type();
+  // Constructor(s).
+  AST_Field (void);
 
-  // Narrowing
+  AST_Field (AST_Type *field_type,
+             UTL_ScopedName *n,
+             Visibility vis = vis_NA);
+
+  AST_Field (AST_Decl::NodeType nt,
+             AST_Type *field_type,
+             UTL_ScopedName *n,
+             Visibility vis = vis_NA);
+
+  virtual ~AST_Field (void);
+
+  // Data Accessors.
+  AST_Type *field_type (void) const;
+
+  Visibility visibility (void);
+
+  // Are we or do we contain a wstring?
+  virtual int contains_wstring (void);
+  
+  // Determine this bit of state after we have
+  // be added to our aggregate type and before
+  // we are destroyed.
+  void set_recursive_flag (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Field, AST_Decl);
   DEF_NARROW_FROM_DECL(AST_Field);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
 private:
-  // Data
-  AST_Type			*pd_field_type;	// Base type for field
+  // Data.
 
+  AST_Type *pd_field_type;
+  // Base type for field.
+
+  Visibility pd_visibility;
+  // Used with valuetype and eventtype fields.
+  
+  bool anonymous_type_;
+  // If our field type is anonymous array or sequence, we're
+  // responsible for destroying it.
 };
 
 #endif           // _AST_FIELD_AST_FIELD_HH

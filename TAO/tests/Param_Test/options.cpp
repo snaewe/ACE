@@ -16,27 +16,30 @@
 //
 // ============================================================================
 
-#include "ace/Read_Buffer.h"
 #include "options.h"
+#include "tao/debug.h"
+#include "ace/Read_Buffer.h"
+#include "ace/Get_Opt.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_fcntl.h"
 
-ACE_RCSID(Param_Test, options, "$Id$")
+ACE_RCSID (Param_Test,
+           options,
+           "$Id$")
 
 // Constructor.p
 Options::Options (void)
-  : ior_ (0),
+  : ior_ (CORBA::string_dup ("file://test.ior")),
     test_type_ (Options::NO_TEST),
     invoke_type_ (Options::SII),
     loop_count_ (1),
-    debug_ (CORBA::B_FALSE),
-    shutdown_ (CORBA::B_FALSE)
+    debug_ (0),
+    shutdown_ (0)
 {
 }
 
 Options::~Options (void)
 {
-  // Free resources
-  CORBA::string_free (this->ior_);
-  this->ior_ = 0;
 }
 
 // Parses the command line arguments and returns an error status.
@@ -57,86 +60,107 @@ Options::parse_args (int argc, char **argv)
         break;
 
       case 'x':
-        this->shutdown_ = CORBA::B_TRUE;
+        this->shutdown_ = 1;
         break;
 
       case 'n':                 // loop count
-        this->loop_count_ = (CORBA::ULong) ACE_OS::atoi (get_opts.optarg);
+        this->loop_count_ = (CORBA::ULong) ACE_OS::atoi (get_opts.opt_arg ());
         break;
 
       case 'f':
-        result = this->read_ior (get_opts.optarg);
+        result = this->read_ior (get_opts.opt_arg ());
 
         if (result < 0)
           ACE_ERROR_RETURN ((LM_ERROR,
                              "Unable to read ior from %s : %p\n",
-                             get_opts.optarg),
+                             get_opts.opt_arg ()),
                             -1);
 
         break;
 
      case 'k':
-        CORBA::string_free (this->ior_);
-        this->ior_ = CORBA::string_copy (get_opts.optarg);
+        this->ior_ = CORBA::string_dup (get_opts.opt_arg ());
         break;
 
       case 'i':  // invocation
-        if (!ACE_OS::strcmp (get_opts.optarg, "dii"))
+        if (!ACE_OS::strcmp (get_opts.opt_arg (), "dii"))
           this->invoke_type_ = Options::DII;
         break;
 
       case 't': // data type
-        if (!ACE_OS::strcmp (get_opts.optarg, "short"))
+        if (!ACE_OS::strcmp (get_opts.opt_arg (), "short"))
           this->test_type_ = Options::TEST_SHORT;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "ulonglong"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ulonglong"))
           this->test_type_ = Options::TEST_ULONGLONG;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "ubstring"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ubstring"))
           this->test_type_ = Options::TEST_UB_STRING;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "bdstring"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ubwstring"))
+          this->test_type_ = Options::TEST_UB_WSTRING;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bdstring"))
           this->test_type_ = Options::TEST_BD_STRING;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "fixed_struct"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bdwstring"))
+          this->test_type_ = Options::TEST_BD_WSTRING;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "fixed_struct"))
           this->test_type_ = Options::TEST_FIXED_STRUCT;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "ub_strseq"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ub_strseq"))
           this->test_type_ = Options::TEST_UB_STRING_SEQUENCE;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "bd_strseq"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bd_strseq"))
           this->test_type_ = Options::TEST_BD_STRING_SEQUENCE;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "var_struct"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ub_wstrseq"))
+          this->test_type_ = Options::TEST_UB_WSTRING_SEQUENCE;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bd_wstrseq"))
+          this->test_type_ = Options::TEST_BD_WSTRING_SEQUENCE;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "var_struct"))
           this->test_type_ = Options::TEST_VAR_STRUCT;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "nested_struct"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "nested_struct"))
           this->test_type_ = Options::TEST_NESTED_STRUCT;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "objref_struct"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "recursive_struct"))
+          this->test_type_ = Options::TEST_RECURSIVE_STRUCT;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "objref_struct"))
           this->test_type_ = Options::TEST_OBJREF_STRUCT;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "ub_struct_seq"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ub_struct_seq"))
           this->test_type_ = Options::TEST_UB_STRUCT_SEQUENCE;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "bd_struct_seq"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bd_struct_seq"))
           this->test_type_ = Options::TEST_BD_STRUCT_SEQUENCE;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "objref"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ub_array_seq"))
+          this->test_type_ = Options::TEST_UB_ARRAY_SEQUENCE;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bd_array_seq"))
+          this->test_type_ = Options::TEST_BD_ARRAY_SEQUENCE;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "objref"))
           this->test_type_ = Options::TEST_OBJREF;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "typecode"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "typecode"))
           this->test_type_ = Options::TEST_TYPECODE;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "any"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "any"))
           this->test_type_ = Options::TEST_ANY;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "objref_sequence"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "objref_sequence"))
           this->test_type_ = Options::TEST_OBJREF_SEQUENCE;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "any_sequence"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "any_sequence"))
           this->test_type_ = Options::TEST_ANYSEQ;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "ub_short_sequence"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ub_short_sequence"))
           this->test_type_ = Options::TEST_UB_SHORTSEQ;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "bd_short_sequence"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bd_short_sequence"))
           this->test_type_ = Options::TEST_BD_SHORTSEQ;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "ub_long_sequence"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "ub_long_sequence"))
           this->test_type_ = Options::TEST_UB_LONGSEQ;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "bd_long_sequence"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "bd_long_sequence"))
           this->test_type_ = Options::TEST_BD_LONGSEQ;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "fixed_array"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "fixed_array"))
           this->test_type_ = Options::TEST_FIXED_ARRAY;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "var_array"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "var_array"))
           this->test_type_ = Options::TEST_VAR_ARRAY;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "multdim_array"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "multdim_array"))
           this->test_type_ = Options::TEST_MULTDIM_ARRAY;
-        else if (!ACE_OS::strcmp (get_opts.optarg, "exception"))
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "exception"))
           this->test_type_ = Options::TEST_EXCEPTION;
-        break;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "big_union"))
+          this->test_type_ = Options::TEST_BIG_UNION;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "small_union"))
+          this->test_type_ = Options::TEST_SMALL_UNION;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "recursive_union"))
+          this->test_type_ = Options::TEST_RECURSIVE_UNION;
+        else if (!ACE_OS::strcmp (get_opts.opt_arg (), "complex_any"))
+          this->test_type_ = Options::TEST_COMPLEX_ANY;
+         break;
 
       case '?':
       default:
@@ -171,17 +195,17 @@ Options::read_ior (char *filename)
   ACE_Read_Buffer ior_buffer (f_handle);
   this->ior_ = ior_buffer.read ();
 
-  if (this->ior_ == 0)
+  if (this->ior_.in () == 0)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "Unable to allocate memory to read ior: %p\n"),
                       -1);
   return 0;
 }
 
-char *
-Options::param_test_ior (void)
+char const *
+Options::param_test_ior (void) const
 {
-  return this->ior_;
+  return this->ior_.in ();
 }
 
 Options::TEST_TYPE
@@ -214,8 +238,6 @@ Options::shutdown (void) const
   return this->shutdown_;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Singleton<Options, ACE_SYNCH_RECURSIVE_MUTEX>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Singleton<Options, ACE_SYNCH_RECURSIVE_MUTEX>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+#if defined (ACE_HAS_EXPLICIT_STATIC_TEMPLATE_MEMBER_INSTANTIATION)
+template ACE_Singleton<Options, ACE_Recursive_Thread_Mutex> *ACE_Singleton<Options, ACE_Recursive_Thread_Mutex>::singleton_;
+#endif /* ACE_HAS_EXPLICIT_STATIC_TEMPLATE_MEMBER_INSTANTIATION */

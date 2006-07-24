@@ -1,13 +1,15 @@
 // $Id$
 
-#include "tao/corba.h"
+#include "tao/ORB_Constants.h"
 #include "cubit_i.h"
+#include "Task_Client.h"
 
 ACE_RCSID(MT_Cubit, cubit_i, "$Id$")
 
-Cubit_i::Cubit_i (Task_State *ts)
-  :ts_ (ts),
-   util_started_ (0)
+Cubit_i::Cubit_i (CORBA::ORB_ptr orb,
+                  PortableServer::POA_ptr poa)
+  : orb_ (CORBA::ORB::_duplicate (orb)),
+    poa_ (PortableServer::POA::_duplicate (poa))
 {
 }
 
@@ -16,41 +18,36 @@ Cubit_i::~Cubit_i (void)
 }
 
 CORBA::Octet
-Cubit_i::cube_octet (CORBA::Octet o,
-                     CORBA::Environment &)
+Cubit_i::cube_octet (CORBA::Octet o
+                     ACE_ENV_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
-  if (ts_->run_server_utilization_test_ == 1 && 
-      ts_->utilization_task_started_ == 0 && 
-      this->util_started_ == 0 )
-    {
-      this->util_started_ = 1;
-      ts_->barrier_->wait ();
-    }
-  
-  ts_->loop_count_++;
-
   return (CORBA::Octet) (o * o * o);
 }
 
 CORBA::Short
-Cubit_i::cube_short (CORBA::Short s,
-                     CORBA::Environment &)
+Cubit_i::cube_short (CORBA::Short s
+                     ACE_ENV_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   return (CORBA::Short) (s * s * s);
 }
 
 CORBA::Long
-Cubit_i::cube_long (CORBA::Long l,
-                    CORBA::Environment &)
+Cubit_i::cube_long (CORBA::Long l
+                    ACE_ENV_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   return (CORBA::Long) (l * l * l);
 }
 
-Cubit::Many 
-Cubit_i::cube_struct (const Cubit::Many &values,
-                      CORBA::Environment &)
+Cubit::Many
+Cubit_i::cube_struct (const Cubit::Many &values
+                      ACE_ENV_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   Cubit::Many out_values;
+
   out_values.o = values.o * values.o * values.o;
   out_values.s = values.s * values.s * values.s;
   out_values.l = values.l * values.l * values.l;
@@ -58,19 +55,23 @@ Cubit_i::cube_struct (const Cubit::Many &values,
   return out_values;
 }
 
-void 
-Cubit_i::noop (CORBA::Environment &)
+void
+Cubit_i::noop (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
   // does nothing.
 }
 
-void Cubit_i::shutdown (CORBA::Environment &)
+void Cubit_i::shutdown (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+    ACE_THROW_SPEC ((CORBA::SystemException))
 {
-  ACE_DEBUG ((LM_DEBUG, 
-	      "(%t) Calling TAO_ORB_Core_instance ()->orb ()->shutdown ()\n"));
+  ACE_DEBUG ((LM_DEBUG,
+              "(%t) Calling orb ()->shutdown ()\n"));
+  this->orb_->shutdown ();
+}
 
-  TAO_ORB_Core_instance ()->orb ()->shutdown ();
-
-  // this is to signal the utilization thread to exit its loop.
-  ts_->utilization_task_started_ = 0;
+PortableServer::POA_ptr
+Cubit_i::_default_POA (ACE_ENV_SINGLE_ARG_DECL_NOT_USED)
+{
+  return PortableServer::POA::_duplicate (this->poa_.in ());
 }

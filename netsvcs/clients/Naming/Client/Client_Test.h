@@ -1,8 +1,12 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+//
 // $Id$
 
+#include "ace/svc_export.h"
 
-#include "ace/OS.h"
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 // Define the external Client_Test interface.
 

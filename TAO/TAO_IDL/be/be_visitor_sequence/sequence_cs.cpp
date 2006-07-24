@@ -18,14 +18,9 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_sequence.h"
-
-ACE_RCSID(be_visitor_sequence, sequence_cs, "$Id$")
-
+ACE_RCSID (be_visitor_sequence,
+           sequence_cs,
+           "$Id$")
 
 // ************************************************************
 // Root visitor for client stub class
@@ -40,178 +35,85 @@ be_visitor_sequence_cs::~be_visitor_sequence_cs (void)
 {
 }
 
-// XXXASG - this method is same as that in the _ch visitor. So we need some
-// abstraction for this
-
-int
-be_visitor_sequence_cs::gen_base_sequence_class (be_sequence *node)
-{
-  TAO_OutStream *os = this->ctx_->stream ();
-  be_type *bt;
-
-
-  // retrieve the base type since we may need to do some code
-  // generation for the base type.
-  bt = be_type::narrow_from_decl (node->base_type ());
-  if (!bt)
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_visitor_sequence_cs::"
-                         "gen_base_sequence_class - "
-                         "Bad element type\n"), -1);
-    }
-
-  os->gen_ifdef_AHETI();
-
-  // this is the instantiation branch
-  *os << node->instance_name ();
-
-  os->gen_else_AHETI();
-
-  // generate the appropriate sequence type
-  switch (node->managed_type ())
-    {
-    case be_sequence::MNG_OBJREF:
-      if (node->unbounded ())
-        *os << "TAO_Unbounded_Object_Sequence<";
-      else
-        *os << "TAO_Bounded_Object_Sequence<";
-      break;
-    case be_sequence::MNG_PSEUDO:
-      if (node->unbounded ())
-        *os << "TAO_Unbounded_Pseudo_Sequence<";
-      else
-        *os << "TAO_Bounded_Pseudo_Sequence<";
-      break;
-    case be_sequence::MNG_STRING:
-      if (node->unbounded ())
-        *os << "TAO_Unbounded_String_Sequence";
-      else
-        *os << "TAO_Bounded_String_Sequence";
-      break;
-    default: // not a managed type
-      if (node->unbounded ())
-        *os << "TAO_Unbounded_Sequence<";
-      else
-        *os << "TAO_Bounded_Sequence<";
-      break;
-    }
-
-  be_visitor_context ctx (*this->ctx_);
-  ctx.state (TAO_CodeGen::TAO_SEQUENCE_BASE_CS);
-  be_visitor *visitor = tao_cg->make_visitor (&ctx);
-
-  if (bt->accept (visitor) == -1)
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_visitor_sequence_cs::"
-                         "visit_sequence - "
-                         "base type visit failed\n"),
-                        -1);
-    }
-  delete visitor;
-
-  // find out if the sequence is of a managed type and if it is bounded or not
-  if (node->managed_type () == be_sequence::MNG_STRING)
-    {
-      if (!node->unbounded ())
-        {
-          *os << "<" << node->max_size () << ">";
-        }
-    }
-  else
-    {
-      if (node->unbounded ())
-        {
-          *os << ">";
-        }
-      else
-        {
-          *os << ", " << node->max_size () << ">";
-        }
-    }
-
-  os->gen_endif_AHETI();
-
-  return 0;
-}
-
 int be_visitor_sequence_cs::visit_sequence (be_sequence *node)
 {
-  // generate the constructors
-  be_type *bt;       // type node
-  TAO_OutStream *os = this->ctx_->stream ();
-
-  if (node->cli_stub_gen () || node->imported ())
-    return 0;
-
-  // generate the ifdefined macro for the sequence type
-  os->gen_ifdef_macro (node->flatname ());
-
-  os->indent (); // start with the current indentation level
-
-  // retrieve the base type since we may need to do some code
-  // generation for the base type.
-  bt = be_type::narrow_from_decl (node->base_type ());
-  if (!bt)
+  if (node->imported () || node->cli_stub_gen ())
     {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_visitor_sequence_cs::"
-                         "visit_sequence - "
-                         "Bad element type\n"), -1);
+      return 0;
     }
 
-  *os << "// *************************************************************"
-      << be_nl
-      << "// " << node->name () << be_nl
-      << "// *************************************************************"
-      << be_nl << be_nl;
+  be_type *bt = be_type::narrow_from_decl (node->base_type ());
+  AST_Decl::NodeType nt = bt->node_type ();
+
+  // If our base type is an anonymous sequence, generate code for it here.
+  if (nt == AST_Decl::NT_sequence)
+    {
+      if (bt->accept (this) != 0)
+        {
+          ACE_ERROR_RETURN ((LM_ERROR,
+                             "(%N:%l) be_visitor_sequence_cs::"
+                             "visit_sequence - "
+                            "codegen for anonymous base type failed\n"),
+                           -1);
+        }
+
+    }
+
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from " << be_nl
+      << "// "__FILE__ << ":" << __LINE__;
+
+  os->gen_ifdef_macro (node->flat_name ());
 
   // default constructor
-  *os << node->name () << "::" << node->local_name () << " (void)" << be_nl
-      << "{}" << be_nl;
+  *os << be_nl << be_nl
+      << node->name () << "::" << node->local_name () << " (void)" << be_nl
+      << "{}";
 
   // for unbounded sequences, we have a different set of constructors
   if (node->unbounded ())
     {
-      *os << node->name () << "::" << node->local_name ()
-          << " (CORBA::ULong max) // uses max size" << be_nl
-          << "  : ";
+      *os << be_nl << be_nl
+          << node->name () << "::" << node->local_name () << " ("
+          << be_idt << be_idt_nl
+          << "::CORBA::ULong max" << be_uidt_nl
+          << ")" << be_nl
+          << ": " << be_idt;
 
-      // pass it to the base constructor
-      if (this->gen_base_sequence_class (node) == -1)
+      // Pass it to the base constructor.
+      if (node->gen_base_class_name (os, "", this->ctx_->scope ()) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_sequence_cs::"
                              "visit_sequence - "
-                            "codegen for base sequence class\n"), -1);
+                             "codegen for base sequence class failed\n"),
+                           -1);
         }
 
 
-      *os << " (max)" << be_nl
-          << "{}" << be_nl;
+      *os << be_nl << "(max)" << be_uidt << be_uidt_nl
+          << "{}";
     }
 
   // constructor with the buffer
-  *os << node->name () << "::" << node->local_name () << " (";
+  *os << be_nl << be_nl
+      << node->name () << "::" << node->local_name () << " ("
+      << be_idt << be_idt_nl;
+
   if (node->unbounded ())
     {
-      *os << "CORBA::ULong max, ";  // unbounded seq takes this extra parameter
-    }
-  *os << "CORBA::ULong length, ";
-  // generate the base type for the buffer
-  be_visitor_context ctx (*this->ctx_);
-  ctx.state (TAO_CodeGen::TAO_SEQUENCE_BUFFER_TYPE_CS);
-  be_visitor *visitor = tao_cg->make_visitor (&ctx);
-  if (!visitor)
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_visitor_sequence_cs::"
-                         "visit_sequence - "
-                         "Bad visitor\n"), -1);
+      // Unbounded seq takes this extra parameter.
+      *os << "::CORBA::ULong max," << be_nl;
     }
 
-  if (bt->accept (visitor) == -1)
+  *os << "::CORBA::ULong length," << be_nl;
+
+  // generate the base type for the buffer
+  be_visitor_context ctx (*this->ctx_);
+  be_visitor_sequence_buffer_type bt_visitor (&ctx);
+
+  if (bt->accept (&bt_visitor) == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_sequence_cs::"
@@ -219,65 +121,78 @@ int be_visitor_sequence_cs::visit_sequence (be_sequence *node)
                          "base type visit failed\n"),
                         -1);
     }
-  delete visitor;
-  *os << " *buffer, CORBA::Boolean release)" << be_nl
-      << "  : ";
-  // pass it to the base constructor
-  if (this->gen_base_sequence_class (node) == -1)
+
+  *os << " * buffer," << be_nl
+      << "::CORBA::Boolean release" << be_uidt_nl
+      << ")" << be_uidt_nl
+      << "  : " << be_idt << be_idt;
+
+  // Pass it to the base constructor.
+  if (node->gen_base_class_name (os, "", this->ctx_->scope ()) == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_sequence_cs::"
                          "visit_sequence - "
-                         "codegen for base sequence class\n"), -1);
+                         "codegen for base sequence class\n"),
+                        -1);
     }
-  *os << " (";
+
+  *os << be_nl << "(";
+
   if (node->unbounded ())
     {
       *os << "max, ";
     }
-  *os << "length, buffer, release)" << be_nl
-      << "{}" << be_nl;
 
-  // copy constructor
-  *os << node->name () << "::" << node->local_name ()
-      << " (const " << node->local_name ()
-      << " &seq) // copy ctor" << be_nl
-      << "  : ";
-  // pass it to the base constructor
-  if (this->gen_base_sequence_class (node) == -1)
+  *os << "length, buffer, release)" << be_uidt << be_uidt_nl
+      << "{}";
+
+  // Copy constructor.
+  *os << be_nl << be_nl
+      << node->name () << "::" << node->local_name ()
+      << " (" << be_idt << be_idt_nl
+      << "const " << node->local_name ()
+      << " &seq" << be_uidt_nl
+      << ")" << be_uidt_nl
+      << "  : " << be_idt << be_idt;
+
+  // Pass it to the base constructor.
+  if (node->gen_base_class_name (os, "", this->ctx_->scope ()) == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_sequence_cs::"
                          "visit_sequence - "
-                         "codegen for base sequence class\n"), -1);
+                         "codegen for base sequence class\n"),
+                        -1);
     }
-  *os << " (seq)" << be_nl
-      << "{}" << be_nl;
 
-  // destructor
-  *os << node->name () << "::~" << node->local_name ()
-      << " (void) // dtor" << be_nl
-      << "{}\n\n";
+  *os << be_nl << "(seq)" << be_uidt << be_uidt_nl
+      << "{}";
 
-  if (!this->ctx_->tdef ())
+  // Destructor.
+  *os << be_nl << be_nl
+      << node->name () << "::~" << node->local_name ()
+      << " (void)" << be_nl
+      << "{}";
+
+
+  if (be_global->any_support () && !node->anonymous ())
     {
-      // by using a visitor to declare and define the TypeCode, we have the
-      // added advantage to conditionally not generate any code. This will be
-      // based on the command line options. This is still TO-DO
-      ctx = *this->ctx_;
-      ctx.state (TAO_CodeGen::TAO_TYPECODE_DEFN);
-      visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor || (node->accept (visitor) == -1))
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_sequence_cs::"
-                             "visit_sequence - "
-                             "TypeCode definition failed\n"
-                             ), -1);
-        }
+      *os << be_nl << be_nl
+          << "void "
+          << node->name () << "::_tao_any_destructor (" << be_idt << be_idt_nl
+          << "void * _tao_void_pointer" << be_uidt_nl
+          << ")" << be_uidt_nl
+          << "{" << be_idt_nl
+          << node->local_name () << " * _tao_tmp_pointer =" << be_idt_nl
+          << "static_cast<" << node->local_name ()
+          << " *> (_tao_void_pointer);" << be_uidt_nl
+          << "delete _tao_tmp_pointer;" << be_uidt_nl
+          << "}";
     }
 
   os->gen_endif ();
 
+  node->cli_stub_gen (true);
   return 0;
 }

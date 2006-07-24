@@ -19,605 +19,828 @@
 //
 // ============================================================================
 
-#include "idl.h"
-#include "idl_extern.h"
-#include "be.h"
+#include "be_decl.h"
+#include "be_scope.h"
+#include "be_interface.h"
+#include "be_interface_fwd.h"
+#include "be_valuetype.h"
+#include "be_component.h"
+#include "be_eventtype.h"
+#include "be_home.h"
+#include "be_module.h"
+#include "be_root.h"
+#include "be_exception.h"
+#include "be_structure.h"
+#include "be_union.h"
+#include "be_enum.h"
+#include "be_operation.h"
+#include "be_factory.h"
+#include "be_sequence.h"
+#include "be_visitor.h"
+#include "ast_structure_fwd.h"
+#include "ast_string.h"
+#include "utl_identifier.h"
+#include "global_extern.h"
+#include "ace/Log_Msg.h"
+#include "ace/String_Base.h"
 
-ACE_RCSID(be, be_decl, "$Id$")
+ACE_RCSID (be,
+           be_decl,
+           "$Id$")
 
 // Default Constructor
 be_decl::be_decl (void)
-  : cli_hdr_gen_ (I_FALSE),
-    cli_stub_gen_ (I_FALSE),
-    cli_inline_gen_ (I_FALSE),
-    srv_hdr_gen_ (I_FALSE),
-    srv_skel_gen_ (I_FALSE),
-    srv_inline_gen_ (I_FALSE),
-    cli_hdr_any_op_gen_ (I_FALSE),
-    cli_stub_any_op_gen_ (I_FALSE),
-    fullname_ (0),
-    flatname_ (0),
-    repoID_ (0),
-    prefix_ (0),
-    size_type_ (be_decl::SIZE_UNKNOWN),
-    encap_len_ (-1)
+  : COMMON_Base (),
+    AST_Decl (),
+    cli_hdr_gen_ (false),
+    cli_stub_gen_ (false),
+    cli_inline_gen_ (false),
+    srv_hdr_gen_ (false),
+    impl_hdr_gen_ (false),
+    srv_skel_gen_ (false),
+    impl_skel_gen_ (false),
+    srv_inline_gen_ (false),
+    cli_hdr_any_op_gen_ (false),
+    cli_stub_any_op_gen_ (false),
+    cli_hdr_cdr_op_gen_ (false),
+    cli_stub_cdr_op_gen_ (false),
+    cli_inline_cdr_op_gen_ (false),
+    cli_inline_cdr_decl_gen_ (false),
+    cli_hdr_serializer_op_gen_ (false),
+    cli_stub_serializer_op_gen_ (false),
+    cli_inline_serializer_op_gen_ (false),
+    cli_inline_serializer_decl_gen_ (false),
+    cli_traits_gen_ (false),
+    cli_arg_traits_gen_ (false),
+    srv_arg_traits_gen_ (false),
+    srv_sarg_traits_gen_ (false),
+    cli_pragma_inst_gen_ (false),
+    cli_inarg_tmpl_class_gen_ (false),
+    cli_inarg_pragma_inst_gen_ (false),
+    cli_inoutarg_tmpl_class_gen_ (false),
+    cli_inoutarg_pragma_inst_gen_ (false),
+    cli_outarg_tmpl_class_gen_ (false),
+    cli_outarg_pragma_inst_gen_ (false),
+    cli_retarg_tmpl_class_gen_ (false),
+    cli_retarg_pragma_inst_gen_ (false),
+    srv_tmpl_class_gen_ (false),
+    srv_pragma_inst_gen_ (false),
+    srv_inarg_tmpl_class_gen_ (false),
+    srv_inarg_pragma_inst_gen_ (false),
+    srv_inoutarg_tmpl_class_gen_ (false),
+    srv_inoutarg_pragma_inst_gen_ (false),
+    srv_outarg_tmpl_class_gen_ (false),
+    srv_outarg_pragma_inst_gen_ (false),
+    srv_retarg_tmpl_class_gen_ (false),
+    srv_retarg_pragma_inst_gen_ (false),
+    ccm_pre_proc_gen_ (false)
 {
 }
 
 // Constructor
 be_decl::be_decl (AST_Decl::NodeType type,
-		  UTL_ScopedName *n,
-		  UTL_StrList *pragmas)
-  : AST_Decl (type, n, pragmas),
-    cli_hdr_gen_ (I_FALSE),
-    cli_stub_gen_ (I_FALSE),
-    cli_inline_gen_ (I_FALSE),
-    srv_hdr_gen_ (I_FALSE),
-    srv_skel_gen_ (I_FALSE),
-    srv_inline_gen_ (I_FALSE),
-    cli_hdr_any_op_gen_ (I_FALSE),
-    cli_stub_any_op_gen_ (I_FALSE),
-    fullname_ (0),
-    flatname_ (0),
-    repoID_ (0),
-    prefix_ (0),
-    size_type_ (be_decl::SIZE_UNKNOWN),
-    encap_len_ (-1)
+                  UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (type,
+              n),
+    cli_hdr_gen_ (false),
+    cli_stub_gen_ (false),
+    cli_inline_gen_ (false),
+    srv_hdr_gen_ (false),
+    impl_hdr_gen_ (false),
+    srv_skel_gen_ (false),
+    impl_skel_gen_ (false),
+    srv_inline_gen_ (false),
+    cli_hdr_any_op_gen_ (false),
+    cli_stub_any_op_gen_ (false),
+    cli_hdr_cdr_op_gen_ (false),
+    cli_stub_cdr_op_gen_ (false),
+    cli_inline_cdr_op_gen_ (false),
+    cli_inline_cdr_decl_gen_ (false),
+    cli_hdr_serializer_op_gen_ (false),
+    cli_stub_serializer_op_gen_ (false),
+    cli_inline_serializer_op_gen_ (false),
+    cli_inline_serializer_decl_gen_ (false),
+    cli_traits_gen_ (false),
+    cli_arg_traits_gen_ (false),
+    srv_arg_traits_gen_ (false),
+    srv_sarg_traits_gen_ (false),
+    cli_pragma_inst_gen_ (false),
+    cli_inarg_tmpl_class_gen_ (false),
+    cli_inarg_pragma_inst_gen_ (false),
+    cli_inoutarg_tmpl_class_gen_ (false),
+    cli_inoutarg_pragma_inst_gen_ (false),
+    cli_outarg_tmpl_class_gen_ (false),
+    cli_outarg_pragma_inst_gen_ (false),
+    cli_retarg_tmpl_class_gen_ (false),
+    cli_retarg_pragma_inst_gen_ (false),
+    srv_tmpl_class_gen_ (false),
+    srv_pragma_inst_gen_ (false),
+    srv_inarg_tmpl_class_gen_ (false),
+    srv_inarg_pragma_inst_gen_ (false),
+    srv_inoutarg_tmpl_class_gen_ (false),
+    srv_inoutarg_pragma_inst_gen_ (false),
+    srv_outarg_tmpl_class_gen_ (false),
+    srv_outarg_pragma_inst_gen_ (false),
+    srv_retarg_tmpl_class_gen_ (false),
+    srv_retarg_pragma_inst_gen_ (false),
+    ccm_pre_proc_gen_ (false)
 {
 }
 
-//destructor
+// Destructor
 be_decl::~be_decl (void)
 {
 }
 
-int
-be_decl::gen_encapsulation (void)
-{
-  // do nothing
-  return 0;
-}
-
-long
-be_decl::tc_encap_len (void)
-{
-  return -1;
-}
-
-// return our size type
-be_decl::SIZE_TYPE
-be_decl::size_type (void)
-{
-  if (this->size_type_ == be_decl::SIZE_UNKNOWN)
-    (void) this->compute_size_type ();
-  return this->size_type_;
-}
-
-// set our size type and that of all our ancestors
 void
-be_decl::size_type (be_decl::SIZE_TYPE st)
+be_decl::compute_full_name  (const char *prefix,
+                             const char *suffix,
+                             char *&name)
 {
-  // precondition - you cannot set somebody's sizetype to unknown
-  ACE_ASSERT (st != be_decl::SIZE_UNKNOWN);
-
-  // st can be VARIABLE or FIXED
-  if (this->size_type_ == be_decl::SIZE_UNKNOWN) // not set yet
-    this->size_type_ = st; // set it
-  else if ((this->size_type_ == be_decl::FIXED) &&
-           (st == be_decl::VARIABLE))
-    // once we are VARIABLE, we cannot be FIXED. But if we were FIXED and then
-    // get overwritten to VARIABLE, it is fine. Such a situation occurs only
-    // when setting the sizes of structures and unions
-    this->size_type_ = st;
-}
-
-// compute stringified fully scoped name
-void
-be_decl::compute_fullname (void)
-{
-  if (fullname_)
-    return;
-  else
+  if (prefix == 0 || suffix == 0)
     {
-      long namelen;
-      UTL_IdListActiveIterator *i;
-      long first = I_TRUE;
-      long second = I_FALSE;
-
-      // in the first loop compute the total length
-      namelen = 0;
-      i = new UTL_IdListActiveIterator (this->name ());
-      while (!(i->is_done ()))
-        {
-          if (!first)
-            namelen += 2; // for "::"
-          else if (second)
-            first = second = I_FALSE;
-          // print the identifier
-          namelen += ACE_OS::strlen (i->item ()->get_string ());
-          if (first)
-            {
-              if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
-                // does not start with a ""
-                first = I_FALSE;
-              else
-                second = I_TRUE;
-            }
-          i->next ();
-        }
-      delete i;
-
-      this->fullname_ = new char [namelen+1];
-      this->fullname_[0] = '\0';
-      first = I_TRUE;
-      second = I_FALSE;
-      i = new UTL_IdListActiveIterator (this->name ());
-      while (!(i->is_done ()))
-        {
-          if (!first)
-            ACE_OS::strcat (this->fullname_, "::");
-          else if (second)
-            first = second = I_FALSE;
-          // print the identifier
-          ACE_OS::strcat (this->fullname_, i->item ()->get_string ());
-          if (first)
-            {
-              if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
-                // does not start with a ""
-                first = I_FALSE;
-              else
-                second = I_TRUE;
-            }
-          i->next ();
-        }
-      delete i;
-    }
-  return;
-}
-
-const char*
-be_decl::fullname (void)
-{
-  if (!this->fullname_)
-    compute_fullname ();
-
-  return this->fullname_;
-}
-
-// compute stringified flattened fully scoped name
-void
-be_decl::compute_flatname (void)
-{
-  if (flatname_)
-    return;
-  else
-    {
-      long namelen;
-      UTL_IdListActiveIterator *i;
-      long first = I_TRUE;
-      long second = I_FALSE;
-
-      // in the first loop compute the total length
-      namelen = 0;
-      i = new UTL_IdListActiveIterator (this->name ());
-      while (!(i->is_done ()))
-        {
-          if (!first)
-            namelen += 1; // for "_"
-          else if (second)
-            first = second = I_FALSE;
-          // print the identifier
-          namelen += ACE_OS::strlen (i->item ()->get_string ());
-          if (first)
-            {
-              if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
-                // does not start with a ""
-                first = I_FALSE;
-              else
-                second = I_TRUE;
-            }
-          i->next ();
-        }
-      delete i;
-
-      this->flatname_ = new char [namelen+1];
-      this->flatname_[0] = '\0';
-      first = I_TRUE;
-      second = I_FALSE;
-      i = new UTL_IdListActiveIterator (this->name ());
-      while (!(i->is_done ()))
-        {
-          if (!first)
-            ACE_OS::strcat (this->flatname_, "_");
-          else if (second)
-            first = second = I_FALSE;
-          // print the identifier
-          ACE_OS::strcat (this->flatname_, i->item ()->get_string ());
-          if (first)
-            {
-              if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
-                // does not start with a ""
-                first = I_FALSE;
-              else
-                second = I_TRUE;
-            }
-          i->next ();
-        }
-      delete i;
-    }
-  return;
-}
-
-const char*
-be_decl::flatname (void)
-{
-  if (!this->flatname_)
-    compute_flatname ();
-
-  return this->flatname_;
-}
-
-// compute stringified repository ID
-void
-be_decl::compute_repoID (void)
-{
-  if (repoID_)
-    return;
-  else
-    {
-      long namelen;
-      UTL_IdListActiveIterator *i;
-      long first = I_TRUE;
-      long second = I_FALSE;
-
-      // in the first loop compute the total length
-      namelen = 8; // for the prefix "IDL:" and suffix ":1.0"
-      namelen += ACE_OS::strlen (this->prefix ()) + 1;
-      i = new UTL_IdListActiveIterator (this->name ());
-      while (!(i->is_done ()))
-        {
-          if (!first)
-            namelen += 1; // for "/"
-          else if (second)
-            first = second = I_FALSE;
-          // print the identifier
-          namelen += ACE_OS::strlen (i->item ()->get_string ());
-          if (first)
-            {
-              if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
-                // does not start with a ""
-                first = I_FALSE;
-              else
-                second = I_TRUE;
-            }
-          i->next ();
-        }
-      delete i;
-
-      this->repoID_ = new char [namelen+1];
-      this->repoID_[0] = '\0';
-      ACE_OS::sprintf (this->repoID_, "%s", "IDL:");
-      ACE_OS::strcat (this->repoID_, this->prefix ());
-      ACE_OS::strcat (this->repoID_, "/");
-      i = new UTL_IdListActiveIterator (this->name ());
-      first = I_TRUE;
-      second = I_FALSE;
-      while (!(i->is_done ()))
-        {
-          if (!first)
-            ACE_OS::strcat (this->repoID_, "/");
-          else if (second)
-            first = second = I_FALSE;
-          // print the identifier
-          ACE_OS::strcat (this->repoID_, i->item ()->get_string ());
-          if (first)
-            {
-              if (ACE_OS::strcmp (i->item ()->get_string (), "") != 0)
-                // does not start with a ""
-                first = I_FALSE;
-              else
-                second = I_TRUE;
-            }
-          i->next ();
-        }
-      delete i;
-      ACE_OS::strcat (this->repoID_, ":1.0");
-    }
-  return;
-}
-
-const char *
-be_decl::repoID (void)
-{
-  if (!this->repoID_)
-    compute_repoID ();
-
-  return this->repoID_;
-}
-
-void
-be_decl::compute_prefix ()
-{
-  const char* pragma = 0;
-  if (this->pragmas () != 0)
-    {
-      for (UTL_StrlistActiveIterator i (this->pragmas ());
-	   !i.is_done ();
-	   i.next ())
-	{
-	  const char* s = i.item ()->get_string ();
-
-	  if (ACE_OS::strncmp (s, "#pragma prefix", 14) == 0)
-	    {
-	      pragma = s;
-	    }
-	}
-    }
-
-  if (pragma != 0)
-    {
-      // Skip the space and the " also...
-      const char* tmp = pragma + 16;
-      const char* end = ACE_OS::strchr (tmp, '"');
-
-      if (end == 0)
-	{
-	  idl_global->err ()->syntax_error
-	    (IDL_GlobalData::PS_PragmaPrefixSyntax);
-	  this->prefix_ = ACE_OS::strnew ("");
-	  return;
-	}
-      int l = end - tmp;
-      this->prefix_ = new char[l+1];
-      ACE_OS::strncpy (this->prefix_, tmp, end - tmp);
-      this->prefix_[l] = 0;
       return;
     }
 
-  // Could not find it in the local scope, try to recurse to the top
-  // scope...
+  ACE_CString prefix_str (prefix);
+  ACE_CString suffix_str (suffix);
+  ACE_CString result_str;
+
+  // Get parent.
   if (this->defined_in () == 0)
-    this->prefix_ = ACE_OS::strnew ("");
+    {
+      // Global scope.
+
+      // Prefix.
+      result_str = prefix_str;
+
+      // Local name.
+      result_str += ACE_CString (this->local_name ()->get_string ());
+
+      // Suffix.
+      result_str += suffix_str;
+    }
   else
     {
-      be_scope* scope = 
-	be_scope::narrow_from_scope (this->defined_in ());
-      if (scope == 0)
-	this->prefix_ = ACE_OS::strnew ("");
-      else
-	this->prefix_ = ACE_OS::strnew (scope->decl()->prefix ());
+      // Get scope name.
+      be_decl *parent =
+        be_scope::narrow_from_scope (this->defined_in ())->decl ();
+
+      if (parent == 0)
+        {
+          ACE_ERROR ((LM_ERROR,
+                      "(%N:%l) be_decl::"
+                      "compute_full_name - "
+                      "scope name is nil\n"));
+        }
+
+      // Parent name.
+      result_str = ACE_CString (parent->full_name ());
+
+      // _
+      if (ACE_OS::strcmp (parent->full_name (), "") != 0)
+        {
+          result_str += ACE_CString ("::");
+        }
+
+      // Prefix.
+      result_str += prefix_str;
+
+      // Local name.
+      result_str += ACE_CString (this->local_name ()->get_string ());
+
+      // Suffix.
+      result_str += suffix_str;
     }
+
+  name = ACE_OS::strdup (result_str.fast_rep ());
 }
 
-const char*
-be_decl::prefix (void)
+void
+be_decl::compute_flat_name  (const char *prefix,
+                             const char *suffix,
+                             char *&name)
 {
-  if (!this->prefix_)
-    compute_prefix ();
-  return this->prefix_;
-}
-
-// converts a string name into an array of 4 byte longs
-int
-be_decl::tc_name2long (const char *name, long *&larr, long &arrlen)
-{
-  static long buf [NAMEBUFSIZE / sizeof (long)];
-  long slen;
-  long i;
-
-  slen = ACE_OS::strlen (name) + 1; // 1 for NULL terminating
-
-  // compute the number of bytes necessary to hold the name rounded to the next
-  // multiple of 4 (i.e., size of long)
-  arrlen = slen/4 + (slen%4 ? 1:0);
-
-  ACE_OS::memset (buf, '\0', arrlen*4);
-  larr = buf;
-  ACE_OS::memcpy (buf, name, arrlen*4);
-  for (i = 0; i < arrlen; i++)
-    larr [i] = ACE_HTONL (larr [i]);
-
-#if 0
-  for (i=0; i < ACE_OS::strlen (name); i++)
+  if (prefix == 0 || suffix == 0)
     {
-      long shift; // num bytes to shift left
-
-      shift = 3 - (i%4);
-      // store the computed shifted quantity in the appropriate byte of the
-      // array to be returned
-      larr [i/4] |= ((name[i] & 0xff) << (shift*8));
+      return;
     }
-#endif
-  return 0;
+
+  ACE_CString prefix_str (prefix);
+  ACE_CString suffix_str (suffix);
+
+  ACE_CString result_str;
+
+  // Get parent.
+  if (this->defined_in () == 0)
+    {
+      // Global scope.
+
+      // Prefix.
+      result_str = prefix_str;
+
+      // Local name.
+      result_str += ACE_CString (this->local_name ()->get_string ());
+
+      // Suffix.
+      result_str += suffix_str;
+    }
+  else
+    {
+      // Get scope name.
+      be_decl *parent =
+        be_scope::narrow_from_scope (this->defined_in ())->decl ();
+      if (parent == 0)
+        {
+          ACE_ERROR ((LM_ERROR,
+                      "(%N:%l) be_decl::"
+                      "compute_flat_name - "
+                      "scope name is nil\n"));
+        }
+
+      // Parent name.
+      result_str = ACE_CString (parent->flat_name ());
+
+      // _
+      if (ACE_OS::strcmp (parent->flat_name (), "") != 0)
+        result_str += "_";
+
+      // Prefix.
+      result_str += prefix_str;
+
+      // Local name.
+      result_str += ACE_CString (this->local_name ()->get_string ());
+
+      // Suffix.
+      result_str += suffix_str;
+    }
+
+  name = ACE_OS::strdup (result_str.c_str ());
 }
 
-idl_bool
-be_decl::is_nested (void)
+void
+be_decl::destroy (void)
 {
-  be_decl *d;
-
-  d = be_scope::narrow_from_scope (this->defined_in ())->decl ();
-  // if we have an outermost scope and if that scope is not that of the Root,
-  // then we are defined at some nesting level
-  if (d && d->node_type () != AST_Decl::NT_root)
-    return I_TRUE;
-
-  return I_FALSE;
 }
 
-// return the length in bytes to hold the repoID inside a typecode. This
-// comprises 4 bytes indicating the length of the string followed by the actual
-// string represented as longs.
-long
-be_decl::repoID_encap_len (void)
+void
+be_decl::set_local (bool val)
 {
-  long slen;
-
-  slen = ACE_OS::strlen (this->repoID ()) + 1; // + 1 for NULL terminating char
-  // the number of bytes to hold the string must be a multiple of 4 since this
-  // will be represented as an array of longs
-  return 4 + 4 * (slen/4 + (slen%4 ? 1:0));
+  this->is_local_ = val;
 }
 
-// return the length in bytes to hold the name inside a typecode. This
-// comprises 4 bytes indicating the length of the string followed by the actual
-// string represented as longs.
-long
-be_decl::name_encap_len (void)
-{
-  long slen;
-
-  slen = ACE_OS::strlen (this->local_name ()->get_string ()) + 1;
-
-  // the number of bytes to hold the string must be a multiple of 4 since this
-  // will be represented as an array of longs
-  return 4 + 4 * (slen/4 + (slen%4 ? 1:0));
-}
-
-// compute the size type of the node in question
-int
-be_decl::compute_size_type (void)
-{
-  return 0;
-}
-
-// return the scope created by this node (if one exists, else NULL)
+// Return the scope created by this node (if one exists, else NULL).
 be_scope *
 be_decl::scope (void)
 {
   be_decl *d = this;
 
-   switch (this->node_type()) {
-   case AST_Decl::NT_interface_fwd:
-      /*
-       * Resolve forward declared interface by looking at full_definition()
-       * field and iterating
-       */
-      d = be_interface::narrow_from_decl ((be_interface_fwd::narrow_from_decl
-                                           (this))->full_definition ());
-      /*
-       * Fall through
-       */
-   case AST_Decl::NT_interface:
-      return be_interface::narrow_from_decl (d);
-   case AST_Decl::NT_module:
-      return be_module::narrow_from_decl (d);
-   case AST_Decl::NT_root:
-      return be_root::narrow_from_decl (d);
-   case AST_Decl::NT_except:
-      return be_exception::narrow_from_decl (d);
-   case AST_Decl::NT_union:
-      return be_union::narrow_from_decl (d);
-   case AST_Decl::NT_struct:
-      return be_structure::narrow_from_decl (d);
-   case AST_Decl::NT_enum:
-      return be_enum::narrow_from_decl (d);
-   case AST_Decl::NT_op:
-      return be_operation::narrow_from_decl (d);
-   case AST_Decl::NT_sequence:
-      return be_sequence::narrow_from_decl (d);
-   default:
-      return (be_scope *)0;
+   switch (this->node_type ())
+   {
+     case AST_Decl::NT_interface_fwd:
+        // Resolve forward declared interface by looking at full_definition()
+        // field and iterating.
+        d =
+          be_interface::narrow_from_decl (
+              (be_interface_fwd::narrow_from_decl (this))->full_definition ()
+            );
+     // Fall through
+     case AST_Decl::NT_interface:
+        return be_interface::narrow_from_decl (d);
+     case AST_Decl::NT_module:
+        return be_module::narrow_from_decl (d);
+     case AST_Decl::NT_root:
+        return be_root::narrow_from_decl (d);
+     case AST_Decl::NT_except:
+        return be_exception::narrow_from_decl (d);
+     case AST_Decl::NT_union:
+        return be_union::narrow_from_decl (d);
+     case AST_Decl::NT_struct:
+        return be_structure::narrow_from_decl (d);
+     case AST_Decl::NT_enum:
+        return be_enum::narrow_from_decl (d);
+     case AST_Decl::NT_op:
+        return be_operation::narrow_from_decl (d);
+     case AST_Decl::NT_factory:
+        return be_factory::narrow_from_decl (d);
+     case AST_Decl::NT_sequence:
+        return be_sequence::narrow_from_decl (d);
+     case AST_Decl::NT_valuetype:
+        return be_valuetype::narrow_from_decl (d);
+     case AST_Decl::NT_component:
+        return be_component::narrow_from_decl (d);
+     case AST_Decl::NT_eventtype:
+        return be_eventtype::narrow_from_decl (d);
+     case AST_Decl::NT_home:
+        return be_home::narrow_from_decl (d);
+     default:
+        return (be_scope *)0;
    }
 }
 
-// boolean methods to test if code was already generated
-idl_bool
+// Boolean methods to test if code was already generated.
+bool
 be_decl::cli_hdr_gen (void)
 {
   return this->cli_hdr_gen_;
 }
 
-idl_bool
+bool
 be_decl::cli_stub_gen (void)
 {
   return this->cli_stub_gen_;
 }
 
-idl_bool
+bool
 be_decl::cli_hdr_any_op_gen (void)
 {
   return this->cli_hdr_any_op_gen_;
 }
 
-idl_bool
+bool
 be_decl::cli_stub_any_op_gen (void)
 {
   return this->cli_stub_any_op_gen_;
 }
 
-idl_bool
+bool
+be_decl::cli_hdr_cdr_op_gen (void)
+{
+  return this->cli_hdr_cdr_op_gen_;
+}
+
+bool
+be_decl::cli_stub_cdr_op_gen (void)
+{
+  return this->cli_stub_cdr_op_gen_;
+}
+
+bool
+be_decl::cli_inline_cdr_op_gen (void)
+{
+  return this->cli_inline_cdr_op_gen_;
+}
+
+bool
+be_decl::cli_inline_cdr_decl_gen (void)
+{
+  return this->cli_inline_cdr_decl_gen_;
+}
+
+bool
+be_decl::cli_hdr_serializer_op_gen (void)
+{
+  return this->cli_hdr_serializer_op_gen_;
+}
+
+bool
+be_decl::cli_stub_serializer_op_gen (void)
+{
+  return this->cli_stub_serializer_op_gen_;
+}
+
+bool
+be_decl::cli_inline_serializer_op_gen (void)
+{
+  return this->cli_inline_serializer_op_gen_;
+}
+
+bool
+be_decl::cli_inline_serializer_decl_gen (void)
+{
+  return this->cli_inline_cdr_decl_gen_;
+}
+
+bool
+be_decl::cli_traits_gen (void)
+{
+  return this->cli_traits_gen_;
+}
+
+bool
+be_decl::cli_arg_traits_gen (void)
+{
+  return this->cli_arg_traits_gen_;
+}
+
+bool
+be_decl::srv_arg_traits_gen (void)
+{
+  return this->srv_arg_traits_gen_;
+}
+
+bool
+be_decl::srv_sarg_traits_gen (void)
+{
+  return this->srv_sarg_traits_gen_;
+}
+
+bool
+be_decl::cli_pragma_inst_gen (void)
+{
+  return this->cli_pragma_inst_gen_;
+}
+
+bool
+be_decl::cli_inarg_tmpl_class_gen (void)
+{
+  return this->cli_inarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::cli_inarg_pragma_inst_gen (void)
+{
+  return this->cli_inarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::cli_inoutarg_tmpl_class_gen (void)
+{
+  return this->cli_inoutarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::cli_inoutarg_pragma_inst_gen (void)
+{
+  return this->cli_inoutarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::cli_outarg_tmpl_class_gen (void)
+{
+  return this->cli_outarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::cli_outarg_pragma_inst_gen (void)
+{
+  return this->cli_outarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::cli_retarg_tmpl_class_gen (void)
+{
+  return this->cli_retarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::cli_retarg_pragma_inst_gen (void)
+{
+  return this->cli_retarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::srv_tmpl_class_gen (void)
+{
+  return this->srv_tmpl_class_gen_;
+}
+
+bool
+be_decl::srv_pragma_inst_gen (void)
+{
+  return this->srv_pragma_inst_gen_;
+}
+
+bool
+be_decl::srv_inarg_tmpl_class_gen (void)
+{
+  return this->srv_inarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::srv_inarg_pragma_inst_gen (void)
+{
+  return this->srv_inarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::srv_inoutarg_tmpl_class_gen (void)
+{
+  return this->srv_inoutarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::srv_inoutarg_pragma_inst_gen (void)
+{
+  return this->srv_inoutarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::srv_outarg_tmpl_class_gen (void)
+{
+  return this->srv_outarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::srv_outarg_pragma_inst_gen (void)
+{
+  return this->srv_outarg_pragma_inst_gen_;
+}
+
+bool
+be_decl::srv_retarg_tmpl_class_gen (void)
+{
+  return this->srv_retarg_tmpl_class_gen_;
+}
+
+bool
+be_decl::srv_retarg_pragma_inst_gen (void)
+{
+  return this->cli_retarg_pragma_inst_gen_;
+}
+
+bool
 be_decl::cli_inline_gen (void)
 {
   return this->cli_inline_gen_;
 }
 
-idl_bool
+bool
 be_decl::srv_hdr_gen (void)
 {
   return this->srv_hdr_gen_;
 }
 
-idl_bool
+bool
+be_decl::impl_hdr_gen (void)
+{
+  return this->impl_hdr_gen_;
+}
+
+bool
 be_decl::srv_skel_gen (void)
 {
   return this->srv_skel_gen_;
 }
 
-idl_bool
+bool
+be_decl::impl_skel_gen (void)
+{
+  return this->impl_skel_gen_;
+}
+
+bool
 be_decl::srv_inline_gen (void)
 {
   return this->srv_inline_gen_;
 }
 
-// set the flag indicating that code generation is done
+bool
+be_decl::ccm_pre_proc_gen (void)
+{
+  return this->ccm_pre_proc_gen_;
+}
+
+// Set the flag indicating that code generation is done.
 void
-be_decl::cli_hdr_gen (idl_bool val)
+be_decl::cli_hdr_gen (bool val)
 {
   this->cli_hdr_gen_ = val;
 }
 
 void
-be_decl::cli_stub_gen (idl_bool val)
+be_decl::cli_stub_gen (bool val)
 {
   this->cli_stub_gen_ = val;
 }
 
 void
-be_decl::cli_hdr_any_op_gen (idl_bool val)
+be_decl::cli_hdr_any_op_gen (bool val)
 {
   this->cli_hdr_any_op_gen_ = val;
 }
 
 void
-be_decl::cli_stub_any_op_gen (idl_bool val)
+be_decl::cli_stub_any_op_gen (bool val)
 {
   this->cli_stub_any_op_gen_ = val;
 }
 
 void
-be_decl::cli_inline_gen (idl_bool val)
+be_decl::cli_hdr_cdr_op_gen (bool val)
+{
+  this->cli_hdr_cdr_op_gen_ = val;
+}
+
+void
+be_decl::cli_stub_cdr_op_gen (bool val)
+{
+  this->cli_stub_cdr_op_gen_ = val;
+}
+
+void
+be_decl::cli_inline_cdr_op_gen (bool val)
+{
+  this->cli_inline_cdr_op_gen_ = val;
+}
+
+void
+be_decl::cli_inline_cdr_decl_gen (bool val)
+{
+  this->cli_inline_cdr_decl_gen_ = val;
+}
+
+void
+be_decl::cli_hdr_serializer_op_gen (bool val)
+{
+  this->cli_hdr_serializer_op_gen_ = val;
+}
+
+void
+be_decl::cli_stub_serializer_op_gen (bool val)
+{
+  this->cli_stub_serializer_op_gen_ = val;
+}
+
+void
+be_decl::cli_inline_serializer_op_gen (bool val)
+{
+  this->cli_inline_serializer_op_gen_ = val;
+}
+
+void
+be_decl::cli_inline_serializer_decl_gen (bool val)
+{
+  this->cli_inline_serializer_decl_gen_ = val;
+}
+
+void
+be_decl::cli_inline_gen (bool val)
 {
   this->cli_inline_gen_ = val;
 }
 
 void
-be_decl::srv_hdr_gen (idl_bool val)
+be_decl::cli_traits_gen (bool val)
+{
+  this->cli_traits_gen_ = val;
+}
+
+void
+be_decl::cli_arg_traits_gen (bool val)
+{
+  this->cli_arg_traits_gen_ = val;
+}
+
+void
+be_decl::srv_arg_traits_gen (bool val)
+{
+  this->srv_arg_traits_gen_ = val;
+}
+
+void
+be_decl::srv_sarg_traits_gen (bool val)
+{
+  this->srv_sarg_traits_gen_ = val;
+}
+
+void
+be_decl::cli_pragma_inst_gen (bool val)
+{
+  this->cli_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::cli_inarg_tmpl_class_gen (bool val)
+{
+  this->cli_inarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::cli_inarg_pragma_inst_gen (bool val)
+{
+  this->cli_inarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::cli_inoutarg_tmpl_class_gen (bool val)
+{
+  this->cli_inoutarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::cli_inoutarg_pragma_inst_gen (bool val)
+{
+  this->cli_inoutarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::cli_outarg_tmpl_class_gen (bool val)
+{
+  this->cli_outarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::cli_outarg_pragma_inst_gen (bool val)
+{
+  this->cli_outarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::cli_retarg_tmpl_class_gen (bool val)
+{
+  this->cli_retarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::cli_retarg_pragma_inst_gen (bool val)
+{
+  this->cli_retarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::srv_tmpl_class_gen (bool val)
+{
+  this->srv_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::srv_pragma_inst_gen (bool val)
+{
+  this->srv_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::srv_inarg_tmpl_class_gen (bool val)
+{
+  this->srv_inarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::srv_inarg_pragma_inst_gen (bool val)
+{
+  this->srv_inarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::srv_inoutarg_tmpl_class_gen (bool val)
+{
+  this->srv_inoutarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::srv_inoutarg_pragma_inst_gen (bool val)
+{
+  this->srv_inoutarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::srv_outarg_tmpl_class_gen (bool val)
+{
+  this->srv_outarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::srv_outarg_pragma_inst_gen (bool val)
+{
+  this->srv_outarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::srv_retarg_tmpl_class_gen (bool val)
+{
+  this->srv_retarg_tmpl_class_gen_ = val;
+}
+
+void
+be_decl::srv_retarg_pragma_inst_gen (bool val)
+{
+  this->srv_retarg_pragma_inst_gen_ = val;
+}
+
+void
+be_decl::srv_hdr_gen (bool val)
 {
   this->srv_hdr_gen_ = val;
 }
 
 void
-be_decl::srv_skel_gen (idl_bool val)
+be_decl::impl_hdr_gen (bool val)
+{
+  this->impl_hdr_gen_ = val;
+}
+
+
+void
+be_decl::srv_skel_gen (bool val)
 {
   this->srv_skel_gen_ = val;
 }
 
 void
-be_decl::srv_inline_gen (idl_bool val)
+be_decl::srv_inline_gen (bool val)
 {
   this->srv_inline_gen_ = val;
 }
+
+void
+be_decl::ccm_pre_proc_gen (bool val)
+{
+  this->ccm_pre_proc_gen_ = val;
+}
+
+//==========================================
 
 int
 be_decl::accept (be_visitor *visitor)
@@ -625,23 +848,120 @@ be_decl::accept (be_visitor *visitor)
   return visitor->visit_decl (this);
 }
 
-idl_bool
-be_decl::is_child (be_decl *node)
+void
+be_decl::set_arg_seen_bit (be_type *bt)
 {
-  if (this->defined_in ())
+  if (bt == 0)
     {
-      be_decl *bd;
-
-      bd = be_scope::narrow_from_scope (this->defined_in ())->decl ();
-      if (!bd)
-        return 0;
-
-      if (!ACE_OS::strcmp (bd->fullname (), node->fullname ()))
-        return 1; // true
+      return;
     }
-  return 0; // not a child
+
+  switch (bt->node_type ())
+    {
+      case NT_typedef:
+        {
+          AST_Typedef *td = AST_Typedef::narrow_from_decl (bt);
+          this->set_arg_seen_bit (
+                    be_type::narrow_from_decl (td->primitive_base_type ())
+                  );
+          break;
+        }
+      case NT_interface:
+      case NT_interface_fwd:
+      case NT_valuetype:
+      case NT_valuetype_fwd:
+      case NT_component:
+      case NT_component_fwd:
+      case NT_home:
+      case NT_eventtype:
+      case NT_eventtype_fwd:
+        idl_global->object_arg_seen_ = true;
+        break;
+      case NT_union:
+      case NT_struct:
+        if (bt->size_type () == AST_Type::FIXED)
+          {
+            idl_global->fixed_size_arg_seen_ = true;
+          }
+        else
+          {
+            idl_global->var_size_arg_seen_ = true;
+          }
+
+        break;
+      case NT_struct_fwd:
+      case NT_union_fwd:
+        {
+          AST_StructureFwd *fwd = AST_StructureFwd::narrow_from_decl (bt);
+          be_type *fd = be_type::narrow_from_decl (fwd->full_definition ());
+          this->set_arg_seen_bit (fd);
+          break;
+        }
+      case NT_enum:
+      case NT_enum_val:
+        idl_global->basic_arg_seen_ = true;
+        break;
+      case NT_string:
+      case NT_wstring:
+        {
+          AST_String *str = AST_String::narrow_from_decl (bt);
+
+          if (str->max_size ()->ev ()->u.ulval == 0)
+            {
+              idl_global->ub_string_arg_seen_ = true;
+            }
+          else
+            {
+              idl_global->bd_string_arg_seen_ = true;
+            }
+
+          break;
+        }
+      case NT_array:
+        if (bt->size_type () == AST_Type::FIXED)
+          {
+            idl_global->fixed_array_arg_seen_ = true;
+          }
+        else
+          {
+            idl_global->var_array_arg_seen_ = true;
+          }
+
+        break;
+      case NT_sequence:
+        idl_global->var_size_arg_seen_ = true;
+        break;
+      case NT_pre_defined:
+        {
+          AST_PredefinedType *pdt = AST_PredefinedType::narrow_from_decl (bt);
+
+          switch (pdt->pt ())
+            {
+              case AST_PredefinedType::PT_object:
+              case AST_PredefinedType::PT_pseudo:
+              case AST_PredefinedType::PT_value:
+                idl_global->object_arg_seen_ = true;
+                break;
+              case AST_PredefinedType::PT_any:
+                idl_global->var_size_arg_seen_ = true;
+                idl_global->any_arg_seen_ = true;
+                break;
+              case AST_PredefinedType::PT_char:
+              case AST_PredefinedType::PT_wchar:
+              case AST_PredefinedType::PT_octet:
+              case AST_PredefinedType::PT_boolean:
+                idl_global->special_basic_arg_seen_ = true;
+                break;
+             default:
+                idl_global->basic_arg_seen_ = true;
+                break;
+            }
+        }
+      default:
+        break;
+    }
 }
 
-// narrowing methods
+// Narrowing methods.
 IMPL_NARROW_METHODS1 (be_decl, AST_Decl)
 IMPL_NARROW_FROM_DECL (be_decl)

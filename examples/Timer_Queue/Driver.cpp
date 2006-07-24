@@ -20,6 +20,9 @@
 #if !defined (_DRIVER_CPP_)
 #define _DRIVER_CPP_
 
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
+#include "ace/OS_NS_unistd.h"
 #include "ace/Auto_Ptr.h"
 #include "Driver.h"
 
@@ -32,6 +35,12 @@ Command<RECEIVER, ACTION>::Command (RECEIVER &recvr,
                                     ACTION action)
   : receiver_ (recvr),
     action_ (action)
+{
+}
+
+// destructor
+template <class RECEIVER, class ACTION>
+Command<RECEIVER, ACTION>::~Command (void)
 {
 }
 

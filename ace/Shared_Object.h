@@ -1,47 +1,59 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
+//==========================================================================
+/**
+ *  @file    Shared_Object.h
+ *
+ *  $Id$
+ *
+ *  @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//==========================================================================
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Shared_Object.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
-
-#if !defined (ACE_SHARED_OBJECT_H)
+#ifndef ACE_SHARED_OBJECT_H
 #define ACE_SHARED_OBJECT_H
 
-#include "ace/ACE.h"
+#include /**/ "ace/pre.h"
 
+#include "ace/ACE_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "ace/os_include/sys/os_types.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class ACE_Shared_Object
+ *
+ * @brief Provide the abstract base class used to access dynamic
+ * linking facilities.
+ */
 class ACE_Export ACE_Shared_Object
 {
-  // = TITLE
-  //     Provide the abstract base class used to access dynamic
-  //     linking facilities.
 public:
   ACE_Shared_Object (void);
 
-  virtual int init (int argc, ASYS_TCHAR *argv[]);
-  // Initializes object when dynamic linking occurs.
+  /// Initializes object when dynamic linking occurs.
+  virtual int init (int argc, ACE_TCHAR *argv[]);
 
+  /// Terminates object when dynamic unlinking occurs.
   virtual int fini (void);
-  // Terminates object when dynamic unlinking occurs.
 
-  virtual int info (ASYS_TCHAR **info_string, size_t length = 0) const;
-  // Returns information on active object.
+  /// Returns information on a service object.
+  virtual int info (ACE_TCHAR **info_string, size_t length = 0) const;
 
   virtual ~ACE_Shared_Object (void);
 };
 
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #if defined (__ACE_INLINE__)
-#include "ace/Shared_Object.i"
+#include "ace/Shared_Object.inl"
 #endif /* __ACE_INLINE__ */
+
+#include /**/ "ace/post.h"
 
 #endif /* ACE_SHARED_OBJECT_H */

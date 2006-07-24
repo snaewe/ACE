@@ -1,71 +1,84 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    LSOCK.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    LSOCK.h
+ *
+ *  $Id$
+ *
+ *  @author Doug Schmidt
+ */
+//=============================================================================
 
-#if !defined (ACE_LOCAL_SOCK_H)
+
+#ifndef ACE_LOCAL_SOCK_H
 #define ACE_LOCAL_SOCK_H
 
-#include "ace/SOCK.h"
+#include /**/ "ace/pre.h"
+
+#include "ace/ACE_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 #if !defined (ACE_LACKS_UNIX_DOMAIN_SOCKETS)
 
+#include "ace/SOCK.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class ACE_LSOCK
+ *
+ * @brief Create a Local ACE_SOCK, which is used for passing file
+ * descriptors.
+ */
 class ACE_Export ACE_LSOCK
 {
-  // = TITLE
-  //     Create a Local ACE_SOCK, which is used for passing file
-  //     descriptors.  
 public:
 #if defined (ACE_HAS_MSG)
-  int send_handle (const ACE_HANDLE handle) const;	
-  // Send an open FD to another process. 
+  /// Send an open FD to another process.
+  ssize_t send_handle (const ACE_HANDLE handle) const;
 
-  int recv_handle (ACE_HANDLE &handles, 
-		   char *pbuf = 0, 
-		   int *len = 0) const; 
-  // Recv an open FD from another process. 
+  /// Recv an open FD from another process.
+  ssize_t recv_handle (ACE_HANDLE &handles,
+                       char *pbuf = 0,
+                       ssize_t *len = 0) const;
 #endif /* ACE_HAS_MSG */
 
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 protected:
-  // = Ensure that ACE_LSOCK is an abstract base class 
+  // = Ensure that ACE_LSOCK is an abstract base class
 
+  /// Default constructor.
   ACE_LSOCK (void);
-  // Default constructor.
 
+  /// Initialize based on @a handle.
   ACE_LSOCK (ACE_HANDLE handle);
-  // Initialize based on <handle>
 
+  /// Get handle.
   ACE_HANDLE get_handle (void) const;
-  // Get handle.
 
+  /// Set handle.
   void set_handle (ACE_HANDLE handle);
-  // Set handle.
 
 private:
+  /// An auxiliary handle used to avoid virtual base classes...
   ACE_HANDLE aux_handle_;
-  // An auxiliary handle used to avoid virtual base classes... 
 };
 
-#if !defined (ACE_LACKS_INLINE_FUNCTIONS)
-#include "ace/LSOCK.i"
-#endif
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#if defined (__ACE_INLINE__)
+#include "ace/LSOCK.inl"
+#endif /* __ACE_INLINE__ */
 
 #endif /* ACE_LACKS_UNIX_DOMAIN_SOCKETS */
+#include /**/ "ace/post.h"
 #endif /* ACE_LOCAL_SOCK_H */

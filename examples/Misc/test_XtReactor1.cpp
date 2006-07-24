@@ -3,14 +3,19 @@
 // The following is another test that exercises the Eric C. Newton's
 // <ecn@clark.net> XtReactor implementation.
 
+#include "ace/OS_main.h"
 #include "ace/XtReactor.h"
 #include "ace/Reactor.h"
 #include "ace/Message_Block.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_NS_fcntl.h"
 
-ACE_RCSID(Misc, test_XtReactor1, "$Id$")
+ACE_RCSID (Misc,
+           test_XtReactor1,
+           "$Id$")
 
-#if defined (ACE_HAS_XT)
-#define String XtString
+//#define String XtString
 #include <Xm/PushB.h>
 
 class Stdout : public ACE_Event_Handler
@@ -23,7 +28,7 @@ public:
     int flags = ACE_OS::fcntl (ACE_STDOUT, F_GETFL);
 
     if (flags != -1
-	&& ACE_OS::fcntl (ACE_STDOUT,
+        && ACE_OS::fcntl (ACE_STDOUT,
                           F_SETFL, flags | O_NONBLOCK) != -1)
       return;
     else
@@ -39,23 +44,23 @@ public:
 
     if (ACE_OS::write (ACE_STDOUT, s, 1) == 1)
       {
-	ACE_DEBUG ((LM_DEBUG,
+        ACE_DEBUG ((LM_DEBUG,
                     "wrote output '%d'\n",
                     (int) *s));
-	msg_.rd_ptr (1);
+        msg_.rd_ptr (1);
       }
 
     if (msg_.length () == 0)
       {
-	reactor_->remove_handler (this,
+        reactor_->remove_handler (this,
                                   ACE_Event_Handler::WRITE_MASK);
-	msg_.rd_ptr (msg_.base ());
-	msg_.wr_ptr (msg_.base ());
+        msg_.rd_ptr (msg_.base ());
+        msg_.wr_ptr (msg_.base ());
       }
     return 0;
   }
 
-  void put (char c) 
+  void put (char c)
   {
     if (msg_.length () == 0)
       reactor_->register_handler (this,
@@ -63,8 +68,8 @@ public:
 
     if (msg_.wr_ptr () < msg_.end ())
       {
-	*msg_.wr_ptr () = c; 
-	msg_.wr_ptr (1);
+        *msg_.wr_ptr () = c;
+        msg_.wr_ptr (1);
       }
     else
       ACE_DEBUG ((LM_DEBUG,
@@ -79,7 +84,7 @@ private:
 class Stdin : public ACE_Event_Handler
 {
 public:
-  Stdin (Stdout *out) 
+  Stdin (Stdout *out)
     : out_ (out) {}
 
   ACE_HANDLE get_handle () const { return ACE_STDIN; }
@@ -106,27 +111,29 @@ private:
   Stdout *out_;
 };
 
-static void 
+static void
 ActivateCB (Widget, XtPointer, XtPointer)
 {
   ACE_DEBUG ((LM_DEBUG,
               "Button pushed!\n"));
 }
 
-int 
-main (int argc, char**argv)
+int
+ACE_TMAIN (int argc, ACE_TCHAR**argv)
 {
   // The worlds most useless user interface
   Widget top_level = XtVaAppInitialize (NULL,
                                         "buttontest",
                                         NULL,
                                         0,
-					&argc,
+                                        &argc,
                                         argv,
                                         NULL,
                                         NULL);
+  char change[] = "change"; // XmCreatePushButton() wants a non-const
+                            // string.
   Widget button = XmCreatePushButton (top_level,
-                                      "change",
+                                      change,
                                       0,
                                       0);
   XtManageChild (button);
@@ -148,9 +155,9 @@ main (int argc, char**argv)
                             ACE_Event_Handler::READ_MASK);
 
   // Print a message every 10 seconds.
-  if (reactor.schedule_timer (stdin_, 0, 
-			      ACE_Time_Value (10), 
-			      ACE_Time_Value (10)) == -1)
+  if (reactor.schedule_timer (stdin_, 0,
+                              ACE_Time_Value (10),
+                              ACE_Time_Value (10)) == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
                        "%p\n",
                        "schedule_timer"),
@@ -164,12 +171,3 @@ main (int argc, char**argv)
 
   return 0;
 }
-#else
-int 
-main (int, char *[])
-{
-  ACE_ERROR_RETURN ((LM_ERROR,
-                     "XT not configured for this platform\n"),
-                    0);
-}
-#endif /* ACE_HAS_XT */

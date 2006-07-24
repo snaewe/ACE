@@ -4,11 +4,13 @@
 // The following configuration file is designed to work
 // for SunOS4 platforms using the Lucid 3.2 compiler.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
 
 #define ACE_LACKS_GETPGID
-// Optimize ACE_Handle_Set for select().
+#define ACE_LACKS_SETPGID
+
 #define ACE_HAS_HANDLE_SET_OPTIMIZED_FOR_SELECT
 
 #define ACE_HAS_SYS_ERRLIST
@@ -22,10 +24,13 @@
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-#define ACE_HAS_SYSCALL_H
+#define ACE_HAS_SYS_SYSCALL_H
 
 // Compiler/platform supports alloca()
-#define ACE_HAS_ALLOCA
+// Although ACE does have alloca() on this compiler/platform combination, it is
+// disabled by default since it can be dangerous.  Uncomment the following line
+// if you ACE to use it.
+//#define ACE_HAS_ALLOCA
 
 // Compiler/platform has <alloca.h>
 #define ACE_HAS_ALLOCA_H
@@ -35,9 +40,6 @@
 
 // Compiler/platform has the getrusage() system call.
 #define ACE_HAS_GETRUSAGE
-
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
 
 // Header files lack t_errno for ACE_TLI.
 // #define ACE_LACKS_T_ERRNO
@@ -52,7 +54,7 @@
 #define ACE_HAS_SEMUN
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler/platform supports struct strbuf
 #define ACE_HAS_STRBUF_T
@@ -63,8 +65,8 @@
 // Compiler/platform supports strerror ().
 // #define ACE_HAS_STRERROR
 
-// SunOS 4 style prototype.
-#define ACE_HAS_SUNOS4_GETTIMEOFDAY
+// Platform/compiler supports timezone * as second parameter to gettimeofday().
+#define ACE_HAS_TIMEZONE_GETTIMEOFDAY
 
 // Compiler/platform supports SVR4 dynamic linking semantics.
 #define ACE_HAS_SVR4_DYNAMIC_LINKING
@@ -87,14 +89,5 @@
 
 #define ACE_LACKS_DIFFTIME
 
-// 10 millisecond fudge factor to account for Solaris timers...
-#if !defined (ACE_TIMER_SKEW)
-#define ACE_TIMER_SKEW 1000 * 10
-#endif /* ACE_TIMER_SKEW */
-
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

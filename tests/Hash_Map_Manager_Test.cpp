@@ -15,282 +15,318 @@
 //      conjunction with the <ACE_Hash_Map_Manager>.
 //
 // = AUTHOR
-//    James Hu and Douglas C. Schmidt
+//    James Hu <jxh@cs.wustl.edu> and
+//    Douglas C. Schmidt <schmidt@cs.wustl.edu>
 //
 // ============================================================================
 
 #include "test_config.h"
 #include "ace/Hash_Map_Manager.h"
 #include "ace/Malloc_T.h"
-#include "ace/SString.h"
-#include "ace/Synch.h"
+#include "ace/Null_Mutex.h"
 
 ACE_RCSID(tests, Hash_Map_Manager_Test, "$Id$")
 
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
+static const size_t STRING_TABLE_ENTRIES = 3 * 2;
+static const size_t MAX_HASH = 6;
 
-#if defined (ACE_HAS_TEMPLATE_SPECIALIZATION)
+typedef ACE_Hash_Map_Entry<const ACE_TCHAR *,
+                           const ACE_TCHAR *> HASH_STRING_ENTRY;
 
-#define HASH_STRING_ENTRY ACE_Hash_Map_Entry<ASYS_TCHAR *, ASYS_TCHAR *>
-#define HASH_STRING_MAP ACE_Hash_Map_Manager<ASYS_TCHAR *, ASYS_TCHAR *, ACE_Null_Mutex>
-#define HASH_STRING_ITER ACE_Hash_Map_Iterator<ASYS_TCHAR *, ASYS_TCHAR *, ACE_Null_Mutex>
-#define HASH_STRING_REVERSE_ITER ACE_Hash_Map_Reverse_Iterator<ASYS_TCHAR *, ASYS_TCHAR *, ACE_Null_Mutex>
+// @@ The following requires too much internal implementation
+// information about the <ACE_Hash_Map_Manager>.  We need to figure
+// out how to simplify this.
+static const size_t STRING_TABLE_SIZE =
+  sizeof (HASH_STRING_ENTRY) * (STRING_TABLE_ENTRIES + MAX_HASH);
 
-#define MAP_STRING ASYS_TCHAR *
-#define ENTRY entry
+static ACE_Static_Allocator<STRING_TABLE_SIZE> ace_test_allocator;
 
-HASH_STRING_ENTRY::ACE_Hash_Map_Entry (ASYS_TCHAR *const &ext_id,
-                                       ASYS_TCHAR *const &int_id,
-                                       HASH_STRING_ENTRY *next,
-                                       HASH_STRING_ENTRY *prev)
-  : ext_id_ (ACE_OS::strdup (ext_id)),
-    int_id_ (ACE_OS::strdup (int_id)),
-    next_ (next),
-    prev_ (prev)
-{
-  ACE_DEBUG ((LM_DEBUG,
-              ASYS_TEXT ("Creating `%s' and `%s'\n"),
-              ext_id_,
-              int_id_));
-}
+typedef ACE_Hash_Map_Manager_Ex<const ACE_TCHAR *,
+                                const ACE_TCHAR *,
+                                ACE_Hash<const ACE_TCHAR *>,
+                                ACE_Equal_To<const ACE_TCHAR *>,
+                                ACE_Null_Mutex> HASH_STRING_MAP;
 
-HASH_STRING_ENTRY::ACE_Hash_Map_Entry (HASH_STRING_ENTRY *next,
-                                       HASH_STRING_ENTRY *prev)
-  : ext_id_ (0),
-    int_id_ (0),
-    next_ (next),
-    prev_ (prev)
-{
-}
+typedef ACE_Hash_Map_Iterator_Ex<const ACE_TCHAR *,
+                                 const ACE_TCHAR *,
+                                 ACE_Hash<const ACE_TCHAR *>,
+                                 ACE_Equal_To<const ACE_TCHAR *>,
+                                 ACE_Null_Mutex> HASH_STRING_ITER;
 
-HASH_STRING_ENTRY::~ACE_Hash_Map_Entry (void)
-{
-  ASYS_TCHAR *key = ext_id_;
-  ASYS_TCHAR *value = int_id_;
+typedef ACE_Hash_Map_Const_Iterator_Ex<const ACE_TCHAR *,
+                                       const ACE_TCHAR *,
+                                       ACE_Hash<const ACE_TCHAR *>,
+                                       ACE_Equal_To<const ACE_TCHAR *>,
+                                       ACE_Null_Mutex> HASH_STRING_CONST_ITER;
 
-  if (key != 0 && value != 0)
-    ACE_DEBUG ((LM_DEBUG,
-                ASYS_TEXT ("Freeing `%s' and `%s'\n"),
-                key,
-                value));
-  ACE_OS::free (key);
-  ACE_OS::free (value);
-}
-
-// We need this template specialization since KEY is defined as a
-// ASYS_TCHAR*, which doesn't have a hash() method defined on it.
-
-long unsigned int
-HASH_STRING_MAP::hash (ASYS_TCHAR *const &ext_id)
-{
-  return ACE::hash_pjw (ext_id);
-}
-
-int
-HASH_STRING_MAP::equal (ASYS_TCHAR *const &id1, ASYS_TCHAR *const &id2)
-{
-  return ACE_OS::strcmp (id1, id2) == 0;
-}
-
-#else
-
-// Do this if we don't have template specialization.  It's not as efficient
-
-#include "Hash_Map_Manager_Test.h"      // Dumb_String is in here
-
-#define HASH_STRING_ENTRY ACE_Hash_Map_Entry<Dumb_String, Dumb_String>
-#define HASH_STRING_MAP \
-        ACE_Hash_Map_Manager<Dumb_String, Dumb_String, ACE_Null_Mutex>
-#define HASH_STRING_ITER \
-        ACE_Hash_Map_Iterator<Dumb_String, Dumb_String, ACE_Null_Mutex>
-#define HASH_STRING_REVERSE_ITER \
-        ACE_Hash_Map_Reverse_Iterator<Dumb_String, Dumb_String, ACE_Null_Mutex>
-
-#define MAP_STRING Dumb_String
-#define ENTRY ((ASYS_TCHAR *) entry)
-
-Dumb_String::Dumb_String (ASYS_TCHAR *s)
-  : s_ (s ? ACE_OS::strdup (s) : s),
-    copy_ (s ? *(new int (1)) : junk_),
-    junk_ (1)
-{
-}
-
-Dumb_String::Dumb_String (const Dumb_String &ds)
-  : s_ (ds.s_),
-    copy_ (ds.copy_),
-    junk_ (1)
-{
-  copy_++;
-}
-
-Dumb_String::~Dumb_String (void)
-{
-  if (--copy_ == 0)
-    {
-      ACE_OS::free (s_);
-      if (&copy_ != &junk_)
-        delete &copy_;
-    }
-}
-
-u_long
-Dumb_String::hash (void) const
-{
-  return ACE::hash_pjw (s_);
-}
-
-int
-Dumb_String::operator== (ASYS_TCHAR const * s) const
-{
-  return ACE_OS::strcmp (s_, s) == 0;
-}
-
-int
-Dumb_String::operator== (const Dumb_String &ds) const
-{
-  return ACE_OS::strcmp (s_, ds.s_) == 0;
-}
-
-ASYS_TCHAR *
-Dumb_String::operator= (const Dumb_String &ds)
-{
-  this->Dumb_String::~Dumb_String ();
-  new (this) Dumb_String (ds);
-  return s_;
-}
-
-Dumb_String::operator ASYS_TCHAR * (void) const
-{
-  return s_;
-}
-
-// Note that in this version, you will not get the Creating and
-// Freeing diagnostic messages.
-
-#endif /* ACE_HAS_TEMPLATE_SPECIALIZATION */
+typedef ACE_Hash_Map_Reverse_Iterator_Ex<const ACE_TCHAR *,
+                                         const ACE_TCHAR *,
+                                         ACE_Hash<const ACE_TCHAR *>,
+                                         ACE_Equal_To<const ACE_TCHAR *>,
+                                         ACE_Null_Mutex> HASH_STRING_REVERSE_ITER;
 
 struct String_Table
 {
-  ASYS_TCHAR *key_;
-  ASYS_TCHAR *value_;
+  const ACE_TCHAR *key_;
+  const ACE_TCHAR *value_;
 };
 
 static String_Table string_table[] =
 {
-  { 
-    ASYS_TEXT ("hello"),
-    ASYS_TEXT ("guten Tag")
+  {
+    ACE_TEXT ("hello"),
+    ACE_TEXT ("guten Tag")
   },
-  { 
-    ASYS_TEXT ("goodbye"),
-    ASYS_TEXT ("auf wiedersehen")
+  {
+    ACE_TEXT ("goodbye"),
+    ACE_TEXT ("auf wiedersehen")
   },
-  { 
-    ASYS_TEXT ("funny"),
-    ASYS_TEXT ("lustig")
+  {
+    ACE_TEXT ("funny"),
+    ACE_TEXT ("lustig")
   },
-  { 
+  {
     0,
     0
   }
 };
 
-static const size_t STRING_TABLE_SIZE = 3;
-static const size_t MAX_HASH = 6;
+static
+int test_two_allocators ()
+{
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Testing both allocators\n")));
+  int status = 0;
 
-// @@ The following requires too much internal implementation
-// information about the <ACE_Hash_Map_Manager>.  We need to figure
-// out how to simplify this.
-static const size_t String_Table_size = sizeof (HASH_STRING_ENTRY) * (STRING_TABLE_SIZE + MAX_HASH);
-static ACE_Static_Allocator<String_Table_size> alloc;
+  // Number of entries in string_table above:
+  size_t chunks     = 3;
+  size_t chunk_size = sizeof (HASH_STRING_MAP::ENTRY);
+
+  // Allocators:
+  ACE_Dynamic_Cached_Allocator<ACE_Null_Mutex> table_alloc (1 , chunk_size * chunks);
+  ACE_Dynamic_Cached_Allocator<ACE_Null_Mutex> table_alloc_small (1, chunk_size * chunks - 1);
+  ACE_Cached_Allocator<HASH_STRING_MAP::ENTRY, ACE_Null_Mutex> entry_alloc (chunks);
+
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Testing hash map manager with %d elements...\n"), chunks));
+
+  HASH_STRING_MAP hash;
+
+  ACE_DEBUG ((LM_DEBUG,
+              ACE_TEXT ("Opening hash map manager with ")
+              ACE_TEXT ("insufficient table allocator, should fail...\n")));
+  ACE_OS::last_error (0);
+  status = hash.open (chunks, &table_alloc_small, &entry_alloc);
+  if (status < 0)
+    ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("OK, failed: %d (%s)\n"),
+                status, ACE_OS::strerror (ACE_OS::last_error ())));
+  else
+    ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("*** Something is wrong...\n")), -1);
+
+  status = hash.close ();
+
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Table allocator depth: %d.\n"),
+              table_alloc.pool_depth ()));
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Entry allocator depth: %d.\n"),
+              entry_alloc.pool_depth ()));
+
+  ACE_DEBUG
+    ((LM_DEBUG,
+      ACE_TEXT ("Opening hash map manager again, should succeed...\n")));
+  ACE_OS::last_error (0);
+  status = hash.open (chunks, &table_alloc, &entry_alloc);
+  if (status < 0)
+    ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("*** Something is wrong: %d (%s)\n"),
+                       status, ACE_OS::strerror (ACE_OS::last_error ())), -1);
+  else
+    ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("OK.\n")));
+
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Table allocator depth: %d\n"),
+              table_alloc.pool_depth ()));
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Entry allocator depth: %d.\n"),
+              entry_alloc.pool_depth ()));
+
+  for (size_t i = 0; i < chunks; i++)
+    {
+      ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("- Binding ('%s', '%s'), should succeed...\n"),
+                  string_table[i].key_ , string_table[i].value_));
+      ACE_OS::last_error (0);
+      status = hash.bind (string_table[i].key_, string_table[i].value_);
+      if (status < 0)
+        ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("*** Something is wrong: %d (%s)\n"),
+                           status, ACE_OS::strerror (ACE_OS::last_error ())), -1);
+      else
+        ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("OK, entry allocator depth: %d\n"),
+                    entry_alloc.pool_depth ()));
+    }
+
+  const ACE_TCHAR *key = ACE_TEXT ("key");
+  const ACE_TCHAR *val = ACE_TEXT ("value");
+
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("- Binding ('%s', '%s'), should fail...\n"),
+              key, val));
+  ACE_OS::last_error (0);
+  status = hash.bind (key, val);
+  if (status < 0)
+    ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("OK, failed (%s).\n"),
+                ACE_OS::strerror (ACE_OS::last_error ())));
+  else
+    ACE_ERROR_RETURN ((LM_ERROR, ACE_TEXT ("*** Something is wrong: %d (%s)\n"),
+                       status, ACE_OS::strerror (ACE_OS::last_error ())), -1);
+
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Closing hash map.\n")));
+  status = hash.close ();
+
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Table allocator depth: %d.\n"),
+              table_alloc.pool_depth ()));
+  ACE_DEBUG ((LM_DEBUG, ACE_TEXT ("Entry allocator depth: %d.\n"),
+              entry_alloc.pool_depth ()));
+
+  return 0;
+}
 
 static int
 run_test (void)
 {
-  alloc.dump ();
+  ace_test_allocator.dump ();
 
-  HASH_STRING_MAP hash (MAX_HASH, &alloc);
+  HASH_STRING_MAP hash (MAX_HASH, &ace_test_allocator);
 
   size_t i;
 
+  // Check the <bind> operation.
   for (i = 0; string_table[i].key_ != 0; i++)
     if (hash.bind (string_table[i].key_,
                    string_table[i].value_) == -1)
       ACE_ERROR_RETURN ((LM_ERROR,
-                         ASYS_TEXT ("%p failed for %s \n"),
-                         ASYS_TEXT ("bind"),
+                         ACE_TEXT ("%p failed for %s \n"),
+                         ACE_TEXT ("bind"),
                          string_table[i].key_), -1);
 
-  MAP_STRING entry;
+  const ACE_TCHAR *entry;
 
+  // Check the <find> operation.
   for (i = 0; string_table[i].key_ != 0; i++)
     if (hash.find (string_table[i].key_,
                    entry) == 0)
       ACE_DEBUG ((LM_DEBUG,
-                  ASYS_TEXT ("`%s' found `%s'\n"),
+                  ACE_TEXT ("`%s' found `%s'\n"),
                   string_table[i].key_,
-                  ENTRY));
+                  entry));
     else
       ACE_ERROR_RETURN ((LM_ERROR,
-                         ASYS_TEXT ("`%s' not found\n"),
+                         ACE_TEXT ("`%s' not found\n"),
                          string_table[i].key_),
                         -1);
 
+  // Check the <trybind> operation.
+  {
+    const ACE_TCHAR *pc = string_table[1].value_;
+    if (hash.trybind (string_table[0].key_,
+                      pc) != 1)
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         ACE_TEXT ("::trybind missed existing entry.")),
+                        -1);
+    else if (pc != string_table[0].value_)
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         ACE_TEXT ("::trybind doesn't return existing value.")),
+                        -1);
+  }
+
   // Let's test the iterator while we are at it.
   {
-    HASH_STRING_ENTRY *entry;
+    HASH_STRING_ENTRY *entry = 0;
     size_t i = 0;
 
     for (HASH_STRING_ITER hash_iter (hash);
          hash_iter.next (entry) != 0;
-         hash_iter.advance (), i++)
-      ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("iterating (%d): [%s, %s]\n"),
-                  i,
-                  (ASYS_TCHAR *) entry->ext_id_,
-                  (ASYS_TCHAR *) entry->int_id_));
+         hash_iter.advance ())
+      {
+        ACE_DEBUG ((LM_DEBUG,
+                    ACE_TEXT ("iterating (%d): [%s, %s]\n"),
+                    i,
+                    entry->ext_id_,
+                    entry->int_id_));
+        i++;
+      }
+  }
+
+  // And now test the const iterator
+  {
+    HASH_STRING_ENTRY *entry = 0;
+    size_t i = 0;
+
+    for (HASH_STRING_CONST_ITER hash_iter (hash);
+         hash_iter.next (entry) != 0;
+         hash_iter.advance ())
+      {
+        ACE_DEBUG ((LM_DEBUG,
+                    ACE_TEXT ("const iterating (%d): [%s, %s]\n"),
+                    i,
+                    entry->ext_id_,
+                    entry->int_id_));
+        i++;
+      }
   }
 
   hash.unbind (string_table[2].key_, entry);
 
+  // Check the <find> operation again.
   for (i = 0; string_table[i].key_ != 0; i++)
     if (hash.find (string_table[i].key_,
                    entry) == 0)
       ACE_DEBUG ((LM_DEBUG,
-                  ASYS_TEXT ("`%s' found `%s'\n"),
+                  ACE_TEXT ("`%s' found `%s'\n"),
                   string_table[i].key_,
-                  ENTRY));
+                  entry));
     else if (i != 2)
       ACE_ERROR_RETURN ((LM_ERROR,
-                         ASYS_TEXT ("`%s' not found\n"),
+                         ACE_TEXT ("`%s' not found\n"),
                          string_table[i].key_),
                         -1);
 
   // Let's test the iterator backwards.
   {
-    HASH_STRING_ENTRY *entry;
+    HASH_STRING_ENTRY *entry = 0;
     size_t i = 0;
 
     for (HASH_STRING_REVERSE_ITER hash_iter (hash);
          hash_iter.next (entry) != 0;
-         hash_iter.advance (), i++)
-      ACE_DEBUG ((LM_DEBUG, ASYS_TEXT ("iterating (%d): [%s, %s]\n"),
-                  i,
-                  (ASYS_TCHAR *) entry->ext_id_,
-                  (ASYS_TCHAR *) entry->int_id_));
+         hash_iter.advance ())
+      {
+        ACE_DEBUG ((LM_DEBUG,
+                    ACE_TEXT ("iterating (%d): [%s, %s]\n"),
+                    i,
+                    entry->ext_id_,
+                    entry->int_id_));
+        i++;
+      }
   }
 
-  alloc.dump ();
+  // Remove all the entries.
+  if (hash.unbind_all () != 0)
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       ACE_TEXT ("unbind_all failed\n")),
+                       -1);
+
+  // Redo the <bind> operations.
+  for (i = 0; string_table[i].key_ != 0; i++)
+    if (hash.bind (string_table[i].key_,
+                   string_table[i].value_) != 0)
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         ACE_TEXT ("%p failed for %s \n"),
+                         ACE_TEXT ("bind"),
+                         string_table[i].key_), -1);
+
+  ace_test_allocator.dump ();
+
+  test_two_allocators();
+
   return 0;
 }
 
 int
-main (int, ASYS_TCHAR *[])
+run_main (int, ACE_TCHAR *[])
 {
-  ACE_START_TEST (ASYS_TEXT ("Hash_Map_Manager_Test"));
+  ACE_START_TEST (ACE_TEXT ("Hash_Map_Manager_Test"));
 
   run_test ();
 
@@ -298,19 +334,3 @@ main (int, ASYS_TCHAR *[])
 
   return 0;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Hash_Map_Entry<MAP_STRING, MAP_STRING>;
-template class ACE_Hash_Map_Manager<MAP_STRING, MAP_STRING, ACE_Null_Mutex>;
-template class ACE_Hash_Map_Iterator<MAP_STRING, MAP_STRING, ACE_Null_Mutex>;
-template class ACE_Hash_Map_Iterator_Base<MAP_STRING, MAP_STRING, ACE_Null_Mutex>;
-template class ACE_Hash_Map_Reverse_Iterator<MAP_STRING, MAP_STRING, ACE_Null_Mutex>;
-template class ACE_Static_Allocator<String_Table_size>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Hash_Map_Entry<MAP_STRING, MAP_STRING>
-#pragma instantiate ACE_Hash_Map_Manager<MAP_STRING, MAP_STRING, ACE_Null_Mutex>
-#pragma instantiate ACE_Hash_Map_Iterator<MAP_STRING, MAP_STRING, ACE_Null_Mutex>
-#pragma instantiate ACE_Hash_Map_Iterator_Base<MAP_STRING, MAP_STRING, ACE_Null_Mutex>
-#pragma instantiate ACE_Hash_Map_Reverse_Iterator<MAP_STRING, MAP_STRING, ACE_Null_Mutex>
-#pragma instantiate ACE_Static_Allocator<String_Table_size>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */

@@ -20,7 +20,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_EXCEPTION_CTOR_H_)
+#ifndef _BE_VISITOR_EXCEPTION_CTOR_H_
 #define _BE_VISITOR_EXCEPTION_CTOR_H_
 
 class be_visitor_exception_ctor : public be_visitor_scope
@@ -37,7 +37,7 @@ public:
   ~be_visitor_exception_ctor (void);
   // dtor
 
-  virtual int post_process (void);
+  virtual int post_process (be_decl *);
   // post processing after each element
 
   virtual int visit_exception (be_exception *node);
@@ -60,6 +60,15 @@ public:
   virtual int visit_interface_fwd (be_interface_fwd *node);
   // visit interface forward
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit valuebox
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit valuetype
+
+  virtual int visit_valuetype_fwd (be_valuetype_fwd *node);
+  // visit valuetype forward
+
   virtual int visit_predefined_type (be_predefined_type *node);
   // visit predefined type
 
@@ -77,6 +86,9 @@ public:
 
   virtual int visit_typedef (be_typedef *node);
   // visit the typedef type
+
+private:
+  int emit_common (be_type *node);
 
 };
 

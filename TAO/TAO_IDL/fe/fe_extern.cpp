@@ -54,8 +54,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -69,58 +69,59 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
  * fe_extern.cc - export FE interfaces to driver
  */
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "fe_extern.h"
+#include "ast_root.h"
+#include "global_extern.h"
+#include "utl_err.h"
+#include "utl_indenter.h"
+#include "ace/UUID.h"
 
-#include	"fe_private.h"
+ACE_RCSID (fe,
+           fe_extern,
+           "$Id$")
 
-#include 	"utl_error.h"
-#include	"utl_indenter.h"
-#include	"utl_string.h"
-
-ACE_RCSID(fe, fe_extern, "$Id$")
-
-/*
- * yacc parser interface
- */
-
-extern int tao_yyparse();
-extern FILE * tao_yyin;
+extern int tao_yyparse (void);
+extern FILE *tao_yyin;
 
 int
-FE_yyparse()
+FE_yyparse (void)
 {
-  int result = tao_yyparse();
-  if (idl_global->err_count() == 0) {
-    idl_global->root()->call_add();
-  }
+  int const result = tao_yyparse ();
+
+  if (0 == idl_global->err_count ())
+    {
+      idl_global->root ()->call_add ();
+    }
+
   return result;
 }
 
 void
-FE_set_yyin(File * f)
+FE_set_yyin (File *f)
 {
-  tao_yyin = ACE_reinterpret_cast(FILE*,f);
+  tao_yyin = reinterpret_cast<FILE *> (f);
 }
 
-/*
- * constructor interfaces 
- */
+// Constructor interfaces.
 
 UTL_Error *
-FE_new_UTL_Error()
+FE_new_UTL_Error (void)
 {
-  return new UTL_Error();
+  UTL_Error *retval = 0;
+  ACE_NEW_RETURN (retval,
+                  UTL_Error,
+                  0);
+
+  return retval;
 }
 
 UTL_Indenter *
-FE_new_UTL_Indenter()
+FE_new_UTL_Indenter (void)
 {
-  return new UTL_Indenter();
-}
+  UTL_Indenter *retval = 0;
+  ACE_NEW_RETURN (retval,
+                  UTL_Indenter,
+                  0);
 
-UTL_String *
-FE_new_UTL_String(char * str)
-{
-  return new UTL_String(str);
+  return retval;
 }

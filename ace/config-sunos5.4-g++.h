@@ -4,33 +4,36 @@
 // The following configuration file is designed to work for SunOS 5.4
 // platforms using the GNU g++ compiler.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
 
 #if ! defined (__ACE_INLINE__)
-#define __ACE_INLINE__
+# define __ACE_INLINE__
 #endif /* ! __ACE_INLINE__ */
+
+// config-g++-common.h undef's ACE_HAS_STRING_CLASS with -frepo, so
+// this must appear before its #include.
+#define ACE_HAS_STRING_CLASS
 
 #include "ace/config-g++-common.h"
 #define ACE_HAS_GNU_CSTRING_H
 
-// Optimize ACE_Handle_Set for select().
 #define ACE_HAS_HANDLE_SET_OPTIMIZED_FOR_SELECT
-
-#define ACE_HAS_STRING_CLASS
 
 // Platform supports pread() and pwrite()
 #define ACE_HAS_P_READ_WRITE
 
 #define ACE_HAS_XPG4_MULTIBYTE_CHAR
 
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS 
 
 // Platform supports System V IPC (most versions of UNIX, but not Win32)
 #define ACE_HAS_SYSV_IPC
 
 // Sun has the wrong prototype for sendmsg.
-#define ACE_HAS_BROKEN_SENDMSG
+#define ACE_HAS_NONCONST_SENDMSG
 
 // The SunOS 5.x version of rand_r is inconsistent with the header files...
 #define ACE_HAS_BROKEN_RANDR
@@ -45,7 +48,7 @@
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-#define ACE_HAS_SYSCALL_H
+#define ACE_HAS_SYS_SYSCALL_H
 
 // Compiler/platform correctly calls init()/fini() for shared libraries.
 #define ACE_HAS_AUTOMATIC_INIT_FINI
@@ -63,20 +66,19 @@
 #define ACE_HAS_IP_MULTICAST
 
 // Compiler/platform supports alloca()
-#define ACE_HAS_ALLOCA
+// Although ACE does have alloca() on this compiler/platform combination, it is
+// disabled by default since it can be dangerous.  Uncomment the following line
+// if you ACE to use it.
+//#define ACE_HAS_ALLOCA
 
 // Compiler/platform has <alloca.h>
 #define ACE_HAS_ALLOCA_H
-
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
 
 // Platform contains <poll.h>.
 #define ACE_HAS_POLL
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Platform supports the /proc file system.
 #define ACE_HAS_PROC_FS
@@ -92,7 +94,7 @@
 #define ACE_HAS_UCONTEXT_T
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler supports the ssize_t typedef.
 #define ACE_HAS_SSIZE_T
@@ -130,10 +132,10 @@
 /* Turn off the following defines if you want to disable threading. */
 // Compile using multi-thread libraries.
 #if !defined (ACE_MT_SAFE)
-#define ACE_MT_SAFE 1
-#if !defined (_REENTRANT)
-#define _REENTRANT
-#endif /* _REENTRANT */
+# define ACE_MT_SAFE 1
+# if !defined (_REENTRANT)
+#   define _REENTRANT
+# endif /* _REENTRANT */
 #endif /* !ACE_MT_SAFE */
 
 // Platform supports Solaris threads.
@@ -168,18 +170,11 @@
 // Use the poll() event demultiplexor rather than select().
 //#define ACE_USE_POLL
 
-// 10 millisecond fudge factor to account for Solaris timers...
-#if !defined (ACE_TIMER_SKEW)
-#define ACE_TIMER_SKEW 1000 * 10
-#endif /* ACE_TIMER_SKEW */
-
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
 // Defines the page size of the system.
 #define ACE_PAGE_SIZE 4096
 #define ACE_HAS_IDTYPE_T
 #define ACE_HAS_GPERF
+#define ACE_HAS_DIRENT
+
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

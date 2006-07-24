@@ -10,7 +10,7 @@
 //    initiator.h
 //
 // = DESCRIPTION
-//      This class implements a simple server for the 
+//      This class implements a simple server for the
 //      Nested Upcalls - Triangle test
 //
 // = AUTHORS
@@ -18,12 +18,17 @@
 //
 // ============================================================================
 
-#if !defined (_TRIANGLE_TEST_INITITATOR_SERVER_H)
+#ifndef _TRIANGLE_TEST_INITITATOR_SERVER_H
 #define _TRIANGLE_TEST_INITITATOR_SERVER_H
 
 #include "ace/Get_Opt.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Log_Msg.h"
-#include "tao/TAO.h"
+#include "tao/Utils/ORB_Manager.h"
 #include "Initiator_i.h"
 
 class Initiator_Server
@@ -46,11 +51,11 @@ public:
   // read in the IOR's for the two objects A and B
 
   int init (int argc,
-            char **argv,
-            CORBA::Environment& env);
+            char **argv
+            ACE_ENV_ARG_DECL);
   // Initialize the Initiator_Server state - parsing arguments and ...
 
-  int run (CORBA::Environment& env);
+  int run (ACE_ENV_SINGLE_ARG_DECL);
   // Run the orb
 
 private:
@@ -80,6 +85,9 @@ private:
 
   char **argv_;
   // commandline arguments.
+
+  CORBA::String_var str_;
+  // IOR of my servant.
 };
 
 #endif /* _TRIANGLE_TEST_INITITATOR_SERVER_H */

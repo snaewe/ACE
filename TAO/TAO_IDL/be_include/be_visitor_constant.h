@@ -19,11 +19,10 @@
 //
 // ============================================================================
 
-#if !defined (TAO_BE_VISITOR_CONSTANT_H)
+#ifndef TAO_BE_VISITOR_CONSTANT_H
 #define TAO_BE_VISITOR_CONSTANT_H
 
-#include "be_visitor.h"
-#include "be_visitor_scope.h"
+#include "be_visitor_decl.h"
 #include "be_visitor_constant/constant_ch.h"
 #include "be_visitor_constant/constant_cs.h"
 

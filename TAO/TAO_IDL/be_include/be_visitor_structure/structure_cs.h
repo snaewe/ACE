@@ -20,7 +20,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_STRUCTURE_STRUCTURE_CS_H_)
+#ifndef _BE_VISITOR_STRUCTURE_STRUCTURE_CS_H_
 #define _BE_VISITOR_STRUCTURE_STRUCTURE_CS_H_
 
 class be_visitor_structure_cs : public be_visitor_structure
@@ -35,14 +35,13 @@ class be_visitor_structure_cs : public be_visitor_structure
   //
 public:
   be_visitor_structure_cs (be_visitor_context *ctx);
-  // constructureor
+  // constructor
 
   ~be_visitor_structure_cs (void);
-  // destructureor
+  // destructor
 
   virtual int visit_structure (be_structure *node);
-  // visit structure. We provide code for this method in the derived class
-
+  // visit structure.
 };
 
 #endif /* _BE_VISITOR_STRUCTURE_STRUCTURE_CS_H_ */

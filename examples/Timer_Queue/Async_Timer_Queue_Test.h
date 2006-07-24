@@ -6,12 +6,12 @@
 //
 // = LIBRARY
 //    examples
-// 
+//
 // = FILENAME
 //    Async_Timer_Queue_Test.h
 //
 // = DESCRIPTION
-//      This test exercises the <ACE_Asynch_Timer_Queue_Adapter> 
+//      This test exercises the <ACE_Asynch_Timer_Queue_Adapter>
 //      using an <ACE_Timer_Heap>.
 //
 // = AUTHORS
@@ -19,34 +19,40 @@
 //    Sergio Flores-Gaitan
 // ============================================================================
 
-#if !defined (_ASYNC_TIMER_QUEUE_TEST_H_)
+#ifndef _ASYNC_TIMER_QUEUE_TEST_H_
 #define _ASYNC_TIMER_QUEUE_TEST_H_
 
 #include "ace/Signal.h"
+#include "ace/svc_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Timer_Heap.h"
 #include "ace/Timer_Queue_Adapters.h"
 
 #include "Driver.h"
 
 class Async_Timer_Handler : public ACE_Event_Handler
+{
   // = TITLE
   //     Target of the asynchronous timeout operation.
-{
 public:
   virtual int handle_timeout (const ACE_Time_Value &tv,
-			      const void *arg);
+                              const void *arg);
   // Callback hook invoked by the <Timer_Queue>.
 };
 
-class Async_Timer_Queue 
+class Async_Timer_Queue
+{
   // = TITLE
   //     Asynchronous Timer Queue Singleton.
   //
   // = DESCRIPTION
   //     We use this class to avoid global variables and to
-  //     consolidate all the Timer Queue processing in one central 
-  //     place. 
-{
+  //     consolidate all the Timer Queue processing in one central
+  //     place.
 public:
   typedef int (Async_Timer_Queue::*ACTION) (void *);
 
@@ -89,7 +95,8 @@ private:
   // The adapter is instantiated by an <ACE_Timer_Heap>.
 };
 
-class Async_Timer_Queue_Test_Driver : public Timer_Queue_Test_Driver <Async_Timer_Queue *, Async_Timer_Queue, Async_Timer_Queue::ACTION>
+class ACE_Svc_Export Async_Timer_Queue_Test_Driver : public Timer_Queue_Test_Driver <Async_Timer_Queue *, Async_Timer_Queue, Async_Timer_Queue::ACTION>
+{
   // = TITLE
   //    Async_Timer_Queue_Test_Driver
   //
@@ -99,7 +106,6 @@ class Async_Timer_Queue_Test_Driver : public Timer_Queue_Test_Driver <Async_Time
   //    prints the options for a user. and init() which initializes
   //    the driver.  The rest of the common functionality is in the
   //    parent class <Timer_Queue_Test_Driver>.
-{
 public:
   Async_Timer_Queue_Test_Driver (void);
 

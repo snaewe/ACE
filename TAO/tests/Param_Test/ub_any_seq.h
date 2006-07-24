@@ -16,7 +16,7 @@
 //
 // ============================================================================
 
-#if !defined (PARAM_TEST_UNBOUNDED_ANY_SEQUENCE_H)
+#ifndef PARAM_TEST_UNBOUNDED_ANY_SEQUENCE_H
 #define PARAM_TEST_UNBOUNDED_ANY_SEQUENCE_H
 
 #include "param_testC.h"
@@ -33,20 +33,15 @@ public:
   ~Test_AnySeq (void);
   // dtor
 
-  int run_sii_test (Param_Test_ptr objref,
-                    CORBA::Environment &env);
+  int run_sii_test (Param_Test_ptr objref
+                    ACE_ENV_ARG_DECL);
   // run the SII test
-
-  int add_args (CORBA::NVList_ptr nvlist,
-                CORBA::NVList_ptr retval,
-                CORBA::Environment &env);
-  // add args to NVList for DII
 
   const char *opname (void) const;
   // return operation name
 
-  int init_parameters (Param_Test_ptr objref,
-                       CORBA::Environment &env);
+  int init_parameters (Param_Test_ptr objref
+                       ACE_ENV_ARG_DECL);
   // set values for parameters
 
   int reset_parameters (void);
@@ -61,28 +56,31 @@ public:
   void print_values (void);
   // print all the values
 
+  void dii_req_invoke (CORBA::Request * ACE_ENV_ARG_DECL_NOT_USED);
+  // invoke DII request with appropriate exception handling.
+
 protected:
-  CORBA::Boolean compare (const Param_Test::AnySeq &s1,
+  CORBA::Boolean compare (const CORBA::AnySeq &s1,
                           const Param_Test::StructSeq &s2);
   // compare
 
-  void print_sequence (const Param_Test::AnySeq &s);
+  void print_sequence (const CORBA::AnySeq &s);
   // print individual sequence
 
 private:
   char *opname_;
   // operation name
 
-  Param_Test::AnySeq_var in_;
+  CORBA::AnySeq_var in_;
   // in parameter
 
-  Param_Test::AnySeq_var inout_;
+  CORBA::AnySeq_var inout_;
   // inout parameter
 
-  Param_Test::AnySeq_var out_;
+  CORBA::AnySeq_var out_;
   // out parameter
 
-  Param_Test::AnySeq_var ret_;
+  CORBA::AnySeq_var ret_;
   // return value
 };
 

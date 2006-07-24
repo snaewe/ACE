@@ -18,555 +18,704 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_union_branch.h"
-
-ACE_RCSID(be_visitor_union_branch, public_ch, "$Id$")
-
+ACE_RCSID (be_visitor_union_branch, 
+           public_ch, 
+           "$Id$")
 
 // **********************************************
-//  visitor for union_branch in the client header file
+//  Visitor for union_branch in the client header file.
 // **********************************************
 
-// constructor
-be_visitor_union_branch_public_ch::be_visitor_union_branch_public_ch
-(be_visitor_context *ctx)
+be_visitor_union_branch_public_ch::be_visitor_union_branch_public_ch (
+    be_visitor_context *ctx
+  )
   : be_visitor_decl (ctx)
 {
 }
 
-// destructor
 be_visitor_union_branch_public_ch::~be_visitor_union_branch_public_ch (void)
 {
 }
 
-// visit the union_branch node
 int
 be_visitor_union_branch_public_ch::visit_union_branch (be_union_branch *node)
 {
-  TAO_OutStream *os; // output stream
-  be_type *bt; // union_branch's type
+  be_type *bt = be_type::narrow_from_decl (node->field_type ());
 
-  os = this->ctx_->stream ();
-  // first generate the type information
-  bt = be_type::narrow_from_decl (node->field_type ());
   if (!bt)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_union_branch - "
                          "Bad union_branch type\n"
-                         ), -1);
+                         ),
+                        -1);
     }
 
-  this->ctx_->node (node); // save the node
+  this->ctx_->node (node);
+
   if (bt->accept (this) == -1)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_union_branch - "
-                         "codegen for union_branch type failed\n"
-                         ), -1);
+                         "codegen for union_branch type failed\n"),
+                        -1);
     }
+
   return 0;
 }
 
-// =visit operations on all possible data types  that a union_branch can be
+// Visit operations on all possible data types  that a union_branch can be.
 
-// visit array type
 int
 be_visitor_union_branch_public_ch::visit_array (be_array *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch member
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union node
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_array - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  if (bt->node_type () != AST_Decl::NT_typedef // not a typedef
-      && bt->is_child (bu)) // bt is defined inside the union
+  // Not a typedef and bt is defined inside the union.
+  if (bt->node_type () != AST_Decl::NT_typedef
+      && bt->is_child (bu))
     {
-      // this is the case of an anonymous array inside a union
+      // This is the case of an anonymous array inside a union.
 
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
-
-      // first generate the array declaration
+      ctx.node (node);
       ctx.state (TAO_CodeGen::TAO_ARRAY_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_union_branch_public_ch::"
-                             "visit_array - "
-                             "Bad visitor\n"
-                             ), -1);
-        }
-      if (node->accept (visitor) == -1)
+      be_visitor_array_ch visitor (&ctx);
+
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_union_branch_public_ch::"
                              "visit_array - "
                              "codegen failed\n"
-                             ), -1);
+                             ),
+                            -1);
         }
-      delete visitor;
-    }
 
-  // now use this array as a "type" for the subsequent declarator
-  os->indent (); // start from current indentation
-  // the set method
-  *os << "void " << ub->local_name () << " ("
-      << bt->nested_type_name (bu) << ");// set"
-      << be_nl;
-  // the get method
-  *os << bt->nested_type_name (bu, "_slice *") << " " << ub->local_name ()
-      << " (void) const; // get method\n\n";
+      ctx.state (TAO_CodeGen::TAO_ROOT_CH);
+
+      *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+          << "// " << __FILE__ << ":" << __LINE__;
+
+      // Now use this array as a "type" for the subsequent declarator
+      // the set method.
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " ("
+          << "_" << bt->local_name () << ");" << be_nl;
+      // The get method.
+      *os << "_" << bt->local_name () << "_slice * " << ub->local_name ()
+          << " (void) const; // get method";
+    }
+  else
+    {
+      *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+          << "// " << __FILE__ << ":" << __LINE__;
+
+      // Now use this array as a "type" for the subsequent declarator
+      // the set method.
+      *os << be_nl << be_nl
+          << "void " << ub->local_name () << " ("
+          << bt->nested_type_name (bu) << ");"
+          << be_nl;
+      // The get method.
+      *os << bt->nested_type_name (bu, "_slice *") << " " << ub->local_name ()
+          << " (void) const;";
+    }
 
   return 0;
 }
 
-// visit enum type
 int
 be_visitor_union_branch_public_ch::visit_enum (be_enum *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch member
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union node
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this node via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_enum - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  if (bt->node_type () != AST_Decl::NT_typedef // not a typedef
-      && bt->is_child (bu)) // bt is defined inside the union
+  // Not a typedef and bt is defined inside the union.
+  if (bt->node_type () != AST_Decl::NT_typedef
+      && bt->is_child (bu))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
+      ctx.node (node);
+      be_visitor_enum_ch visitor (&ctx);
 
-      // first generate the enum declaration
-      ctx.state (TAO_CodeGen::TAO_ENUM_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+     if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_union_branch_public_ch::"
                              "visit_enum - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_union_branch_public_ch::"
-                             "visit_enum - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
     }
 
-  // now use this enum as a "type" for the subsequent declarator
-  os->indent (); // start from current indentation
-  // the set method
-  *os << "void " << ub->local_name () << " ("
-      << bt->nested_type_name (bu) << ");// set"
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Now use this enum as a "type" for the subsequent declarator
+  // the set method.
+  *os << be_nl << be_nl
+      << "void " << ub->local_name () << " ("
+      << bt->nested_type_name (bu) << ");"
       << be_nl;
-  // the get method
+  // the get method.
   *os << bt->nested_type_name (bu) << " " << ub->local_name ()
-      << " (void) const; // get method\n\n";
+      << " (void) const;";
 
   return 0;
 }
 
-// visit interface type
 int
 be_visitor_union_branch_public_ch::visit_interface (be_interface *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this node via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_interface - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  os->indent (); // start from current indentation
-  // set method
-  *os << "void " << ub->local_name () << " ("
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Set method.
+  *os << be_nl << be_nl
+      << "void " << ub->local_name () << " ("
       << bt->nested_type_name (bu, "_ptr")
-      << ");// set" << be_nl;
-  // get method
+      << ");" << be_nl;
+  // Get method.
   *os << bt->nested_type_name (bu, "_ptr") << " " << ub->local_name ()
-      << " (void) const; // get method\n\n";
+      << " (void) const;";
+
   return 0;
 }
 
-// visit interface forward type
 int
 be_visitor_union_branch_public_ch::visit_interface_fwd (be_interface_fwd *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this node via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_interface_fwd - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  os->indent (); // start from current indentation
-  // set method
-  *os << "void " << ub->local_name () << " ("
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Set method.
+  *os << be_nl << be_nl
+      << "void " << ub->local_name () << " ("
       << bt->nested_type_name (bu, "_ptr")
-      << ");// set" << be_nl;
-  // get method
+      << ");" << be_nl;
+  // Get method.
   *os << bt->nested_type_name (bu, "_ptr") << " " << ub->local_name ()
-      << " (void) const; // get method\n\n";
+      << " (void) const;";
+
   return 0;
 }
 
-// visit predefined type
+int
+be_visitor_union_branch_public_ch::visit_valuebox (be_valuebox *node)
+{
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
+  be_type *bt;
+
+  // Check if we are visiting this via a visit to a typedef node.
+  if (this->ctx_->alias ())
+    {
+      bt = this->ctx_->alias ();
+    }
+  else
+    {
+      bt = node;
+    }
+
+  if (!ub || !bu)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_union_branch_public_ch::"
+                         "visit_valuebox - "
+                         "bad context information\n"),
+                        -1);
+    }
+
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Set method.
+  *os << be_nl << be_nl
+      << "void " << ub->local_name () << " ("
+      << bt->nested_type_name (bu, "*")
+      << ");" << be_nl;
+  // Get method.
+  *os << bt->nested_type_name (bu, "*") << " " << ub->local_name ()
+      << " (void) const;";
+
+  return 0;
+}
+
+int
+be_visitor_union_branch_public_ch::visit_valuetype (be_valuetype *node)
+{
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
+  be_type *bt;
+
+  // Check if we are visiting this via a visit to a typedef node.
+  if (this->ctx_->alias ())
+    {
+      bt = this->ctx_->alias ();
+    }
+  else
+    {
+      bt = node;
+    }
+
+  if (!ub || !bu)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_union_branch_public_ch::"
+                         "visit_valuetype - "
+                         "bad context information\n"),
+                        -1);
+    }
+
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Set method.
+  *os << be_nl << be_nl
+      << "void " << ub->local_name () << " ("
+      << bt->nested_type_name (bu, "*")
+      << ");" << be_nl;
+  // Get method.
+  *os << bt->nested_type_name (bu, "*") << " " << ub->local_name ()
+      << " (void) const;";
+
+  return 0;
+}
+
+int
+be_visitor_union_branch_public_ch::visit_valuetype_fwd (be_valuetype_fwd *node)
+{
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
+  be_type *bt;
+
+  // Check if we are visiting this via a visit to a typedef node.
+  if (this->ctx_->alias ())
+    {
+      bt = this->ctx_->alias ();
+    }
+  else
+    {
+      bt = node;
+    }
+
+  if (!ub || !bu)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_visitor_union_branch_public_ch::"
+                         "visit_valuetype_fwd - "
+                         "bad context information\n"),
+                        -1);
+    }
+
+  TAO_OutStream *os = this->ctx_->stream ();
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Set method.
+  *os << be_nl << be_nl
+      << "void " << ub->local_name () << " ("
+      << bt->nested_type_name (bu, "*")
+      << ")" << be_nl;
+  // Get method.
+  *os << bt->nested_type_name (bu, "*") << " " << ub->local_name ()
+      << " (void) const;";
+
+  return 0;
+}
+
 int
 be_visitor_union_branch_public_ch::visit_predefined_type (be_predefined_type *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
+  be_typedef *td = this->ctx_->alias ();
 
-  // check if we are visiting this node via a visit to a typedef node
-  if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+  // Check if we are visiting this via a visit to a typedef node.
+  if (td != 0)
+    {
+      bt = td;
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_predefined_type - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  os->indent (); // start from current indentation
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+      
+  const char *no_td_global = (td == 0 ? "::" : "");
+
   switch (node->pt ())
     {
     case AST_PredefinedType::PT_pseudo:
-      // set method
-      *os << "void " << ub->local_name () << " ("
-          << bt->nested_type_name (bu, "_ptr") << ");// set" << be_nl;
-        // get method
-      *os << bt->nested_type_name (bu, "_ptr") << " " << ub->local_name ()
-          << " (void) const; // get method\n\n";
+    case AST_PredefinedType::PT_object:
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " (const " << no_td_global
+          << bt->nested_type_name (bu, "_ptr") << ");" << be_nl;
+      *os << no_td_global << bt->nested_type_name (bu, "_ptr") << " "
+          << ub->local_name () << " (void) const;";
+      break;
+    case AST_PredefinedType::PT_value:
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " ( " << no_td_global
+          << bt->nested_type_name (bu, " *") << ");" << be_nl;
+      *os << no_td_global << bt->nested_type_name (bu, " *") << " "
+          << ub->local_name () << " (void) const;";
       break;
     case AST_PredefinedType::PT_any:
-      // set method
-      *os << "void " << ub->local_name () << " ("
-          << bt->nested_type_name (bu) << ");// set" << be_nl;
-      // get method (read-only)
-      *os << "const " << bt->nested_type_name (bu) << " "
-          << ub->local_name () << " (void) const; // get method\n\n";
-      // get method (read/write)
-      *os << bt->nested_type_name (bu) << " "
-          << ub->local_name () << " (void); // get method\n\n";
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " (const " << no_td_global
+          << bt->nested_type_name (bu) << " &);" << be_nl;
+      *os << "const " << no_td_global<< bt->nested_type_name (bu) << " &"
+          << ub->local_name () << " (void) const;" << be_nl;
+      *os << no_td_global << bt->nested_type_name (bu) << " &"
+          << ub->local_name () << " (void);";
       break;
     case AST_PredefinedType::PT_void:
       break;
     default:
-      // set method
-      *os << "void " << ub->local_name () << " ("
-          << bt->nested_type_name (bu) << ");// set" << be_nl;
-      // get method
-      *os << bt->nested_type_name (bu) << " " << ub->local_name ()
-          << " (void) const; // get method\n\n";
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " ( " << no_td_global
+          << bt->nested_type_name (bu) << ");" << be_nl;
+      *os << no_td_global << bt->nested_type_name (bu) << " "
+          << ub->local_name () << " (void) const;";
     }
+
   return 0;
 }
 
-// visit sequence type
 int
 be_visitor_union_branch_public_ch::visit_sequence (be_sequence *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this node via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_sequence - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  if (bt->node_type () != AST_Decl::NT_typedef // not a typedef
-      && bt->is_child (bu)) // bt is defined inside the union
+  // Not a typedef and bt is defined inside the union.
+  if (bt->node_type () != AST_Decl::NT_typedef
+      && bt->is_child (bu))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
+      ctx.node (node);
+      be_visitor_sequence_ch visitor (&ctx);
 
-      // first generate the sequence declaration
-      ctx.state (TAO_CodeGen::TAO_SEQUENCE_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_union_branch_public_ch::"
                              "visit_sequence - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_union_branch_public_ch::"
-                             "visit_sequence - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
+
+      *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+          << "// " << __FILE__ << ":" << __LINE__;
+
+      // Generate the anonymous sequence member typedef.
+      // This provides a consistent name to use instead of the
+      // implementation-specific name.
+      *os << be_nl << be_nl 
+          << "typedef " << bt->nested_type_name (bu)
+          << " _" << ub->local_name () << "_seq;";
     }
-  os->indent ();
-  // set method
-  *os << "void " << ub->local_name () << " (const "
-      << bt->nested_type_name (bu) << " &);// set" << be_nl;
-  // read-only
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  *os << be_nl << be_nl 
+      << "void " << ub->local_name () << " (const "
+      << bt->nested_type_name (bu) << " &);" << be_nl;
   *os << "const " << bt->nested_type_name (bu) << " &"
-      << ub->local_name  () << " (void) const; // get method (read only)"
+      << ub->local_name  () << " (void) const;"
       << be_nl;
-  // read/write
   *os << bt->nested_type_name (bu) << " &" << ub->local_name ()
-      << " (void); // get method (read/write only)\n\n";
+      << " (void);";
 
   return 0;
 }
 
-// visit string type
 int
 be_visitor_union_branch_public_ch::visit_string (be_string *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_string - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  os->indent ();
-  // three methods to set the string value
-  *os << "void " << ub->local_name () << " (char *); // set" << be_nl;
-  *os << "void " << ub->local_name () << " (const char *); // set"
-      << be_nl;
-  *os << "void " << ub->local_name () << " (const CORBA::String_var&); // set"
-      << be_nl;
-  //get method
-  *os << "const char *" << ub->local_name ()
-      << " (void) const; // get method\n\n";
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  // Three methods to set the string value
+  if (node->width () == (long) sizeof (char))
+    {
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " (char *);" << be_nl;
+      *os << "void " << ub->local_name () << " (const char *);"
+          << be_nl;
+      *os << "void " << ub->local_name () << " (const ::CORBA::String_var&);"
+          << be_nl;
+      *os << "const char *" << ub->local_name ()
+          << " (void) const;";
+    }
+  else
+    {
+      *os << be_nl << be_nl 
+          << "void " << ub->local_name () << " ( ::CORBA::WChar *);" << be_nl;
+      *os << "void " << ub->local_name () << " (const ::CORBA::WChar *);"
+          << be_nl;
+      *os << "void " << ub->local_name () << " (const ::CORBA::WString_var&);"
+          << be_nl;
+      *os << "const ::CORBA::WChar *" << ub->local_name ()
+          << " (void) const;";
+    }
+
   return 0;
 }
 
-// visit structure type
 int
 be_visitor_union_branch_public_ch::visit_structure (be_structure *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this node via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_structure - "
-                         "bad context information\n"
-                         ), -1);
+                         "bad context information\n"),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  if (bt->node_type () != AST_Decl::NT_typedef // not a typedef
-      && bt->is_child (bu)) // bt is defined inside the union
+  // Not a typedef and bt is defined inside the union.
+  if (bt->node_type () != AST_Decl::NT_typedef
+      && bt->is_child (bu))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
+      ctx.node (node);
+      be_visitor_structure_ch visitor (&ctx);
 
-      // first generate the sequence declaration
-      ctx.state (TAO_CodeGen::TAO_STRUCT_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_union_branch_public_ch::"
                              "visit_structure - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_union_branch_public_ch::"
-                             "visit_structure - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
     }
-  os->indent ();
-  // set method
-  *os << "void " << ub->local_name () << " (const "
-      << bt->nested_type_name (bu) << " &);// set" << be_nl
-    // read-only
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  *os << be_nl << be_nl 
+      << "void " << ub->local_name () << " (const "
+      << bt->nested_type_name (bu) << " &);" << be_nl
       << "const " << bt->nested_type_name (bu) << " &"
-      << ub->local_name  () << " (void) const; // get method (read only)"
+      << ub->local_name  () << " (void) const;"
       << be_nl
-    // read/write
       << bt->nested_type_name (bu) << " &" << ub->local_name ()
-      << " (void); // get method (read/write only)\n\n";
+      << " (void);";
 
   return 0;
 }
 
-// visit typedefed type
 int
 be_visitor_union_branch_public_ch::visit_typedef (be_typedef *node)
 {
-  TAO_OutStream *os; // output stream
+  this->ctx_->alias (node);
 
-  os = this->ctx_->stream ();
-  os->indent (); // start from current indentation level
-  this->ctx_->alias (node);     // save the node for use in code generation and
-                               // indicate that the union_branch of the union_branch node
-                               // is a typedefed quantity
-
-  // make a decision based on the primitive base type
+  // Make a decision based on the primitive base type.
   be_type *bt = node->primitive_base_type ();
+
   if (!bt || (bt->accept (this) == -1))
     {
       ACE_ERROR_RETURN ((LM_ERROR,
                          "(%N:%l) be_visitor_union_branch_spec_ch::"
                          "visit_typedef - "
-                         "Bad primitive type\n"
-                         ), -1);
+                         "Bad primitive type\n"),
+                        -1);
     }
+
   this->ctx_->alias (0);
   return 0;
 }
 
-// visit union type
 int
 be_visitor_union_branch_public_ch::visit_union (be_union *node)
 {
-  TAO_OutStream *os; // output stream
-  be_decl *ub = this->ctx_->node (); // get union branch
-  be_decl *bu = this->ctx_->scope ();  // get the enclosing union backend
+  be_decl *ub = this->ctx_->node ();
+  be_decl *bu = this->ctx_->scope ();
   be_type *bt;
 
-  // check if we are visiting this node via a visit to a typedef node
+  // Check if we are visiting this via a visit to a typedef node.
   if (this->ctx_->alias ())
-    bt = this->ctx_->alias ();
+    {
+      bt = this->ctx_->alias ();
+    }
   else
-    bt = node;
+    {
+      bt = node;
+    }
 
   if (!ub || !bu)
     {
@@ -574,52 +723,41 @@ be_visitor_union_branch_public_ch::visit_union (be_union *node)
                          "(%N:%l) be_visitor_union_branch_public_ch::"
                          "visit_union - "
                          "bad context information\n"
-                         ), -1);
+                         ),
+                        -1);
     }
 
-  os = this->ctx_->stream ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
-  if (bt->node_type () != AST_Decl::NT_typedef // not a typedef
-      && bt->is_child (bu)) // bt is defined inside the union
+  // Not a typedef and bt is defined inside the union.
+  if (bt->node_type () != AST_Decl::NT_typedef
+      && bt->is_child (bu))
     {
-      // instantiate a visitor context with a copy of our context. This info
-      // will be modified based on what type of node we are visiting
       be_visitor_context ctx (*this->ctx_);
-      ctx.node (node); // set the node to be the node being visited. The scope
-                       // is still the same
+      ctx.node (node);
+      be_visitor_union_ch visitor (&ctx);
 
-      // first generate the sequence declaration
-      ctx.state (TAO_CodeGen::TAO_STRUCT_CH);
-      be_visitor *visitor = tao_cg->make_visitor (&ctx);
-      if (!visitor)
+      if (node->accept (&visitor) == -1)
         {
           ACE_ERROR_RETURN ((LM_ERROR,
                              "(%N:%l) be_visitor_union_branch_public_ch::"
                              "visit_union - "
-                             "Bad visitor\n"
-                             ), -1);
+                             "codegen failed\n"),
+                            -1);
         }
-      if (node->accept (visitor) == -1)
-        {
-          ACE_ERROR_RETURN ((LM_ERROR,
-                             "(%N:%l) be_visitor_union_branch_public_ch::"
-                             "visit_union - "
-                             "codegen failed\n"
-                             ), -1);
-        }
-      delete visitor;
     }
-  os->indent ();
-  // set method
-  *os << "void " << ub->local_name () << " (const "
-      << bt->nested_type_name (bu) << " &);// set" << be_nl
-    // read-only
+
+  *os << be_nl << be_nl << "// TAO_IDL - Generated from" << be_nl
+      << "// " << __FILE__ << ":" << __LINE__;
+
+  *os << be_nl << be_nl 
+      << "void " << ub->local_name () << " (const "
+      << bt->nested_type_name (bu) << " &);" << be_nl
       << "const " << bt->nested_type_name (bu) << " &"
-      << ub->local_name  () << " (void) const; // get method (read only)"
+      << ub->local_name  () << " (void) const;"
       << be_nl
-    // read/write
       << bt->nested_type_name (bu) << " &" << ub->local_name ()
-      << " (void); // get method (read/write only)\n\n";
+      << " (void);";
 
   return 0;
 }

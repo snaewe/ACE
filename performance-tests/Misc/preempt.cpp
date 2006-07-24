@@ -31,9 +31,15 @@
 //
 // ============================================================================
 
+#include "ace/OS_main.h"
+#include "ace/ACE.h"
 #include "ace/Task.h"
 #include "ace/Sched_Params.h"
 #include "ace/Get_Opt.h"
+#include "ace/OS_NS_sys_select.h"
+#include "ace/OS_NS_time.h"
+#include "ace/OS_NS_errno.h"
+#include "ace/OS_NS_unistd.h"
 
 ACE_RCSID(Misc, preempt, "$Id$")
 
@@ -76,7 +82,7 @@ ACE_hrtime_t starttime;
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-class High_Priority_Task : public ACE_Task<ACE_MT_SYNCH>
+class High_Priority_Task : public ACE_Task<ACE_SYNCH>
 {
 public:
   High_Priority_Task (void);
@@ -94,7 +100,7 @@ private:
 };
 
 High_Priority_Task::High_Priority_Task (void)
-  : ACE_Task<ACE_MT_SYNCH> (ACE_Thread_Manager::instance ()),
+  : ACE_Task<ACE_SYNCH> (ACE_Thread_Manager::instance ()),
     priority_ (ACE_Sched_Params::next_priority (
                  ACE_SCHED_FIFO,
                  ACE_Sched_Params::priority_min (ACE_SCHED_FIFO,
@@ -131,8 +137,8 @@ High_Priority_Task::open (void *)
       // Become an active object.
       if (this->activate (flags, 1, 0, this->priority_) == -1)
         {
-          ACE_DEBUG ((LM_ERROR, "(%P|%t) task activation failed, exiting!\n%a",
-                      -1));
+          ACE_DEBUG ((LM_ERROR, "(%P|%t) task activation failed, exiting!\n"));
+          ACE_OS::exit (1);
         }
 
       return 0;
@@ -189,7 +195,7 @@ High_Priority_Task::print_times () const
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-class Low_Priority_Task : public ACE_Task<ACE_MT_SYNCH>
+class Low_Priority_Task : public ACE_Task<ACE_SYNCH>
 {
 public:
   Low_Priority_Task (const High_Priority_Task &);
@@ -204,7 +210,7 @@ private:
 
 Low_Priority_Task::Low_Priority_Task (
   const High_Priority_Task &high_priority_task)
-  : ACE_Task<ACE_MT_SYNCH> (ACE_Thread_Manager::instance ()),
+  : ACE_Task<ACE_SYNCH> (ACE_Thread_Manager::instance ()),
     priority_ (ACE_Sched_Params::priority_min (ACE_SCHED_FIFO,
                                                ACE_SCOPE_THREAD)),
     high_priority_task_ (high_priority_task)
@@ -285,9 +291,9 @@ Low_Priority_Task::svc (void)
 ///////////////////////////////////////////////////////////////////////////////
 
 static int
-get_options (int argc, char *argv[])
+get_options (int argc, ACE_TCHAR *argv[])
 {
-  ACE_Get_Opt get_opt (argc, argv, "fh:l:n:p:y?");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT("fh:l:n:p:y?"));
   int opt;
   while ((opt = get_opt ()) != EOF) {
     switch (opt) {
@@ -295,28 +301,28 @@ get_options (int argc, char *argv[])
       use_fork = 1;
       break;
     case 'h':
-      if (ACE_OS::atoi (get_opt.optarg) >= 2)
-        high_iterations = ACE_OS::atoi (get_opt.optarg);
+      if (ACE_OS::atoi (get_opt.opt_arg ()) >= 2)
+        high_iterations = ACE_OS::atoi (get_opt.opt_arg ());
       else
         ACE_ERROR_RETURN ((LM_ERROR, "%n: high iterations must be >= 2\n"),
                           -1);
       break;
     case 'l':
-      if (ACE_OS::atoi (get_opt.optarg) >= 2)
-        low_iterations = ACE_OS::atoi (get_opt.optarg);
+      if (ACE_OS::atoi (get_opt.opt_arg ()) >= 2)
+        low_iterations = ACE_OS::atoi (get_opt.opt_arg ());
       else
         ACE_ERROR_RETURN ((LM_ERROR, "%n: low iterations must be >= 2\n"), -1);
       break;
     case 'n':
-      if (ACE_OS::atoi (get_opt.optarg) >= 1)
-        high_priority_tasks = ACE_OS::atoi (get_opt.optarg);
+      if (ACE_OS::atoi (get_opt.opt_arg ()) >= 1)
+        high_priority_tasks = ACE_OS::atoi (get_opt.opt_arg ());
       else
         ACE_ERROR_RETURN ((LM_ERROR, "%n: number of high priority threads "
                            "must be >= 1\n"), -1);
       break;
     case 'p':
-      if (ACE_OS::atoi (get_opt.optarg) > 0)
-        read_period = ACE_OS::atoi (get_opt.optarg);
+      if (ACE_OS::atoi (get_opt.opt_arg ()) > 0)
+        read_period = ACE_OS::atoi (get_opt.opt_arg ());
       else
         ACE_ERROR_RETURN ((LM_ERROR, "%n: read period > 0\n"), -1);
       break;
@@ -333,7 +339,7 @@ get_options (int argc, char *argv[])
     }
   }
 
-  switch (argc - get_opt.optind) {
+  switch (argc - get_opt.opt_ind ()) {
   case 0:
     // OK, no non-flag arguments.
     break;
@@ -356,9 +362,9 @@ get_options (int argc, char *argv[])
 ///////////////////////////////////////////////////////////////////////////////
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
-  ACE_LOG_MSG->open (argv[0] ? argv[0] : "preempt");
+  ACE_LOG_MSG->open (argv[0] ? argv[0] : ACE_TEXT("preempt"));
 
 #if defined (ACE_HAS_THREADS) || !defined (ACE_LACKS_FORK)
 
@@ -401,7 +407,7 @@ main (int argc, char *argv[])
   pid_t child = 0;
   if (use_fork == 1)
     {
-      switch ((child = ACE_OS::fork ("preempt-low_priority_process")))
+      switch ((child = ACE_OS::fork (ACE_TEXT("preempt-low_priority_process"))))
         {
         case -1:
           ACE_ERROR ((LM_ERROR, "%p\n%a", "fork failed"));

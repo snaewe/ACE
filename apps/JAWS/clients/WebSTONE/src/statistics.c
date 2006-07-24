@@ -1,3 +1,4 @@
+/* $Id$ */
 /**************************************************************************
  *									  *
  * 		 Copyright (C) 1995 Silicon Graphics, Inc.		  *
@@ -9,6 +10,7 @@
  *									  *
  **************************************************************************/
 
+/* FUZZ: disable check_for_math_include */
 #include <math.h>
 #include <stdlib.h>
 #include "sysdep.h"

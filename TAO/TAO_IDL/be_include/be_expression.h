@@ -4,7 +4,7 @@
 //
 // = LIBRARY
 //    TAO IDL
-// 
+//
 // = FILENAME
 //    be_expression.h
 //
@@ -14,34 +14,50 @@
 //
 // = AUTHOR
 //    Copyright 1994-1995 by Sun Microsystems, Inc.
-//    and 
+//    and
 //    Aniruddha Gokhale
-// 
+//
 // ============================================================================
 
-#if !defined (BE_EXPRESSION_H)
+#ifndef BE_EXPRESSION_H
 #define BE_EXPRESSION_H
 
-/*
- * BE_Expression
- */
-class be_expression : public virtual AST_Expression 
+#include "ast_expression.h"
+#include "idl_uns_long.h"
+
+class be_visitor;
+
+class be_expression : public virtual AST_Expression
 {
 public:
-  // Operations
+  // Constructors.
   be_expression (UTL_ScopedName *n);
-  be_expression (AST_Expression *b, AST_Expression::ExprType t);
+
+  be_expression (AST_Expression *b,
+                 AST_Expression::ExprType t);
+
   be_expression (AST_Expression::ExprComb c,
                  AST_Expression *v1,
                  AST_Expression *v2);
+
   be_expression (long l);
-  be_expression (long l, AST_Expression::ExprType t);
-  be_expression (unsigned long l);
-  be_expression (String *s);
+
+  be_expression (bool b);
+
+  be_expression (idl_uns_long l,
+                 AST_Expression::ExprType t);
+
+  be_expression (UTL_String *s);
+
+  be_expression (char *s);
+
   be_expression (char c);
+
+  be_expression (ACE_OutputCDR::from_wchar wc);
+
   be_expression (double d);
 
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
 };
 

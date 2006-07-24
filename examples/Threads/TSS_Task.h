@@ -6,17 +6,23 @@
 //
 // = LIBRARY
 //    tests
-// 
+//
 // = FILENAME
 //    TSS_Task.h
 //
 // = AUTHOR
 //    Prashant Jain and Doug Schmidt
-// 
+//
 // ============================================================================
 
-#include "ace/Synch.h"
+#include "ace/config-all.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Token.h"
+#include "ace/Atomic_Op.h"
 
 class Test_Task
 {

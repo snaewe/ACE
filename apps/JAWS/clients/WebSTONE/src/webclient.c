@@ -1,5 +1,6 @@
+/* $Id$ */
 /**************************************************************************
- * $Header$
+ *                                                                        *
  * 		 Copyright (C) 1995 Silicon Graphics, Inc.		  *
  *									  *
  *  These coded instructions, statements, and computer programs were	  *
@@ -8,6 +9,8 @@
  *  modifications and changes to the code and release it.		  *
  *									  *
  **************************************************************************/
+
+/* FUZZ: disable check_for_math_include */
 
 #include <thread.h>
 

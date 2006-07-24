@@ -1,3 +1,5 @@
+// -*- C++ -*-
+
 // $Id$
 
 // ============================================================================
@@ -19,20 +21,24 @@
 //
 // ============================================================================
 
-#if !defined (BE_SEQUENCE_H)
+#ifndef BE_SEQUENCE_H
 #define BE_SEQUENCE_H
 
-/*
- * BE_Sequence
- */
+#include "be_scope.h"
+#include "be_type.h"
+#include "ast_sequence.h"
 
+class AST_Expression;
+class AST_Type;
+class be_visitor;
 class be_typedef;
+class be_field;
 
 // A sequence in OMG IDL does not define a scoping construct just as a struct
 // or union or an interface do. However, in the C++ mapping, a sequence becomes
 // a class. If the base type of a sequence is another anonymous sequence, then
 // the base type is defined in the scope of this sequence. Hence we define
-// be_sequence to possess the additional characteristics of a scope
+// be_sequence to possess the additional characteristics of a scope.
 class be_sequence : public virtual AST_Sequence,
                     public virtual be_scope,
                     public virtual be_type
@@ -40,72 +46,79 @@ class be_sequence : public virtual AST_Sequence,
 public:
   enum MANAGED_TYPE
   {
-    MNG_UNKNOWN ,
+    MNG_UNKNOWN,
     MNG_NONE,
     MNG_STRING,
+    MNG_WSTRING,
     MNG_OBJREF,
+    MNG_VALUE,
     MNG_PSEUDO
   };
 
-  // =Operations
-
   be_sequence (void);
-  // default constructor
+  // Default constructor.
 
-  be_sequence (AST_Expression *v, AST_Type *bt);
-  // constructor
+  be_sequence (AST_Expression *v,
+               AST_Type *bt,
+               UTL_ScopedName *n,
+               bool local,
+               bool abstract);
+  // Constructor.
 
-  virtual int create_name (be_typedef *node=0);
-  // create a name for ourselves. If we are typedefed, then we get the name of
-  // the typedef node, else we generate a name for ourselves
-
-  virtual int gen_typecode (void);
-  // generate the typecode
-
-  virtual int gen_encapsulation (void);
-  // encapsulation for parameters
-
-  virtual long tc_size (void);
-  // return typecode size
-
-  virtual long tc_encap_len (void);
-  // return length of encapsulation
+  virtual int create_name (be_typedef *node);
+  // Create a name for ourselves. If we are typedefed, then we get the name of
+  // the typedef node, else we generate a name for ourselves.
 
   virtual MANAGED_TYPE managed_type (void);
-  // return the managed type
+  // Return the managed type.
 
-  virtual idl_bool unbounded (void) const;
-  // is this sequence bounded or not
-
-  // =Scope management functions
+  // Scope management functions.
   virtual AST_Sequence *fe_add_sequence (AST_Sequence *);
 
   virtual be_decl *decl (void);
-  // overridden method on the be_scope class
+  // Overridden method on the be_scope class.
 
-  // Visiting
+  virtual void destroy (void);
+  // Cleanup method.
+
+  // Visiting.
   virtual int accept (be_visitor *visitor);
 
-  // Narrowing
+  // Narrowing.
   DEF_NARROW_METHODS3 (be_sequence, AST_Sequence, be_scope, be_type);
   DEF_NARROW_FROM_DECL (be_sequence);
 
-  const char *instance_name ();
-  // report the instance name for instantiation
+  const char *instance_name (void);
+  // Report the instance name for instantiation.
 
-  const char *object_manager_name ();
-  // report the object manager name for the sequence of objects
+  int gen_base_class_name (TAO_OutStream *os,
+                           const char * linebreak,
+                           AST_Decl *elem_scope);
+  // Common code for generating the name and parameters of our
+  // template sequence base class.
+
+  be_field *field_node (void) const;
+  void field_node (be_field *node);
+  // Accessors for the member.
+
+  virtual char *gen_name (void);
+  // Helper to create_name, also used by the traits visitor.
 
 protected:
-  virtual char *gen_name (void);
-  // helper to create_name
+
+  virtual void compute_tc_name (void);
+  // Computes the fully scoped typecode name.
 
 private:
-  idl_bool unbounded_;
-  // whether we are bounded or unbounded
+  const char *smart_fwd_helper_name (AST_Decl *elem_scope,
+                                     be_type *elem);
 
+private:
   MANAGED_TYPE mt_;
-  // our managed type
+  // Our managed type.
+
+  be_field *field_node_;
+  // Used if we are an anonymous member, to help generate a unique name.
 };
 
 #endif

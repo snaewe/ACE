@@ -1,13 +1,18 @@
 // $Id$
 
 #include "ace/FIFO_Send_Msg.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_main.h"
+#include "ace/OS_NS_stdlib.h"
+#include "ace/OS_NS_time.h"
+#include "ace/OS_NS_string.h"
 
 ACE_RCSID(FIFO_SAP, FIFO_Msg_client, "$Id$")
 
 #if defined (ACE_HAS_STREAM_PIPES)
 
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_FIFO_Send_Msg client (ACE_DEFAULT_RENDEZVOUS);
 
@@ -18,7 +23,7 @@ main (int, char *[])
 
   while (ACE_OS::fgets (buf, sizeof buf, stdin) != 0)
     {
-      msg.len = strlen (buf) + 1;
+      msg.len = ACE_OS::strlen (buf) + 1;
       if (client.send (ACE_OS::rand () % 11, &msg) == -1)
 	::perror ("send");
     }
@@ -29,8 +34,8 @@ main (int, char *[])
   return 0;
 }
 #else
-#include <stdio.h>
-int main (int, char *[])
+#include "ace/os_include/os_stdio.h"
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_OS::fprintf (stderr, "This feature is not supported\n");
   return 0;

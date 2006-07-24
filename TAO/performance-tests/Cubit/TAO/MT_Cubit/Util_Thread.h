@@ -10,11 +10,12 @@
 //    Util_Thread.h
 //
 // = AUTHOR
-//    Andy Gokhale, Sumedh Mungee, and Sergio Flores-Gaitan
+//    Andy Gokhale, Sumedh Mungee, Sergio Flores-Gaitan and Nagarajan
+//    Surendran.
 //
 // ============================================================================
 
-#if !defined (UTIL_THREAD_H)
+#ifndef UTIL_THREAD_H
 #define UTIL_THREAD_H
 
 #include "Task_Client.h"

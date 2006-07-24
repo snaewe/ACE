@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,54 +62,67 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_ENUM_AST_ENUM_HH
 #define _AST_ENUM_AST_ENUM_HH
 
-// Representation of enum:
+#include "ast_concrete_type.h"
+#include "utl_scope.h"
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, utl_scope.hh, ast_enum_val.hh,
-**		 utl_scoped_name.hh, utl_strlist.hh, ast_expression.hh,
-**
-** USE: Included from ast.hh
-*/
+class AST_EnumVal;
 
-class	AST_Enum : public virtual AST_ConcreteType, public virtual UTL_Scope
+class TAO_IDL_FE_Export AST_Enum : public virtual AST_ConcreteType,
+                                   public virtual UTL_Scope
 {
 public:
-  // Operations
+  AST_Enum (void);
+  AST_Enum (UTL_ScopedName *n,
+            bool local,
+            bool abstract);
 
-  // Constructor(s)
-  AST_Enum();
-  AST_Enum(UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Enum() {}
+  virtual ~AST_Enum (void);
 
   // Narrowing
   DEF_NARROW_METHODS2(AST_Enum, AST_ConcreteType, UTL_Scope);
   DEF_NARROW_FROM_DECL(AST_Enum);
   DEF_NARROW_FROM_SCOPE(AST_Enum);
 
-  // AST Dumping
-  virtual void			dump(ostream &);
-
-  // Other operations
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &);
 
   // Look up an AST_EnumVal by value
-  virtual AST_EnumVal		*lookup_by_value(const AST_Expression *v);
+  AST_EnumVal *lookup_by_value (const AST_Expression *v);
 
-  // Get value to be assigned to next enumerator
-  virtual unsigned long		next_enum_val();
+  // Get value to be assigned to next enumerator.
+  unsigned long next_enum_val (void);
+
+  // Return the count of members
+  virtual int member_count (void);
+
+  // Convert a numeric value to the enum's string name for it.
+  UTL_ScopedName *value_to_name (const unsigned long v);
+
+  // Cleanup function.
+  virtual void destroy (void);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
 
 private:
-  // Data
-  unsigned long			pd_enum_counter;	// Value for next
-							// enumerator
-  // Scope management
-  friend int tao_yyparse();
-  virtual AST_EnumVal		*fe_add_enum_val(AST_EnumVal	*v);
+  friend int tao_yyparse (void);
 
+  unsigned long pd_enum_counter;
+  // Value for next enumerator.
+
+  int member_count_;
+  // Number of members.
+
+  int compute_member_count (void);
+  // Count the number of members.
+
+  virtual AST_EnumVal *fe_add_enum_val (AST_EnumVal *v);
+  // Scope Management.
 };
 
 #endif           // _AST_ENUM_AST_ENUM_HH

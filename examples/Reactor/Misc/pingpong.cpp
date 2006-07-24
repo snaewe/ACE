@@ -35,9 +35,18 @@
    stop it earlier, just hit the control-C sequence
    and you'll see the same messages. */
 
-#include "ace/Synch.h"
 #include "ace/Reactor.h"
 #include "ace/Pipe.h"
+#include "ace/Log_Msg.h"
+#include "ace/ACE.h"
+#include "ace/Test_and_Set.h"
+#include "ace/OS_NS_string.h"
+#include "ace/Null_Mutex.h"
+#include "ace/OS_NS_unistd.h"
+#if defined (ACE_WIN32) || defined (CHORUS)
+#  include "ace/Barrier.h"
+#  include "ace/Thread.h"
+#endif
 
 ACE_RCSID(Misc, pingpong, "$Id$")
 
@@ -50,7 +59,8 @@ public:
   virtual int handle_output (ACE_HANDLE);
   virtual int handle_timeout (const ACE_Time_Value &,
                               const void *);
-
+  virtual int handle_close (ACE_HANDLE handle,
+                            ACE_Reactor_Mask close_mask);
 private:
   char buf_[BUFSIZ];
   // Buffer to send.
@@ -84,6 +94,14 @@ Ping_Pong::get_handle (void) const
 }
 
 int
+Ping_Pong::handle_close (ACE_HANDLE,
+                         ACE_Reactor_Mask)
+{
+  delete this; // Cleanup when we're removed from the reactor.
+  return 0;
+}
+
+int
 Ping_Pong::handle_input (ACE_HANDLE)
 {
 #if defined (ACE_HAS_STREAM_PIPES)
@@ -93,33 +111,33 @@ Ping_Pong::handle_input (ACE_HANDLE)
 
   if (n != (ssize_t) this->buflen_)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       "(%P|%t) reading [%d] %p\n",
+                       ACE_TEXT ("(%P|%t) reading [%d] %p\n"),
                        handle_,
-                       "read"),
+                       ACE_TEXT ("read")),
                       -1);
 
   ACE_DEBUG ((LM_DEBUG,
-	      "(%P|%t) reading <%d> (%d) [%d] = %s\n",
-	      this->handle_,
-	      *(int *) this->buf_,
-	      *(int *) (this->buf_ + sizeof (int)),
-	      this->buf_ + (2 * sizeof (int))));
+              ACE_TEXT ("(%P|%t) reading <%d> (%d) [%d] = %C\n"),
+              this->handle_,
+              *(int *) this->buf_,
+              *(int *) (this->buf_ + sizeof (int)),
+              this->buf_ + (2 * sizeof (int))));
 #else
   ssize_t n = ACE::recv (this->handle_,
                          this->buf_,
                          this->buflen_);
   if (n == -1)
     ACE_ERROR_RETURN ((LM_ERROR,
-                       "[%d] %p\n",
+                       ACE_TEXT ("[%d] %p\n"),
                        handle_,
-                       "read"),
+                       ACE_TEXT ("read")),
                       -1);
   n -= (2 * sizeof (int));
   char *buf = this->buf_ + (2 * sizeof (int));
 
   ACE_DEBUG ((LM_DEBUG,
-              "(%P|%t) reading <%d> = %*s\n",
-	      this->handle_,
+              ACE_TEXT ("(%P|%t) reading <%d> = %*C\n"),
+              this->handle_,
               n,
               buf));
 #endif /* ACE_HAS_STREAM_PIPES */
@@ -141,8 +159,8 @@ Ping_Pong::handle_output (ACE_HANDLE)
   else
     {
       ACE_DEBUG ((LM_DEBUG,
-		  "(%P|%t) writing <%d> [%d]\n",
-		  this->handle_,
+                  ACE_TEXT ("(%P|%t) writing <%d> [%d]\n"),
+                  this->handle_,
                   this->pid_));
       return 0;
     }
@@ -154,7 +172,7 @@ Ping_Pong::handle_output (ACE_HANDLE)
   else
     {
       ACE_DEBUG ((LM_DEBUG,
-		  "(%P|%t) writing <%d>\n",
+                  ACE_TEXT ("(%P|%t) writing <%d>\n"),
                   this->handle_));
       return 0;
     }
@@ -163,57 +181,55 @@ Ping_Pong::handle_output (ACE_HANDLE)
 
 int
 Ping_Pong::handle_timeout (const ACE_Time_Value &,
-			   const void *)
+                           const void *)
 {
   this->set (1);
   return 0;
 }
 
 // Contains the string to "pingpong" back and forth...
-static char *string_name;
+static ACE_TCHAR *string_name;
 
 // Wait for 10 seconds and then shut down.
-static const int SHUTDOWN_TIME = 10;
+static const ACE_Time_Value SHUTDOWN_TIME (10);
 
 static void
 run_svc (ACE_HANDLE handle)
 {
-  // The <callback> object is an <ACE_Event_Handler> created on the
-  // stack.  This is normally not a good idea, but in this case it
-  // works because the ACE_Reactor is destroyed before leaving this
-  // scope as well, so it'll remove the <callback> object from its
-  // internal tables BEFORE it is destroyed.
-  Ping_Pong callback (string_name, handle);
+  Ping_Pong *callback = 0;
+  ACE_NEW (callback,
+           Ping_Pong (ACE_TEXT_ALWAYS_CHAR (string_name),
+                      handle));
 
-  // Note that we put the <reactor> AFTER the <callback> so that the
-  // <reactor> will get shutdown first.
   ACE_Reactor reactor;
 
   // Register the callback object for the various I/O, signal, and
   // timer-based events.
 
-  if (reactor.register_handler (&callback,
-				ACE_Event_Handler::READ_MASK
-				| ACE_Event_Handler::WRITE_MASK) == -1
+  if (reactor.register_handler (callback,
+                                ACE_Event_Handler::READ_MASK
+                                | ACE_Event_Handler::WRITE_MASK) == -1
 #if !defined (CHORUS)
       || reactor.register_handler (SIGINT,
-                                   &callback) == -1
+                                   callback) == -1
 #endif /* CHORUS */
-      || reactor.schedule_timer (&callback,
+      || reactor.schedule_timer (callback,
                                  0,
                                  SHUTDOWN_TIME) == -1)
-    ACE_ERROR ((LM_ERROR,
-                "%p\n%a",
-                "reactor",
-                1));
+    {
+      ACE_ERROR ((LM_ERROR,
+                  ACE_TEXT ("%p\n"),
+                  ACE_TEXT ("reactor")));
+      ACE_OS::exit (1);
+    }
 
   // Main event loop (one per process).
 
-  while (callback.is_set () == 0)
+  while (callback->is_set () == 0)
     if (reactor.handle_events () == -1)
       ACE_ERROR ((LM_ERROR,
-                  "%p\n",
-                  "handle_events"));
+                  ACE_TEXT ("%p\n"),
+                  ACE_TEXT ("handle_events")));
 }
 
 #if defined (ACE_WIN32) || defined (CHORUS)
@@ -230,20 +246,20 @@ worker (void *arg)
   barrier.wait ();
 
   ACE_DEBUG ((LM_DEBUG,
-              "(%P|%t) %n: shutting down tester\n"));
+              ACE_TEXT ("(%P|%t) %n: shutting down tester\n")));
   return 0;
 }
 #endif /* ACE_WIN32 */
 
 int
-main (int argc, char *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
-  ACE_LOG_MSG->open (argv[0]);
-
   if (argc != 2)
-    ACE_ERROR ((LM_ERROR,
-                "usage: %n string\n%a",
-                1));
+    ACE_ERROR_RETURN ((LM_ERROR,
+                       ACE_TEXT ("usage: pingpong <string>\n")),
+                       -1);
+
+  ACE_LOG_MSG->open (argv[0]);
 
   string_name = argv[1];
 
@@ -254,14 +270,14 @@ main (int argc, char *argv[])
 
 #if defined (ACE_WIN32) || defined (CHORUS)
   if (ACE_Thread::spawn (ACE_THR_FUNC (worker),
-			 (void *) handles[0],
-			 THR_DETACHED) == -1
+                         (void *) handles[0],
+                         THR_DETACHED) == -1
       || ACE_Thread::spawn (ACE_THR_FUNC (worker),
-			    (void *) handles[1],
-			    THR_DETACHED) == -1)
+                            (void *) handles[1],
+                            THR_DETACHED) == -1)
       ACE_ERROR ((LM_ERROR,
-                  "%p\n%a",
-                  "spawn",
+                  ACE_TEXT ("%p\n%a"),
+                  ACE_TEXT ("spawn"),
                   1));
   barrier.wait ();
 #else
@@ -269,25 +285,18 @@ main (int argc, char *argv[])
 
   if (pid == -1)
     ACE_ERROR ((LM_ERROR,
-                "%p\n%a",
-                "fork",
+                ACE_TEXT ("%p\n%a"),
+                ACE_TEXT ("fork"),
                 1));
   run_svc (handles[pid == 0]);
 
   ACE_DEBUG ((LM_DEBUG,
-              "(%P|%t) %n: shutting down tester\n"));
+              ACE_TEXT ("(%P|%t) %n: shutting down tester\n")));
 #endif /* ACE_WIN32 */
 
   if (pipe.close () == -1)
     ACE_ERROR ((LM_ERROR,
-                "%p\n",
-                "close"));
+                ACE_TEXT ("%p\n"),
+                ACE_TEXT ("close")));
   return 0;
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Test_and_Set<ACE_Null_Mutex, sig_atomic_t>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Test_and_Set<ACE_Null_Mutex, sig_atomic_t>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-

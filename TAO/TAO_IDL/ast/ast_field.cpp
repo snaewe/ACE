@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,94 +62,139 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_field.cc - Implementation of class AST_Field
- *
- * AST_Fields denote fields in IDL structure, union and exception
- * declarations. AST_Field is also used as a superclass of AST_Argument
- * and AST_UnionBranch.
- * AST_Fields have a field type (a subclass of AST_Type) and a name
- * (a UTL_ScopedName)
- *
- * AST_Field supplies two constructors, one to be used in constructing
- * AST_Field nodes, the other to be used in constructing AST_Argument
- * nodes and AST_UnionBranch nodes.
- */
+// AST_Fields denote fields in IDL structure, union and exception
+// declarations. AST_Field is also used as a superclass of AST_Argument
+// and AST_UnionBranch.
+// AST_Fields have a field type (a subclass of AST_Type) and a name
+// (a UTL_ScopedName).
 
-#include	"idl.h"
-#include	"idl_extern.h"
+// AST_Field supplies two constructors, one to be used in constructing
+// AST_Field nodes, the other to be used in constructing AST_Argument
+// nodes and AST_UnionBranch nodes.
 
-ACE_RCSID(ast, ast_field, "$Id$")
+#include "ast_field.h"
+#include "ast_type.h"
+#include "ast_visitor.h"
+#include "utl_identifier.h"
 
-/*
- * Constructor(s) and destructor
- */
+ACE_RCSID (ast, ast_field, "$Id$")
 
-/*
- * Default constructor
- */
-AST_Field::AST_Field()
-	 : pd_field_type(NULL)
+AST_Field::AST_Field (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    pd_field_type (0),
+    pd_visibility (vis_NA),
+    anonymous_type_ (false)
 {
 }
 
-/*
- * To be used when constructing an AST_Field node
- */
-AST_Field::AST_Field(AST_Type *ft, UTL_ScopedName *n, UTL_StrList *p)
-	 : AST_Decl(AST_Decl::NT_field, n, p),
-	   pd_field_type(ft)
+// To be used when constructing an AST_Field node.
+AST_Field::AST_Field (AST_Type *ft,
+                      UTL_ScopedName *n,
+                      Visibility vis)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_field,
+              n),
+    pd_field_type (ft),
+    pd_visibility (vis),
+    anonymous_type_ (false)
+{
+  AST_Decl::NodeType fnt = ft->node_type ();
+  
+  if (AST_Decl::NT_array == fnt || AST_Decl::NT_sequence == fnt)
+    {
+      this->anonymous_type_ = true;
+    }
+}
+
+// To be used when constructing a node of a subclass of AST_Field.
+AST_Field::AST_Field (AST_Decl::NodeType nt,
+                      AST_Type *ft,
+                      UTL_ScopedName *n,
+                      Visibility vis)
+  : COMMON_Base (),
+    AST_Decl (nt,
+              n),
+    pd_field_type (ft),
+    pd_visibility (vis),
+    anonymous_type_ (false)
+{
+  AST_Decl::NodeType fnt = ft->node_type ();
+  
+  if (AST_Decl::NT_array == fnt || AST_Decl::NT_sequence == fnt)
+    {
+      this->anonymous_type_ = true;
+    }
+}
+
+AST_Field::~AST_Field (void)
 {
 }
 
-/*
- * To be used when constructing a node of a subclass of AST_Field
- */
-AST_Field::AST_Field(AST_Decl::NodeType nt, AST_Type *ft,
-		   UTL_ScopedName *n, UTL_StrList *p)
-	 : AST_Decl(nt, n, p),
-	   pd_field_type(ft)
-{
-}
-
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_Field node to the ostream o
- */
+// Dump this AST_Field node to the ostream o.
 void
-AST_Field::dump(ostream &o)
+AST_Field::dump (ACE_OSTREAM_TYPE &o)
 {
-  pd_field_type->local_name()->dump(o);
-  o << " ";
-  local_name()->dump(o);
+  switch (this->pd_visibility)
+    {
+    case vis_PRIVATE:
+      this->dump_i (o, "private ");
+
+      break;
+    case vis_PUBLIC:
+      this->dump_i (o, "public ");
+
+      break;
+    case vis_NA:
+      break;
+    }
+
+  this->pd_field_type->local_name ()->dump (o);
+
+  this->dump_i (o, " ");
+
+  this->local_name ()->dump (o);
 }
 
-/*
- * Data accessors
- */
+int
+AST_Field::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_field (this);
+}
+
+void
+AST_Field::destroy (void)
+{
+  if (this->anonymous_type_)
+    {
+      this->pd_field_type->destroy ();
+      delete this->pd_field_type;
+      this->pd_field_type = 0;
+    }
+
+  this->AST_Decl::destroy ();
+}
 
 AST_Type *
-AST_Field::field_type()
+AST_Field::field_type (void) const
 {
-  return pd_field_type;
+  return this->pd_field_type;
 }
 
-/*
- * Narrowing methods
- */
+AST_Field::Visibility
+AST_Field::visibility (void)
+{
+  return this->pd_visibility;
+}
+
+int
+AST_Field::contains_wstring (void)
+{
+  return this->pd_field_type->contains_wstring ();
+}
+
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_Field, AST_Decl)
 IMPL_NARROW_FROM_DECL(AST_Field)

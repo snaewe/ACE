@@ -1,31 +1,80 @@
 // $Id$
 
-#define ACE_BUILD_DLL
 #include "ace/Task.h"
 #include "ace/Module.h"
-#if !defined (ACE_HAS_WINCE)
-#include "ace/Service_Config.h"
-#endif /* !ACE_HAS_WINCE */
 
 #if !defined (__ACE_INLINE__)
-#include "ace/Task.i"
+#include "ace/Task.inl"
 #endif /* __ACE_INLINE__ */
 
-ACE_RCSID(ace, Task, "$Id$")
 
-ACE_Task_Base::~ACE_Task_Base (void)
-{
-}
+ACE_RCSID (ace,
+           Task,
+           "$Id$")
+
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 ACE_Task_Base::ACE_Task_Base (ACE_Thread_Manager *thr_man)
   : thr_count_ (0),
     thr_mgr_ (thr_man),
     flags_ (0),
-    grp_id_ (0)
+    grp_id_ (-1),
+    last_thread_id_ (0)
 {
 }
 
+ACE_Task_Base::~ACE_Task_Base (void)
+{
+}
+
+// Default ACE_Task service routine
+
+int
+ACE_Task_Base::svc (void)
+{
+  ACE_TRACE ("ACE_Task_Base::svc");
+  return 0;
+}
+
+// Default ACE_Task open routine
+
+int
+ACE_Task_Base::open (void *)
+{
+  ACE_TRACE ("ACE_Task_Base::open");
+  return 0;
+}
+
+// Default ACE_Task close routine
+
+int
+ACE_Task_Base::close (u_long)
+{
+  ACE_TRACE ("ACE_Task_Base::close");
+  return 0;
+}
+
+// Forward the call to close() so that existing applications don't
+// break.
+
+int
+ACE_Task_Base::module_closed (void)
+{
+  return this->close (1);
+}
+
+// Default ACE_Task put routine.
+
+int
+ACE_Task_Base::put (ACE_Message_Block *, ACE_Time_Value *)
+{
+  ACE_TRACE ("ACE_Task_Base::put");
+  return 0;
+}
+
 // Wait for all threads running in a task to exit.
+
 int
 ACE_Task_Base::wait (void)
 {
@@ -47,8 +96,8 @@ ACE_Task_Base::suspend (void)
   ACE_MT (ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, this->lock_, -1));
   if (this->thr_count_ > 0)
     return this->thr_mgr_->suspend_task (this);
-  else
-    return 0;
+
+  return 0;
 }
 
 // Resume a suspended task.
@@ -59,8 +108,8 @@ ACE_Task_Base::resume (void)
   ACE_MT (ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, this->lock_, -1));
   if (this->thr_count_ > 0)
     return this->thr_mgr_->resume_task (this);
-  else
-    return 0;
+
+  return 0;
 }
 
 int
@@ -73,7 +122,7 @@ ACE_Task_Base::activate (long flags,
                          ACE_hthread_t thread_handles[],
                          void *stack[],
                          size_t stack_size[],
-                         ACE_thread_t thread_names[])
+                         ACE_thread_t thread_ids[])
 {
   ACE_TRACE ("ACE_Task_Base::activate");
 
@@ -87,19 +136,30 @@ ACE_Task_Base::activate (long flags,
   if (this->thr_count_ > 0 && force_active == 0)
     return 1; // Already active.
   else
-    this->thr_count_ += n_threads;
+    {
+      if (this->thr_count_ > 0 && this->grp_id_ != -1)
+        // If we're joining an existing group of threads then make
+        // sure to use its group id.
+        grp_id = this->grp_id_;
+      this->thr_count_ += n_threads;
+    }
 
   // Use the ACE_Thread_Manager singleton if we're running as an
   // active object and the caller didn't supply us with a
   // Thread_Manager.
   if (this->thr_mgr_ == 0)
+# if defined (ACE_THREAD_MANAGER_LACKS_STATICS)
+    this->thr_mgr_ = ACE_THREAD_MANAGER_SINGLETON::instance ();
+# else /* ! ACE_THREAD_MANAGER_LACKS_STATICS */
     this->thr_mgr_ = ACE_Thread_Manager::instance ();
+# endif /* ACE_THREAD_MANAGER_LACKS_STATICS */
 
-  if (thread_names == 0)
-    // thread names were not specified
-    this->grp_id_ =
+  int grp_spawned = -1;
+  if (thread_ids == 0)
+    // Thread Ids were not specified
+    grp_spawned =
       this->thr_mgr_->spawn_n (n_threads,
-                               ACE_THR_FUNC (&ACE_Task_Base::svc_run),
+                               &ACE_Task_Base::svc_run,
                                (void *) this,
                                flags,
                                priority,
@@ -110,21 +170,32 @@ ACE_Task_Base::activate (long flags,
                                stack_size);
   else
     // thread names were specified
-    this->grp_id_ =
-      this->thr_mgr_->spawn_n (thread_names,
+    grp_spawned =
+      this->thr_mgr_->spawn_n (thread_ids,
                                n_threads,
-                               ACE_THR_FUNC (&ACE_Task_Base::svc_run),
+                               &ACE_Task_Base::svc_run,
                                (void *) this,
                                flags,
                                priority,
                                grp_id,
                                stack,
                                stack_size,
-                               thread_handles);
+                               thread_handles,
+                               task);
+  if (grp_spawned == -1)
+    {
+      // If spawn_n fails, restore original thread count.
+      this->thr_count_ -= n_threads;
+      return -1;
+    }
+
   if (this->grp_id_ == -1)
-    return -1;
-  else
-    return 0;
+    this->grp_id_ = grp_spawned;
+
+  this->last_thread_id_ = 0;    // Reset to prevent inadvertant match on ID
+
+  return 0;
+
 #else
   {
     // Keep the compiler from complaining.
@@ -137,7 +208,7 @@ ACE_Task_Base::activate (long flags,
     ACE_UNUSED_ARG (thread_handles);
     ACE_UNUSED_ARG (stack);
     ACE_UNUSED_ARG (stack_size);
-    ACE_UNUSED_ARG (thread_names);
+    ACE_UNUSED_ARG (thread_ids);
     ACE_NOTSUP_RETURN (-1);
   }
 #endif /* ACE_MT_SAFE */
@@ -150,10 +221,18 @@ ACE_Task_Base::cleanup (void *object, void *)
 
   // The thread count must be decremented first in case the <close>
   // hook does something crazy like "delete this".
-  t->thr_count_dec ();
+  {
+    ACE_MT (ACE_GUARD (ACE_Thread_Mutex, ace_mon, t->lock_));
+    t->thr_count_--;
+    if (0 == t->thr_count_)
+      t->last_thread_id_ = ACE_Thread::self ();
+  }
+
   // @@ Is it possible to pass in the exit status somehow?
   t->close ();
+  // t is undefined here. close() could have deleted it.
 }
+
 
 #if defined (ACE_HAS_SIG_C_FUNC)
 extern "C" void
@@ -163,7 +242,7 @@ ACE_Task_Base_cleanup (void *object, void *)
 }
 #endif /* ACE_HAS_SIG_C_FUNC */
 
-void *
+ACE_THR_FUNC_RETURN
 ACE_Task_Base::svc_run (void *args)
 {
   ACE_TRACE ("ACE_Task_Base::svc_run");
@@ -181,7 +260,14 @@ ACE_Task_Base::svc_run (void *args)
 #endif /* ACE_HAS_SIG_C_FUNC */
 
   // Call the Task's svc() hook method.
-  void * status = (void *) t->svc ();
+  int svc_status = t->svc ();
+  ACE_THR_FUNC_RETURN status;
+#if (defined (__BORLANDC__) && (__BORLANDC__ < 0x600)) || defined (__MINGW32__) || (defined (_MSC_VER) && (_MSC_VER <= 1400)) || (defined (ACE_WIN32) && defined(__IBMCPP__) || defined (__DCC__))
+  // Some compilers complain about reinterpret_cast from int to unsigned long...
+  status = static_cast<ACE_THR_FUNC_RETURN> (svc_status);
+#else
+  status = reinterpret_cast<ACE_THR_FUNC_RETURN> (svc_status);
+#endif /* (__BORLANDC__ < 0x600) || __MINGW32__ || _MSC_VER <= 1400 || __IBMCPP__ */
 
 // If we changed this zero change the other if in OS.cpp Thread_Adapter::invoke
 #if 1
@@ -198,11 +284,4 @@ ACE_Task_Base::svc_run (void *args)
   return status;
 }
 
-// Forward the call to close() so that existing applications don't
-// break.
-
-int
-ACE_Task_Base::module_closed (void)
-{
-  return this->close (1);
-}
+ACE_END_VERSIONED_NAMESPACE_DECL

@@ -1,8 +1,9 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (ACE_CONFIG_SCO_5_0_0_H)
+#ifndef ACE_CONFIG_SCO_5_0_0_H
 #define ACE_CONFIG_SCO_5_0_0_H
+#include /**/ "ace/pre.h"
 
 // Compiling for SCO.
 #if !defined (SCO)
@@ -13,6 +14,7 @@
 #define MAXPATHLEN 1023
 #endif /* SCO */
 
+#define ACE_HAS_NONCONST_SELECT_TIMEVAL
 #define ACE_HAS_SIG_MACROS
 #define ACE_LACKS_CONST_TIMESPEC_PTR
 #define ACE_LACKS_SYSCALL
@@ -29,20 +31,15 @@
 // Platform supports System V IPC (most versions of UNIX, but not Win32)
 #define ACE_HAS_SYSV_IPC
 #define ACE_HAS_NONCONST_MSGSND
-#define ACE_HAS_LONG_FDMASK
-// #define      ACE_LACKS_POSIX_PROTOTYPES
+#define ACE_HAS_BIG_FD_SET
 #define ACE_HAS_SVR4_DYNAMIC_LINKING
 #define ACE_HAS_AUTOMATIC_INIT_FINI
 
-// Platform supports Term Ioctls
-#define ACE_HAS_TERM_IOCTLS
-
-// Platform supports recvmsg and sendmsg.
-// #define ACE_HAS_MSG
-#define ACE_LACKS_RPC_H
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS
 
 // Compiler/platform contains the <sys/syscall.h> file.
-//#define ACE_HAS_SYSCALL_H
+//#define ACE_HAS_SYS_SYSCALL_H
 
 // Fixes a problem with HP/UX not wrapping the mmap(2) header files
 // with extern "C".
@@ -77,9 +74,6 @@
 
 #define ACE_HAS_TIMEZONE_GETTIMEOFDAY
 
-// HP/UX has an undefined syscall for GETRUSAGE...
-//#define ACE_HAS_SYSCALL_GETRUSAGE
-
 // Note, this only works if the flag is set above!
 //#define ACE_HAS_GETRUSAGE
 
@@ -87,22 +81,20 @@
 #define ACE_HAS_SELECT_H
 
 // Platform has prototypes for ACE_TLI.
-//#define ACE_HAS_TLI_PROTOTYPES
+#define ACE_HAS_TLI_PROTOTYPES
 // Platform has the XLI version of ACE_TLI.
 // #define ACE_HAS_XLI
-
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
 
 #define ACE_HAS_SIGINFO_T
 #define ACE_HAS_UCONTEXT_T
 
-#define ACE_NEEDS_SYSTIME_H
 #define ACE_LACKS_STRCASECMP
 
 // #define      ACE_HAS_POSIX_TIME
 #define ACE_HAS_IP_MULTICAST
+#define ACE_HAS_DIRENT
+#define ACE_LACKS_READDIR_R
+#define ACE_HAS_GPERF
 
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_SCO_5_0_0_H */

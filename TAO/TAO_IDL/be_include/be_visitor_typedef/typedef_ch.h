@@ -21,7 +21,7 @@
 //
 // ============================================================================
 
-#if !defined (_BE_VISITOR_TYPEDEF_TYPEDEF_CH_H_)
+#ifndef _BE_VISITOR_TYPEDEF_TYPEDEF_CH_H_
 #define _BE_VISITOR_TYPEDEF_TYPEDEF_CH_H_
 
 class be_visitor_typedef_ch : public be_visitor_typedef
@@ -56,6 +56,9 @@ public:
   virtual int visit_interface (be_interface *node);
   // visit an interface;
 
+  virtual int visit_interface_fwd (be_interface_fwd *node);
+  // visit an interface;
+
   virtual int visit_predefined_type (be_predefined_type *node);
   // visit predefined type node
 
@@ -71,6 +74,11 @@ public:
   virtual int visit_union (be_union *node);
   // visit a union
 
+  virtual int visit_valuebox (be_valuebox *node);
+  // visit a valuebox
+
+  virtual int visit_valuetype (be_valuetype *node);
+  // visit a valuetype
 };
 
 #endif /* _BE_VISITOR_TYPEDEF_TYPEDEF_CH_H_ */

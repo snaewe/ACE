@@ -1,155 +1,204 @@
 /* -*- C++ -*- */
-// $Id$
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Service_Object.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Service_Object.h
+ *
+ *  $Id$
+ *
+ *  @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//=============================================================================
 
-#if !defined (ACE_SERVICE_OBJECT_H)
+#ifndef ACE_SERVICE_OBJECT_H
 #define ACE_SERVICE_OBJECT_H
+#include /**/ "ace/pre.h"
 
 #include "ace/Shared_Object.h"
-#include "ace/Event_Handler.h"
+#include "ace/Svc_Conf_Tokens.h"
 
-class ACE_Export ACE_Service_Object : public ACE_Event_Handler, public ACE_Shared_Object
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+#include "ace/Event_Handler.h"
+#include "ace/DLL.h"
+
+#include "ace/Service_Gestalt.h"
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+#define ACE_Component ACE_Service_Object
+
+/**
+ * @class ACE_Service_Object
+ *
+ * @brief Provide the abstract base class common to all service
+ * implementations.
+ *
+ * Classes that inherit from <ACE_Service_Objects> are capable
+ * of being registered with the ACE_Reactor (due to the
+ * ACE_Event_Handler, as well as being dynamically linked by
+ * the ACE_Service_Config (due to the <ACE_Shared_Object>).
+ */
+class ACE_Export ACE_Service_Object
+  : public ACE_Event_Handler,
+    public ACE_Shared_Object
 {
-  // = TITLE
-  //     Provide the abstract base class common to all service
-  //     implementations.  
-  //
-  // = DESCRIPTION
-  //     Classes that inherit from <ACE_Service_Objects> are capable
-  //     of being registered with the <ACE_Reactor> (due to the
-  //     <ACE_Event_Handler>, as well as being dynamically linked by
-  //     the <ACE_Service_Config> (due to the <ACE_Shared_Object>).
 public:
   // = Initialization and termination methods.
-  ACE_Service_Object (void);
+  /// Constructor.
+  ACE_Service_Object (ACE_Reactor * = 0);
+
+  /// Destructor.
   virtual ~ACE_Service_Object (void);
 
+    /// Temporarily disable a service without removing it completely.
   virtual int suspend (void);
-    // Temporarily disable a service without removing it completely.
 
+    /// Re-enable a previously suspended service.
   virtual int resume (void);
-    // Re-enable a previously suspended service.
 };
 
 // Forward decl.
 class ACE_Service_Type_Impl;
 
+/**
+ * @class ACE_Service_Type
+ *
+ * @brief Keeps track of information related to the various
+ * ACE_Service_Type_Impl subclasses.
+ *
+ * This class acts as the interface of the "Bridge" pattern.
+ */
 class ACE_Export ACE_Service_Type
 {
-  // = TITLE
-  //      Keeps track of information related to the various
-  //      <ACE_Service_Type_Impl> subclasses.  
-  //
-  // = DESCRIPTION
-  //      This class acts as the interface of the "Bridge" pattern.
 public:
   enum
   {
-    DELETE_OBJ = 1, 
-    // Delete the payload object.
+    /// Delete the payload object.
+    DELETE_OBJ = 1,
 
-    DELETE_THIS = 2 
-    // Delete the enclosing object.
+    /// Delete the enclosing object.
+    DELETE_THIS = 2
   };
 
+  enum
+    {
+      SERVICE_OBJECT = ACE_SVC_OBJ_T,
+      MODULE = ACE_MODULE_T,
+      STREAM = ACE_STREAM_T,
+      INVALID_TYPE = -1
+    };
+
   // = Initialization and termination methods.
-  ACE_Service_Type (const ASYS_TCHAR *n, 
-		      ACE_Service_Type_Impl *o, 
-		      const ACE_SHLIB_HANDLE handle, 
-		      int active);
+  ACE_Service_Type (const ACE_TCHAR *n,
+                    ACE_Service_Type_Impl *o,
+                    const ACE_DLL &dll,
+                    int active);
+  ACE_Service_Type (const ACE_TCHAR *n,
+                    ACE_Service_Type_Impl *o,
+                    ACE_SHLIB_HANDLE handle,
+                    int active);
   ~ACE_Service_Type (void);
-			 
-  const ASYS_TCHAR *name (void) const;
-  void name (const ASYS_TCHAR *);
-  const char *chname (void) const;
+
+  const ACE_TCHAR *name (void) const;
+  void name (const ACE_TCHAR *);
 
   const ACE_Service_Type_Impl *type (void) const;
-  void type (const ACE_Service_Type_Impl *, 
-	     int active = 1);
+  void type (const ACE_Service_Type_Impl *, int active = 1);
 
-  ACE_SHLIB_HANDLE handle (void) const;
-  void handle (const ACE_SHLIB_HANDLE);
+  // Is this just a stub for the real thing?
+  bool is_forward_declaration (void) const;
 
-  void suspend (void) const;
-  void resume (void) const;
+  int suspend (void) const;
+  int resume (void) const;
   int  active (void) const;
   void active (int);
 
-  void fini (void);
-  // Calls fini() on <type_>
+  /// Calls <fini> on <type_>
+  int fini (void);
 
+  /// Check if the service has been fini'ed.
+  int fini_called (void) const;
+
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Get to the DLL's implentation
+  const ACE_DLL & dll () const;
+
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 private:
-  const ASYS_TCHAR *name_;   
-  // Humanly readible name of svc.
+  /// Humanly readible name of svc.
+  const ACE_TCHAR *name_;
 
-#if defined (ACE_HAS_MOSTLY_UNICODE_APIS)
-  char *chname_;
-  // This interface is used to pass char name when instantiate
-  // ACE_Parse_Node.
-#endif /* ACE_HAS_MOSTLY_UNICODE_APIS */
-
+  /// Pointer to C++ object that implements the svc.
   const ACE_Service_Type_Impl *type_;
-  // Pointer to C++ object that implements the svc.
 
-  ACE_SHLIB_HANDLE handle_; 
-  // Handle to shared object file (non-zero if dynamically linked).
+  /// ACE_DLL representing the shared object file (non-zero if
+  /// dynamically linked).
+  mutable ACE_DLL dll_;
 
-  int active_;  
-  // 1 if svc is currently active, otherwise 0.
+  /// 1 if svc is currently active, otherwise 0.
+  int active_;
 
-  int fini_already_called_;  
-  // 1 if fini() on <type_> has already been called, otherwise 0.
+  /// 1 if <fini> on <type_> has already been called, otherwise 0.
+  int fini_already_called_;
 };
 
+/**
+ * @class ACE_Service_Object_Ptr
+ *
+ * @brief This is a smart pointer that holds onto the associated
+ * ACE_Service_Object * until the current scope is left, at
+ * which point the object's <fini> hook is called and the
+ * service_object_ gets deleted.
+ *
+ * This class is similar to the Standard C++ Library class
+ * <auto_ptr>.  It is used in conjunction with statically linked
+ * <ACE_Service_Objects>, as shown in the
+ * ./netsvcs/server/main.cpp example.
+ */
 class ACE_Export ACE_Service_Object_Ptr
 {
-  // = TITLE 
-  //     This is a smart pointer that holds onto the associated
-  //     <ACE_Service_Object> * until the current scope is left, at
-  //     which point the object's <fini> hook is called and the
-  //     service_object_ gets deleted.
-  //
-  // = DESCRIPTION
-  //     This class is similar to the Standard C++ Library class
-  //     <auto_ptr>.  It is used in conjunction with statically linked
-  //     <ACE_Service_Objects>, as shown in the
-  //     ./netsvcs/server/main.cpp example.  
 public:
   // = Initialization and termination methods.
+  /// Acquire ownership of the @a so.
   ACE_Service_Object_Ptr (ACE_Service_Object *so);
-  // Acquire ownership of the <so>.
 
+  /// Release the held ACE_Service_Object by calling its <fini> hook.
   ~ACE_Service_Object_Ptr (void);
-  // Release the held <ACE_Service_Object> by calling its <fini> hook.
 
+  /// Smart pointer to access the underlying ACE_Service_Object.
   ACE_Service_Object *operator-> ();
-  // Smart pointer to access the underlying <ACE_Service_Object>.
 
 private:
+  /// Holds the service object until we're done.
   ACE_Service_Object *service_object_;
-  // Holds the service object until we're done.
 };
 
+#if defined (ACE_OPENVMS)
+/**
+ * @class ACE_Dynamic_Svc_Registrar
+ *
+ * @brief Used to register Service allocator function by its full name.
+ */
+class ACE_Dynamic_Svc_Registrar
+{
+public:
+  ACE_Dynamic_Svc_Registrar (const ACE_TCHAR* alloc_name,
+                             void* svc_allocator);
+};
+#endif
+
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #if defined (__ACE_INLINE__)
-#include "ace/Service_Object.i"
+#include "ace/Service_Object.inl"
 #endif /* __ACE_INLINE__ */
 
+#include /**/ "ace/post.h"
 #endif /* ACE_SERVICE_OBJECT_H */

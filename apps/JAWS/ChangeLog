@@ -1,3 +1,297 @@
+Mon Feb  6 01:00:55 UTC 2006  William Otte  <wotte@dre.vanderbilt.edu>
+
+        * server/HTTP_Server.h
+        
+          Surrounded a proactor forward declaration with versioned
+          namespace macros.
+
+Thu Jan  5 00:42:28 UTC 2006  J.T. Conklin  <jtc@acorntoolworks.com>
+
+        * ChangeLog:
+        
+          Untabify.
+          Delete-trailing-whitespace.
+
+Wed Jan  4 22:57:37 UTC 2006  J.T. Conklin  <jtc@acorntoolworks.com>
+
+        * ChangeLog:
+
+          Added "Local Variables" section defining "add-log-time-format"
+          to a really ugly lambda expression that formats changelog
+          timestamps in UTC and works with both GNU Emacs and XEmacs.
+
+Fri Apr 22 21:42:30 2005  Ossama Othman  <ossama@dre.vanderbilt.edu>
+
+        * server/HTTP_Helpers.cpp (HTTP_mktime):
+
+          Made rfc1123_date, rfc850_date and asctime_date strings into
+          string literals.  Allows g++ format specifier argument checking
+          to work, and addresses a related g++ 4.0 warning.
+
+        * server/IO.h (~JAWS_IO_Handler):
+        * server/IO.cpp (~JAWS_IO_Handler):
+
+          Added virtual destructor to silence g++ 4.0 warnings.
+
+Thu Aug 26 08:13:12 UTC 2004  Johnny Willemsen  <jwillemsen@remedy.nl>
+
+        * clients/Caching/http_client.cpp:
+        * server/HTTP_Response.cpp:
+          Added include of ace/os_include/os_ctype.h to fix compile problems
+          in our daily builds.
+
+Tue Feb 25 18:58:26 2003  Carlos O'Ryan  <coryan@atdesk.com>
+
+        * clients/WebSTONE/src/cgi-send:
+          Removed pre-compiled binary for MIPS (R3000 of all things!)
+
+Wed Dec 26 09:35:35 2001  Douglas C. Schmidt  <schmidt@ace.cs.wustl.edu>
+
+        * clients/Blobby/Options.cpp
+          server/HTTP_Server.cpp
+          stress_testing/benchd.cpp
+          JAWS2/JAWS/Server.cpp: Replaced all uses of getopt.optarg
+          with getopt.opt_arg().
+
+Thu Dec  6 09:00:31 2001  Douglas C. Schmidt  <schmidt@macarena.cs.wustl.edu>
+
+        * clients/Caching/http_client.cpp (main): Make sure to remove the
+          trailing '\n' so the example works properly.  Thanks to Andrey
+          Shkinev <andreyshkinev@rogers.com> for reporting this.
+
+Wed Nov 14 16:21:46 2001  Douglas C. Schmidt  <schmidt@macarena.cs.wustl.edu>
+
+        * clients/Blobby/Blob.{h,cpp},
+        * clients/Blobby/Blob_Handler.{h,cpp},
+        * clients/Blobby/blobby.{h,cpp},
+        * clients/Blobby/Options.{h,cpp}:
+          Fixed the code to be Unicode-compliant.  Thanks to Johnny
+          Willemsen for contributing this.
+
+Fri Aug 24 18:39:39 2001  Douglas C. Schmidt  <schmidt@macarena.cs.wustl.edu>
+
+        * server/HTTP_Response.cpp (normal_response),
+        * server/HTTP_Helpers.cpp (HTTP_decode_base64): Use delete [] buf
+          rather than delete buf.  Thanks to Don Hinton for reporting
+          this.
+
+Thu Aug 16 09:57:15 2001  Balachandran Natarajan  <bala@cs.wustl.edu>
+
+        * */Makefile: Updated dependencies.
+
+Mon Aug 13 14:04:44 2001  Douglas C. Schmidt  <schmidt@ace.cs.wustl.edu>
+
+        * Applied the following fixes courtesy of Blair Zajac
+          <blair@gps.caltech.edu>:
+
+          1) Allow a static libHTTPU.a to be built when
+             "make static_libs_only=1" is used.
+
+          2) When I try to build both JAWS and JAWS2 with the same
+             ACE_ROOT, the libJAWS.* that is built and installed first
+             prevents the other JAWS from properly compiling.  This
+             resolves this problem by renaming the JAWS2 library to
+             libJAWS2.*.
+
+          3) The JAWS2 subdirectory is now descended into by
+             apps/Makefile.
+
+          4) The Makefile in JAWS2 now descends into HTTPU and JAWS to
+             build those libraries.
+
+Tue Jun 12 20:35:26 2001  Krishnakumar B  <kitty@cs.wustl.edu>
+
+        * clients/Blobby/Blob_Handler.cpp:
+
+          Fixed a size_t printf to make gcc happy on IA-64 Linux.
+
+Sun Feb 18 09:33:33 2001  Douglas C. Schmidt  <schmidt@ace.cs.wustl.edu>
+
+        * server/IO.cpp (handle): Added a const to the handle() method
+          to make compilers happy.  Thanks to Kitty for reporting this.
+
+Mon Jun 12 14:22:35 PDT 2000 James Hu <jxh@entera.com>
+
+        * server/HTTP_Response.cpp: Added content length support.
+          Thanks to Greg Gallant (gcg@micrografx.com) for the fixes!
+
+        * server/HTTP_Helpers.cpp: Fix date handling for NT.
+          Thanks to Greg Gallant (gcg@micrografx.com) for the fixes!
+
+Sun Jun  4 14:57:04 2000  Darrell Brunsch <brunsch@uci.edu>
+
+        * clients/WebSTONE/bin/WebStone-common.pl:
+        * clients/WebSTONE/bin/WebStone-manage.pl:
+        * clients/WebSTONE/bin/WebStone-run.pl:
+        * clients/WebSTONE/bin/WebStone-setup.pl:
+        * clients/WebSTONE/bin/killbench.pl:
+        * clients/WebSTONE/bin/mine-logs.pl:
+        * clients/WebSTONE/bin/move-filelist.pl:
+        * clients/WebSTONE/bin/move-runs.pl:
+        * clients/WebSTONE/bin/runbench.pl:
+        * clients/WebSTONE/bin/view-results.pl:
+        * clients/WebSTONE/bin/webstone-gui.pl:
+        * clients/WebSTONE/bin/write-testbed.pl:
+        * clients/WebSTONE/bin/wscollect.pl:
+        * clients/WebSTONE/conf/paths.pl:
+        * clients/WebSTONE/doc/FAQ-webstone.html:
+        * clients/WebSTONE/doc/LICENSE.html:
+        * clients/WebSTONE/doc/WebStone.html:
+        * clients/WebSTONE/doc/webstone2.html:
+        * clients/WebSTONE/src/acconfig.h:
+        * clients/WebSTONE/src/bench.c:
+        * clients/WebSTONE/src/bench.h:
+        * clients/WebSTONE/src/cgi-send.c:
+        * clients/WebSTONE/src/config.h:
+        * clients/WebSTONE/src/debug.h:
+        * clients/WebSTONE/src/errexit.c:
+        * clients/WebSTONE/src/genrand.c:
+        * clients/WebSTONE/src/get.c:
+        * clients/WebSTONE/src/get.h:
+        * clients/WebSTONE/src/getopt.c:
+        * clients/WebSTONE/src/gettimeofday.c:
+        * clients/WebSTONE/src/nsapi-send.c:
+        * clients/WebSTONE/src/parse_file_list.c:
+        * clients/WebSTONE/src/parse_file_list.h:
+        * clients/WebSTONE/src/rexec.c:
+        * clients/WebSTONE/src/statistics.c:
+        * clients/WebSTONE/src/statistics.h:
+        * clients/WebSTONE/src/sysdep.c:
+        * clients/WebSTONE/src/sysdep.h:
+        * clients/WebSTONE/src/timefunc.c:
+        * clients/WebSTONE/src/timefunc.h:
+        * clients/WebSTONE/src/webclient.c:
+        * clients/WebSTONE/src/webmaster.c:
+        * clients/WebSTONE/src/nsapi-includes/netsite.h:
+        * clients/WebSTONE/src/nsapi-includes/base/buffer.h:
+        * clients/WebSTONE/src/nsapi-includes/base/cinfo.h:
+        * clients/WebSTONE/src/nsapi-includes/base/crit.h:
+        * clients/WebSTONE/src/nsapi-includes/base/daemon.h:
+        * clients/WebSTONE/src/nsapi-includes/base/dll.h:
+        * clients/WebSTONE/src/nsapi-includes/base/ereport.h:
+        * clients/WebSTONE/src/nsapi-includes/base/eventlog.h:
+        * clients/WebSTONE/src/nsapi-includes/base/file.h:
+        * clients/WebSTONE/src/nsapi-includes/base/minissl.h:
+        * clients/WebSTONE/src/nsapi-includes/base/net.h:
+        * clients/WebSTONE/src/nsapi-includes/base/nodelock.h:
+        * clients/WebSTONE/src/nsapi-includes/base/nterrors.h:
+        * clients/WebSTONE/src/nsapi-includes/base/objndx.h:
+        * clients/WebSTONE/src/nsapi-includes/base/pblock.h:
+        * clients/WebSTONE/src/nsapi-includes/base/sem.h:
+        * clients/WebSTONE/src/nsapi-includes/base/session.h:
+        * clients/WebSTONE/src/nsapi-includes/base/shexp.h:
+        * clients/WebSTONE/src/nsapi-includes/base/shmem.h:
+        * clients/WebSTONE/src/nsapi-includes/base/systems.h:
+        * clients/WebSTONE/src/nsapi-includes/base/systhr.h:
+        * clients/WebSTONE/src/nsapi-includes/base/util.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/conf.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/dnfilter.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/func.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/http.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/httpact.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/ipfilter.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/log.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/object.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/objset.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/protocol.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/req.h:
+        * clients/WebSTONE/src/nsapi-includes/frame/servact.h:
+
+          Added missing CVS Id strings.
+
+Wed Mar 22 12:36:00 2000  James Hu  <jxh@cs.wustl.edu>
+
+        * stress_testing/connection.h:
+
+          Fixes to class declaration.  Method return types should never
+          be implicit.  Thanks to Craig Rodrigues (rodrigc@mediaone.net)
+          for the heads up.
+
+        * stress_testing/Makefile:
+
+          Fixed it so that the programs actually link.  Thanks to Craig
+          Rodrigues (rodrigc@mediaone.net) for the heads up.
+
+Tue Sep 21 11:47:00 1999  Ossama Othman  <othman@cs.wustl.edu>
+
+        * server/HTTP_Server.cpp (init):
+
+          Changed cast style to make gcc 2.95.1 happy.  Thanks to Jeffrey
+          Franks <Jeffrey_Franks@i-o.com> for reporting the problems.
+
+Tue Aug 31 05:10:32 1999  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * server/HTTP_Handler.cpp (destroy_http_handler): Switched
+          the order in which handler and io were deleted since the current
+          order seems to destroy handler first, which is problematic since
+          io is contained within handler!  Thanks to Yosi Sarusi
+          <yosi@appstream.com> for reporting this.
+
+Wed Aug 18 16:00:46 1999  David L. Levine  <levine@cs.wustl.edu>
+
+        * server/Makefile,client/Caching/Makefile: don't build if
+          ACE_COMPONENTS is FOR_TAO, because we now exclude Filecache
+          from the ACE library in that case.
+
+Thu Jul 29 16:05:59 1999  Douglas C. Schmidt  <schmidt@tango.cs.wustl.edu>
+
+        * PROTOTYPE/JAWS/IO.cpp (transmit_file): Added some fixes so this
+          code will compile on NT.  Thanks to Brian Jones
+          <bjones@edgemail.com> for reporting this problem and to James Hu
+          for fixing it.
+
+Tue Jun 22 13:42:51 1999  David L. Levine  <levine@cs.wustl.edu>
+
+        * remora/app/Makefile: replaced rm -f with $(RM).
+
+Tue Mar 16 01:08:05 1999  Nanbor Wang  <nanbor@cs.wustl.edu>
+
+        * server/Makefile:
+        * server/jaws.dsp: Updated makefiles to build shared library.
+
+        * server/svc.conf: Added example settings for using HTTP_Server as
+          a dynamic service.
+
+        * server/HTTP_Server.{h,cpp}: Added macros to build dynamic
+          HTTP_Server service.
+
+        * server/main.cpp (main): Since we use static service in JAWS, we
+          must open the service configure without ignoring the static
+          svcs.  Thanks to Bill Rizzi <rizzi@softserv.com> for pointing
+          this out.
+
+Mon Feb 01 17:04:39 1999  David L. Levine  <levine@cs.wustl.edu>
+
+        * clients/WebSTONE/conf/paths.{pl,sh}.old:
+          removed these apparently useless files.
+
+Sat Jan 02 08:44:48 1999  David L. Levine  <levine@cs.wustl.edu>
+
+        * server/HTTP_Request.cpp,Parse_Headers.cpp: initialized
+          third param to strtok_r with 0.  DU 4.0 cxx was complaining
+          about it, with ACE_NDEBUG.  According to the strtok_r
+          man page on DU 4.0, it must be initialized to 0 on the
+          first call to strtok_r.
+
+Fri Sep 25 23:29:14 1998  David L. Levine  <levine@cs.wustl.edu>
+
+        * server/IO.cpp (receive_file,transmit_file): changed
+          NOMAP to ACE_NOMAP.  Thanks to Dann Corbit
+          <DCorbit@SolutionsIQ.com> for reporting this.
+
+Thu Sep 17 18:53:05 1998  Carlos O'Ryan  <coryan@cs.wustl.edu>
+
+        * server/IO.cpp:
+        * PROTOTYPE/JAWS/IO.cpp:
+          Revert back to iovec. Also added some missing casts.
+
+Wed Sep 16 22:53:06 1998  Carlos O'Ryan  <coryan@cs.wustl.edu>
+
+        * server/IO.cpp:
+        * PROTOTYPE/JAWS/IO.cpp:
+          Use ACE_IO_Vector instead of iovec, because it is more
+          protable.
+
 Tue Aug 25 10:18:16 1998  David L. Levine  <levine@cs.wustl.edu>
 
         * clients/Caching/URL_Properties.cpp: removed explicit
@@ -678,3 +972,9 @@ Tue May 20 22:49:24 1997  James C Hu  <jxh@polka.cs.wustl.edu>
 
         * test_JAWS_File.cpp: A test program written to see if the new
           virtual filesystem works the way I expect it to.
+
+Local Variables:
+mode: change-log
+add-log-time-format: (lambda () (progn (setq tz (getenv "TZ")) (set-time-zone-rule "UTC") (setq time (format-time-string "%a %b %e %H:%M:%S %Z %Y" (current-time))) (set-time-zone-rule tz) time))
+indent-tabs-mode: nil
+End:

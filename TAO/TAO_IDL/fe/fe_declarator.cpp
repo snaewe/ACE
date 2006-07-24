@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,100 +62,148 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * fe_declarator.cc - Implementation of FE private declaration
- *		      statement class
- *
- * The FE_Declarator class is used to hold together complex declarations
- * until all the components are parsed and before they are composed into
- * an AST_Type node.
- */
+#include "fe_declarator.h"
+#include "ast_array.h"
+#include "ast_type.h"
+#include "utl_err.h"
+#include "global_extern.h"
+#include "nr_extern.h"
+#include "ace/config-all.h"
 
-#include	"idl.h"
-#include	"idl_extern.h"
+ACE_RCSID (fe,
+           fe_declarator,
+           "$Id$")
 
-#include	"fe_private.h"
-
-ACE_RCSID(fe, fe_declarator, "$Id$")
-
-/*
- * Constructor(s) and destructor
- */
-
-FE_Declarator::FE_Declarator(UTL_ScopedName *n, DeclaratorType dt,
-			     AST_Decl *cp)
-	     : pd_complex_part(cp),
-	       pd_name(n),
-	       pd_decl_type(dt)
+FE_Declarator::FE_Declarator (UTL_ScopedName *n,
+                              DeclaratorType dt,
+			                        AST_Decl *cp)
+ : pd_complex_part (cp),
+	 pd_decl_type (dt)
 {
+  this->pd_name = n;
 }
-
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
 
 // Compose the type of the complex declarator (if any) with the base
-// type supplied in ct
+// type supplied in ct.
 AST_Type *
-FE_Declarator::compose(AST_Decl *d)
+FE_Declarator::compose (AST_Decl *d)
 {
-  AST_Array	*arr;
-  AST_Type	*ct;
+  AST_Decl::NodeType nt = d->node_type ();
 
-  ct = AST_Type::narrow_from_decl(d);
-  if (ct == NULL) {
-    idl_global->err()->not_a_type(d);
-    return NULL;
-  }
-  if (ct->node_type() == AST_Decl::NT_except) {
-    idl_global->err()->not_a_type(d);
-    return NULL;
-  }
-  if (pd_decl_type == FD_simple || pd_complex_part == NULL) {
-    return ct;
-  }
-  if (pd_complex_part->node_type() == AST_Decl::NT_array) {
-    arr = AST_Array::narrow_from_decl(pd_complex_part);
-    arr->set_base_type(ct);
+  if (nt == AST_Decl::NT_struct_fwd || nt == AST_Decl::NT_union_fwd)
+    {
+      if (! AST_Type::narrow_from_decl (d)->is_defined ())
+        {
+          idl_global->err ()->error1 (UTL_Error::EIDL_ILLEGAL_ADD,
+                                      d);
 
-    /*
-     * Add the new array to the types defined in the global scope
-     */
-    idl_global->root()->fe_add_array(arr);
+          return 0;
+        }
+    }
 
-    return arr;
-  }
-  return NULL; // return through this statement should not happen
+  AST_Array	*arr = 0;
+  AST_Type *ct = 0;
+
+  ct = AST_Type::narrow_from_decl (d);
+
+  if (ct == 0)
+    {
+      idl_global->err ()->not_a_type (d);
+      return 0;
+    }
+
+  // All uses of forward declared types must
+  // not have a different prefix from the place of declaration.
+  if (!ct->is_defined ())
+    {
+      char *current_prefix = 0;
+      idl_global->pragma_prefixes ().top (current_prefix);
+
+      const char *original_prefix = d->prefix ();
+      AST_Decl *scope = d;
+
+      // Maybe the prefix hasn't been applied yet.
+      while (ACE_OS::strcmp (original_prefix, "") == 0)
+        {
+          scope = ScopeAsDecl (scope->defined_in ());
+
+          // Are we at global scope.8
+          if (scope == 0)
+            {
+              break;
+            }
+
+          original_prefix = scope->prefix ();
+        }
+
+      // Skip if the pointers are the same.
+      if (d->prefix () != original_prefix)
+        {
+          d->prefix (const_cast<char *> (original_prefix));
+        }
+
+      if (current_prefix != 0
+          && ACE_OS::strcmp (current_prefix, d->prefix ()) != 0)
+        {
+          idl_global->err ()->error1 (UTL_Error::EIDL_PREFIX_CONFLICT,
+                                      d);
+
+          return 0;
+        }
+    }
+
+  if (this->pd_decl_type == FD_simple || this->pd_complex_part == 0)
+    {
+      return ct;
+    }
+
+  if (this->pd_complex_part->node_type () == AST_Decl::NT_array)
+    {
+      arr = AST_Array::narrow_from_decl (this->pd_complex_part);
+      
+      // The base type of an array isn't set until after the array
+      // has been created, so the check below gets done at this point.
+      arr->set_base_type (ct);      
+      AST_Decl::NodeType nt = ct->unaliased_type ()->node_type ();
+      
+      if (nt == AST_Decl::NT_string || nt == AST_Decl::NT_wstring)
+        {
+          idl_global->string_member_seen_ = true;
+        }
+        
+      return arr;
+    }
+
+  // We shouldn't get here.
+  return 0;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
+void
+FE_Declarator::destroy (void)
+{
+  this->pd_name->destroy ();
+  delete this->pd_name;
+  this->pd_name = 0;
+}
 
-/*
- * Data accessors
- */
+// Data accessors.
 
 AST_Decl *
-FE_Declarator::complex_part()
+FE_Declarator::complex_part (void)
 {
-  return pd_complex_part;
+  return this->pd_complex_part;
 }
 
 UTL_ScopedName *
-FE_Declarator::name()
+FE_Declarator::name (void)
 {
-  return pd_name;
+  return this->pd_name;
 }
 
 FE_Declarator::DeclaratorType
-FE_Declarator::decl_type()
+FE_Declarator::decl_type (void)
 {
-  return pd_decl_type;
+  return this->pd_decl_type;
 }

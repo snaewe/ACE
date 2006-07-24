@@ -1,5 +1,9 @@
 // $Id$
 
+#ifndef CONSTRAINT_TOKEN_H
+#define CONSTRAINT_TOKEN_H
+#include /**/ "ace/pre.h"
+
 # define TAO_GT 257
 # define TAO_GE 258
 # define TAO_LT 259
@@ -34,3 +38,12 @@
 # define TAO_MIN 288
 # define TAO_FIRST 289
 # define TAO_RANDOM 290
+
+
+#include /**/ "ace/post.h"
+#endif //CONSTRAINT_TOKEN_H
+
+
+
+
+

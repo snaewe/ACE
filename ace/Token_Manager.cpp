@@ -1,15 +1,18 @@
-// Token_Manager.cpp
-// $Id$
-
-#define ACE_BUILD_DLL
 #include "ace/Token_Manager.h"
+
+#if defined (ACE_HAS_TOKENS_LIBRARY)
+
 #include "ace/Object_Manager.h"
 
 #if !defined (__ACE_INLINE__)
-#include "ace/Token_Manager.i"
+#include "ace/Token_Manager.inl"
 #endif /* __ACE_INLINE__ */
 
-ACE_RCSID(ace, Token_Manager, "$Id$")
+ACE_RCSID (ace,
+           Token_Manager,
+           "$Id$")
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
 // singleton token manager
 ACE_Token_Manager *ACE_Token_Manager::token_manager_ = 0;
@@ -23,23 +26,23 @@ ACE_Token_Manager::~ACE_Token_Manager ()
 {
   ACE_TRACE ("ACE_Token_Manager::~ACE_Token_Manager");
 
-  COLLECTION_ITERATOR iterator (collection_);
+  COLLECTION::ITERATOR iterator (collection_);
 
-  for (COLLECTION_ENTRY *temp = 0;
+  for (COLLECTION::ENTRY *temp = 0;
        iterator.next (temp) != 0;
        iterator.advance ())
     {
       // @ should I be doing an unbind here?
       delete temp->int_id_;
       // The ext_id_'s delete themselves when the array of
-      // COLLECTION_ENTRYs goes away.
+      // COLLECTION::ENTRYs goes away.
     }
 }
 
 ACE_Token_Manager *
 ACE_Token_Manager::instance (void)
 {
-  ACE_TRACE ("ACE_Token_Manager::token_manager");
+  ACE_TRACE ("ACE_Token_Manager::instance");
 
   // This first check is to avoid acquiring the mutex in the common
   // case.  Double-Check pattern rules.
@@ -54,8 +57,9 @@ ACE_Token_Manager::instance (void)
 
       if (token_manager_ == 0)
         {
-          ACE_NEW_RETURN (token_manager_, ACE_Token_Manager, 0);
-
+          ACE_NEW_RETURN (token_manager_,
+                          ACE_Token_Manager,
+                          0);
           // Register for destruction with ACE_Object_Manager.
           ACE_Object_Manager::at_exit (token_manager_);
         }
@@ -66,9 +70,9 @@ ACE_Token_Manager::instance (void)
 
 void
 ACE_Token_Manager::get_token (ACE_Token_Proxy *proxy,
-                              const ASYS_TCHAR *token_name)
+                              const ACE_TCHAR *token_name)
 {
-  ACE_TRACE ("ACE_Token_Manager::get");
+  ACE_TRACE ("ACE_Token_Manager::get_token");
   // Hmm.  I think this makes sense.  We perform our own locking here
   // (see safe_acquire.)  We have to make sure that only one thread
   // uses the collection at a time.
@@ -118,8 +122,8 @@ ACE_Token_Manager::check_deadlock (ACE_Token_Proxy *proxy)
 
   // Whether or not we detect deadlock, we have to unmark all tokens
   // for the next time.
-  COLLECTION_ITERATOR iterator (collection_);
-  for (COLLECTION_ENTRY *temp = 0;
+  COLLECTION::ITERATOR iterator (collection_);
+  for (COLLECTION::ENTRY *temp = 0;
        iterator.next (temp) != 0;
        iterator.advance ())
       temp->int_id_->visit (0);
@@ -150,8 +154,8 @@ ACE_Token_Manager::check_deadlock (ACE_Tokens *token, ACE_Token_Proxy *proxy)
       // The caller is an owner, so we have a deadlock situation.
       if (debug_)
         {
-          ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("(%t) Deadlock detected.\n")));
-          ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("%s owns %s and is waiting for %s.\n"),
+          ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("(%t) Deadlock detected.\n")));
+          ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("%s owns %s and is waiting for %s.\n"),
                       proxy->client_id (),
                       token->name (),
                       proxy->token_->name ()));
@@ -173,7 +177,7 @@ ACE_Token_Manager::check_deadlock (ACE_Tokens *token, ACE_Token_Proxy *proxy)
               if (debug_)
                 {
                   ACE_DEBUG ((LM_DEBUG,
-                              ASYS_TEXT ("%s owns %s and is waiting for %s.\n"),
+                              ACE_LIB_TEXT ("%s owns %s and is waiting for %s.\n"),
                               e->client_id (),
                               token->name (),
                               twf->name ()));
@@ -190,10 +194,10 @@ ACE_Token_Manager::check_deadlock (ACE_Tokens *token, ACE_Token_Proxy *proxy)
 
 
 ACE_Tokens *
-ACE_Token_Manager::token_waiting_for (const ASYS_TCHAR *client_id)
+ACE_Token_Manager::token_waiting_for (const ACE_TCHAR *client_id)
 {
-  COLLECTION_ITERATOR iterator (collection_);
-  for (COLLECTION_ENTRY *temp = 0;
+  COLLECTION::ITERATOR iterator (collection_);
+  for (COLLECTION::ENTRY *temp = 0;
        iterator.next (temp) != 0;
        iterator.advance ())
     {
@@ -211,7 +215,7 @@ ACE_Token_Manager::token_waiting_for (const ASYS_TCHAR *client_id)
 void
 ACE_Token_Manager::release_token (ACE_Tokens *&token)
 {
-  ACE_TRACE ("ACE_Token_Manager::release");
+  ACE_TRACE ("ACE_Token_Manager::release_token");
   // again, let's perform our own locking here.
 
   ACE_GUARD (ACE_TOKEN_CONST::MUTEX, ace_mon, this->lock_);
@@ -228,8 +232,8 @@ ACE_Token_Manager::release_token (ACE_Tokens *&token)
         // we did not find one in the collection
         {
           errno = ENOENT;
-          ACE_ERROR ((LM_ERROR, ASYS_TEXT ("Token Manager could not release %s:%d\n"),
-                      ASYS_MULTIBYTE_STRING (token->name ()), token->type ()));
+          ACE_ERROR ((LM_ERROR, ACE_LIB_TEXT ("Token Manager could not release %s:%d\n"),
+                      token->name (), token->type ()));
           // @@ bad
         }
       else
@@ -252,26 +256,18 @@ ACE_Token_Manager::release_token (ACE_Tokens *&token)
 void
 ACE_Token_Manager::dump (void) const
 {
+#if defined (ACE_HAS_DUMP)
   ACE_TRACE ("ACE_Token_Manager::dump");
   ACE_DEBUG ((LM_DEBUG, ACE_BEGIN_DUMP, this));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("ACE_Token_Manager::dump:\n")));
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("lock_\n")));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("ACE_Token_Manager::dump:\n")));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("lock_\n")));
   lock_.dump ();
-  ACE_DEBUG ((LM_DEBUG,  ASYS_TEXT ("collection_\n")));
+  ACE_DEBUG ((LM_DEBUG,  ACE_LIB_TEXT ("collection_\n")));
   collection_.dump ();
   ACE_DEBUG ((LM_DEBUG, ACE_END_DUMP));
+#endif /* ACE_HAS_DUMP */
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Map_Manager <ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>;
-template class ACE_Map_Iterator_Base<ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>;
-template class ACE_Map_Iterator<ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>;
-template class ACE_Map_Reverse_Iterator<ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>;
-template class ACE_Map_Entry <ACE_Token_Name, ACE_Tokens *>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Map_Manager <ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Iterator_Base<ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Iterator<ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Reverse_Iterator<ACE_Token_Name, ACE_Tokens *, ACE_Null_Mutex>
-#pragma instantiate ACE_Map_Entry <ACE_Token_Name, ACE_Tokens *>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
+ACE_END_VERSIONED_NAMESPACE_DECL
+
+#endif /* ACE_HAS_TOKENS_LIBRARY */

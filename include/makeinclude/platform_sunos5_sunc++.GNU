@@ -1,23 +1,67 @@
+# -*- Makefile -*-
+
 # $Id$
 
-# SunOS 5.x (Solaris 2.x) with SunC++ 4.2 or earlier
-# *not* using Orbix
+# SunOS 5.x (Solaris 2.x) with Sun C++ 4.2 and 5.x
 #
-# Note: some ACE files might generate these kinds of warnings:
-# 1) "Warning: Could not find source for " one of the following:
+# NOTE: Sun C++ 5.0 users might need to add this to their CCFLAGS:
+#   -compat=4 and/or remove -instances=explicit.  Please note that
+#   inlining is disabled by default with Sun C++ 5.0.  If you'd like
+#   to try enabling it, comment out the "inline = 0" line below.
+#
+# To enable compilation of 64-bit binaries with Sun CC 5.0, a
+# platform_macros.GNU file such as this can be used:
+#     fast=1
+#     include $(ACE_ROOT)/include/makeinclude/platform_sunos5_sunc++.GNU
+#     CFLAGS += -xtarget=ultra2 -xarch=v9a #### CPU specific!
+#     SOFLAGS += -xtarget=ultra2 -xarch=v9a
+#     LDFLAGS += -L/opt/SUNWspro/SC5.0/lib/v9 -L/usr/lib/sparcv9
+# Please note that the xtarget and xarch settings are specific to
+# the target CPU.  The /opt/SUNWspro/ Sun C++ installation directory
+# is site-specific.
+#
+# To build 64-bit binaries with Forte 6 and later, build with the
+# "buildbits=64" option (make buildbits=64).
+#
+# With slight modification, this file could be used with Sun C++ 4.1.
+# However, it's likely that you won't be able to build all of ACE
+# with Sun C++ 4.1.
+#
+# NOTE: some ACE files might generate this warning:
+#   "Warning: Could not find source for " one of the following:
 #    default constructor, copy constructor, destructor, or assignment
 #    operator.  It appears that with +w, Sun C++ 4.x issues this warning
 #    whenever it has to generate one of these functions (because it wasn't
 #    defined by the user).  This isn't really a problem.
 #    This warning appears to be fixed by Sun C++ 4.2 jumbo patch 104631-02.
-# 2) "Warning: <foo> hides the function " or "hides the same name in an
-#    outer scope".  A useful warning, perhaps, but not really a problem.
-#    Again, this appears much more often with +w.  The jumbo patch did not
-#    remove it.
-# There should be no other warnings from Sun C++ when building ACE.
+#
+# -pta instantiates all template members, which makes libraries bigger.
+# But, it's supposed to put each member into it's own .o, so executable
+# size should not be penalized.  We don't use it because it's not
+# necessary with automatic template instantiation.
 
-debug = 1
-threads = 1
+compat4 ?= 0
+debug ?= 1
+distrib ?= 0
+stdcpplib ?= 1
+threads ?= 1
+versioned_so ?= 1
+tk_reactor ?= 0
+ace_with_x11 ?= 0
+no_hidden_visibility ?= 1
+templates ?= automatic
+
+## If you set this to 1 you will need to add -xarch=v8plus (or higher)
+## to CFLAGS or the assembler code will not compile
+atomic_ops_sparc ?= 0
+
+PLATFORM_TK_CPPFLAGS=
+PLATFORM_TK_LIBS=-ltk -ltcl
+PLATFORM_TK_LDFLAGS=
+
+PLATFORM_X11_CPPFLAGS= -I/usr/openwin/include -I/usr/dt/include
+PLATFORM_X11_LIBS =-lX11
+PLATFORM_X11_LDFLAGS=
 
 ifeq ($(threads),1)
   CFLAGS += -mt
@@ -26,13 +70,143 @@ endif # threads
 
 CC              = cc
 CXX             = CC
-#### -pta instantiates all template members, which makes libraries bigger.
-#### But, it's supposed to put each member into it's own .o, so executable
-#### size should not be penalized.
-#### We've commented -pta out for the moment to see if it works.
-CCFLAGS         += $(CFLAGS) -features=castop # -pta
+
+CC_VERSION := $(shell $(CXX) -V 2>&1)
+
+### CC 5.4 provides insufficient preprocessor output (at 111715-17 2005/10/13)
+### We need to use cc instead - see bugzilla #2478.
+ifeq (C++ 5.4,$(findstring C++ 5.4,$(CC_VERSION)))
+  ACE_CC_PREPROCESSOR = cc
+endif
+
+ifeq (C++ 5.6,$(findstring C++ 5.6,$(CC_VERSION)))
+  PLATFORM_STLPORT_CPPFLAGS = -library=stlport4
+else
+  ifeq (C++ 5.7,$(findstring C++ 5.7,$(CC_VERSION)))
+    PLATFORM_STLPORT_CPPFLAGS = -library=stlport4
+  endif
+endif
+
+ifeq ($(atomic_ops_sparc),1)
+  CFLAGS += -DACE_HAS_BUILTIN_ATOMIC_OP -DACE_INCLUDE_ATOMIC_OP_SPARC
+endif
+
+#### The following macro overrides enable creation of fast executables.
+#### They _don't_ support fast compilation :-)
+#### To use, add fast=1 to your "make" invocation.
+####
+#### -g is incompatible with -fast.  If you need -g, you can
+#### use "-fast -O3".
+####
+#### Have to do this _before_ adding any -xarch, -xtarget, etc. flags since
+#### -fast is shorthand for a list of internally-assigned options, some of
+#### which will are -xarch, -xtarget. Thus, explicit -xarch needs to go
+#### to the right of -fast.
 DCFLAGS         += -g
+DCCFLAGS        +=
 DLD             = $(CXX)
+ifeq (1,$(fast))
+  CFLAGS += -fast
+  DCFLAGS =
+  DCCFLAGS =
+  LDFLAGS += -fast
+endif # fast
+
+ifeq (Compilers 4.2,$(findstring Compilers 4.2,$(CC_VERSION)))
+  #### CC 4.2, only, supports -features=castop
+  CCFLAGS      += $(CFLAGS) -features=castop
+
+  #### RTTI can coexist with ACE, but it doesn't use it.  To enable,
+  #### add rtti=1 to your make invocation.  Sun C++ 4.2, only, supports
+  #### this option.
+  ifeq (1,$(rtti))
+    CCFLAGS += -features=rtti
+  else  # ! rtti
+    #### ACE_LACKS_RTTI is necessary with -features=castop, but
+    #### without -features=rtti, to convert dynamic_cast to static_cast.
+    CPPFLAGS += -DACE_LACKS_RTTI
+  endif # ! rtti
+
+  #### Create template repository to avoid compiler warning.
+  TEMPLATE_REPOSITORY = Templates.DB
+
+else  # ! 4.2
+  ifeq (C++ 5,$(findstring C++ 5,$(CC_VERSION)))
+    #### CC 5.0 or later
+    #### Inlining appears to cause link problems with early releases of
+    #### CC 5.0.
+    ifeq (C++ 5.0,$(findstring C++ 5.0,$(CC_VERSION)))
+        inline = 0
+    else
+      ifeq (C++ 5.1,$(findstring C++ 5.1,$(CC_VERSION)))
+        inline = 0
+      else # ! 5.1
+        inline ?= 1
+        exceptions ?= 1
+      endif # 5.2 or greater
+    endif #! 5.0
+
+    CCFLAGS += $(CFLAGS)
+
+    #### If compat=4 is desired, set up for that. There are syntactic diffs
+    #### in the compatibility modes, but here all we need to be concerned with
+    #### is turning on -compat=4, and not trying to enable the new libraries.
+    ifeq ($(compat4),1)
+      CCFLAGS += -compat=4
+
+      #### RTTI can coexist with ACE, but it doesn't use it.  To enable,
+      #### add rtti=1 to your make invocation.  Sun C++ 4.2, only, supports
+      #### this option.
+      ifeq (1,$(rtti))
+        CCFLAGS += -features=rtti
+      else  # ! rtti
+        #### ACE_LACKS_RTTI is necessary with -features=castop, but
+        #### without -features=rtti, to convert dynamic_cast to static_cast.
+        CPPFLAGS += -DACE_LACKS_RTTI
+      endif # ! rtti
+    else
+      #### Support RTTI by default. And, use old iostreams.
+      ifeq (C++ 5.0,$(findstring C++ 5.0,$(CC_VERSION)))
+        ifeq (1,$(stdcpplib))
+          CCFLAGS += -library=Cstd
+        else
+          CCFLAGS += -library=iostream,no%Cstd
+          CPPFLAGS += -DACE_USES_OLD_IOSTREAMS
+        endif # stdcpplib
+      else
+        ifeq (0,$(stdcpplib))
+          CCFLAGS += -library=iostream
+          CPPFLAGS += -DACE_USES_OLD_IOSTREAMS
+        endif # stdcpplib
+
+        # If 64-bit build is desired, turn that on. If no code gen options
+        # are given to Forte 6, the default build is 32-bit, even when
+        # building on a 64-bit system. Specifying xarch=v9 generates code
+        # that runs on any Sparc v9 (64-bit) processor.
+        # Beginning at (I believe) Studio 10 (C++ 5.7) there's a
+        # -xarch=generic64 option that works for both Sparc and x86.
+        # If you want to tune this further, you should extract and insert
+        # from CCFLAGS in a private platform_macros.GNU file.
+        ifeq (64,$(buildbits))
+          ifeq (C++ 5.7,$(findstring C++ 5.7,$(CC_VERSION)))
+            CFLAGS += -xarch=generic64
+            LDFLAGS += -xarch=generic64
+          else
+            CFLAGS += -xarch=v9
+            LDFLAGS += -xarch=v9
+          endif # C++ 5.7
+        endif # buildbits
+      endif # CC 5.0
+    endif # compat4 requested
+  endif # CC 5.0 or later
+endif # ! 4.2
+
+
+CCFLAGS         += $(TEMPLATES_FLAG)
+
+#### Sun CC-specific "Pure virtual finction called" bug fix trigger.
+#### XXX: Shouldn't this go into a compiler version specific guard ???
+CPPFLAGS       += -DSUN_CC_HAS_PVFC_BUG
 
 #### Exception handling breaks on MP machines prior to Sun C++ 4.2
 #### with jumbo patch 104631-02, see ace/config-sunos5.5.h.
@@ -41,43 +215,69 @@ DLD             = $(CXX)
 #### performance penalty of exception handling, then use the default
 #### of no exceptions.  If you want to enable exception handling,
 #### add "exceptions=1" to your "make" invocation.
-ifndef exceptions
+ifeq (0,$(exceptions))
   CCFLAGS += -noex
+  ifeq (C++ 5.6,$(findstring C++ 5.6,$(CC_VERSION)))
+    override stlport = 1
+  else
+    ifeq (C++ 5.7,$(findstring C++ 5.7,$(CC_VERSION)))
+      override stlport = 1
+    endif
+  endif
 endif # ! exceptions
 
-#### RTTI can coexist with ACE, but it doesn't use it.  To enable,
-#### add rtti=1 to your make invocation.  Sun C++ 4.2 (and later?)
-#### only support this option.
-ifdef rtti
-  CCFLAGS += -features=rtti -DACE_HAS_RTTI
-endif # rtti
+ifeq ($(shared_libs), 1)
+  ifneq ($(static_libs_only), 1)
+
+   # Sun Studio 8 or better has version greater than 5.3.
+    SUN_STUDIO_8_OR_BETTER := $(shell a=`echo $(CC_VERSION) | sed -e 's/[^0-9]*\([0-9]*\)\.\([0-9]*\).*$$/\1\2/g'`; if test "$$a" -gt 53; then echo 1; else echo 0; fi)
+
+    # Take advantage of Sun Studio 8 (v5.5) symbol scopes to
+    # generate improved shared library binaries.
+    ifeq ($(SUN_STUDIO_8_OR_BETTER),1)
+      ifneq ($(no_hidden_visibility),1)
+        CCFLAGS += -xldscope=hidden
+      else
+        CPPFLAGS += -DACE_HAS_CUSTOM_EXPORT_MACROS=0
+      endif # no_hidden_visibility
+    endif # Sun Studio 8 (C++ 5.5) or better.
+  endif # static_libs_only
+endif # shared_libs
 
 LD              = $(CXX)
+ifeq ($(distrib),0)
+  LDFLAGS       += -R $(ACE_ROOT)/lib -R./
+endif
 
-ifdef orbix
-  LDFLAGS       += $(PIC) -L$(ORBIX_ROOT)/corba2/lib \
-                   -R $(ACE_ROOT)/ace -R./ -R $(ORBIX_ROOT)/corba2/lib
-  LIBS          += -lITinimt -liiopmt -lorbixmt -lsocket -ldl -lnsl \
-                   -lthread -lgen -lposix4
-  CPPFLAGS      += -I$(ORBIX_ROOT)/corba2/include
-else
-  LDFLAGS       += -R $(ACE_ROOT)/ace -R./
-  LIBS          += -lsocket -ldl -lnsl -lgen -lposix4
-endif # orbix
+ifeq ($(shell /bin/uname -r),5.9)
+  # Solaris 9 puts sendfile() in a separate library.
+  LIBS          += -lsendfile
+endif
+ifeq ($(shell /bin/uname -r),5.10)
+  # Solaris 10 puts sendfile() in a separate library.
+  LIBS          += -lsendfile
+endif
+LIBS            += -lsocket -lrt -laio -ldl -lnsl -lgen -lposix4 -ladm
 
 LDFLAGS         += -xildoff
 
-OCFLAGS         += -O
-PIC             = -PIC
+OCFLAGS         += -xO4
+PIC             = -KPIC
 AR              = CC
 ARFLAGS         = -xar -o
 RANLIB          = echo
-SOFLAGS         = -G $(CPPFLAGS)
+SOFLAGS         += -G $(CPPFLAGS)
 
-#### Create template repository to avoid compiler warning.
-TEMPLATE_REPOSITORY = Templates.DB
+# The correct flags to pass to the linker for ELF dynamic shared library
+# versioning. This knows that wrapper_macros.GNU will set versioned_so to
+# 1 if it's not set. So, the only way SOFLAGS should _not_ get this is if
+# versioned_so has been explicitly disabled.
+#
+ifeq ($(versioned_so),1)
+  SOFLAGS += -h $(SONAME)
+endif
 
-ifdef BIN
+ifdef CLEANUP_BIN
   #### Builds .shobj/$*.o file, then .shobj/$*.so file.  The .o files
   #### are used for building libraries and executables.  But, it seems
   #### to be necessary to build the .so files (with -G) in order to get
@@ -96,19 +296,6 @@ else
   #### a .so extension.  Rather than muck with the ACE build rules and
   #### risk upsetting builds on other platforms, just ln the output
   #### after building it.
-  SOBUILD = /bin/rm -f $@; \
-           $(COMPILE.cc) $(PIC) -o $(VSHDIR)$*.o $< && /bin/ln $(VSHDIR)$*.o $@
-endif # BIN
-
-#### The following macro overrides enable creation of fast executables.
-#### They _don't_ support fast compilation :-)
-#### To use, add fast=1 to your "make" invocation.
-####
-#### -g is incompatible with -fast.  If you need -g, you can
-#### use "-fast -O3".
-####
-ifdef fast
-  CFLAGS += -fast
-  DCFLAGS =
-  LDFLAGS += -fast
-endif # fast
+  SOBUILD = $(RM) $@; $(COMPILE.cc) $(PIC) -o $(VSHDIR)$*.o $< && \
+                      /bin/ln $(VSHDIR)$*.o $@
+endif # CLEANUP_BIN

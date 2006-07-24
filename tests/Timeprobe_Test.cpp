@@ -9,10 +9,10 @@
 //    Timeprobe_Test.cpp
 //
 // = DESCRIPTION
-//      This is a simple test of Timeprobes.
+//      This is a simple test of ACE Timeprobes.
 //
 // = AUTHOR
-//    Irfan Pyarali
+//    Irfan Pyarali <irfan@cs.wustl.edu>
 //
 // ============================================================================
 
@@ -21,14 +21,14 @@
 //#define ACE_TSS_TIMEPROBES
 
 #include "tests/test_config.h"
+#include "ace/Singleton.h"
+#include "ace/Synch_Traits.h"
+#include "ace/Recursive_Thread_Mutex.h"
+#include "ace/Null_Mutex.h"
+#include "ace/OS_NS_unistd.h"
 #include "ace/Timeprobe.h"
 
 ACE_RCSID(tests, Timeprobe_Test, "$Id$")
-
-#if defined(__BORLANDC__) && __BORLANDC__ >= 0x0530
-USELIB("..\ace\aced.lib");
-//---------------------------------------------------------------------------
-#endif /* defined(__BORLANDC__) && __BORLANDC__ >= 0x0530 */
 
 #if defined (ACE_ENABLE_TIMEPROBES)
 
@@ -84,10 +84,26 @@ work (int time)
   ACE_OS::sleep (time);
 }
 
-int
-main (int, ASYS_TCHAR *[])
+#if !defined (ACE_HAS_PURIFY)
+// Test creation of ACE_Singletons during static object construction.
+// Timeprobes can do that, when they're enabled.  Purify would notice
+// the memory in use at program termination.
+static int
+create_singleton ()
 {
-  ACE_START_TEST (ASYS_TEXT ("Timeprobe_Test"));
+  int *i = ACE_Singleton <int, ACE_SYNCH_RECURSIVE_MUTEX>::instance ();
+  *i = 3;
+
+  return *i;
+}
+
+int static_singleton_creator = create_singleton ();
+#endif /* ! ACE_HAS_PURIFY */
+
+int
+run_main (int, ACE_TCHAR *[])
+{
+  ACE_START_TEST (ACE_TEXT ("Timeprobe_Test"));
 
   ACE_TIMEPROBE ("Starting Test");
 
@@ -105,3 +121,4 @@ main (int, ASYS_TCHAR *[])
 
   return 0;
 }
+

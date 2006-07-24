@@ -1,246 +1,100 @@
+// -*- C++ -*-
+//
 // $Id$
 
-// = methods for class CORBA_Object
+// ****************************************************************
 
-ACE_INLINE CORBA::ULong
-CORBA_Object::_incr_refcnt (void)
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+ACE_INLINE
+CORBA::Object::Object (int)
+  : is_local_ (true),
+    is_evaluated_ (true),
+    ior_ (),
+    orb_core_ (0),
+    protocol_proxy_ (0),
+    refcount_ (),
+    object_init_lock_ (0)
 {
-  ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, guard, this->refcount_lock_, 0);
-  return this->refcount_++;
 }
 
-ACE_INLINE CORBA::ULong
-CORBA_Object::_decr_refcnt (void)
-{
-  {
-    ACE_GUARD_RETURN (ACE_SYNCH_MUTEX, mon, this->refcount_lock_, 0);
-    this->refcount_--;
-    if (this->refcount_ != 0)
-      return this->refcount_;
-  }
-
-  delete this;
-  return 0;
-}
-
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object::_duplicate (CORBA_Object_ptr obj)
+ACE_INLINE CORBA::Object_ptr
+CORBA::Object::_duplicate (CORBA::Object_ptr obj)
 {
   if (obj)
-    obj->_incr_refcnt ();
+    {
+      obj->_add_ref ();
+    }
+
   return obj;
 }
+
+// ************************************************************
+// These are in CORBA namespace
+
+ACE_INLINE
+void
+CORBA::release (CORBA::Object_ptr obj)
+{
+  if (obj)
+    {
+      obj->_remove_ref ();
+    }
+}
+
+ACE_INLINE
+CORBA::Boolean
+CORBA::is_nil (CORBA::Object_ptr obj)
+{
+  if (obj == 0)
+    {
+      return true;
+    }
+
+  return CORBA::Object::is_nil_i (obj);
+}
+
+// ************************************************************
 
 // Null pointers represent nil objects.
 
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object::_nil (void)
+ACE_INLINE
+CORBA::Object_ptr
+CORBA::Object::_nil (void)
 {
   return 0;
 }
 
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object::_narrow (CORBA_Object_ptr obj, CORBA::Environment&)
+ACE_INLINE
+CORBA::Object_ptr
+CORBA::Object::_narrow (CORBA::Object_ptr obj
+                        ACE_ENV_ARG_DECL_NOT_USED)
 {
-  return obj;
+  return CORBA::Object::_duplicate (obj);
 }
 
 ACE_INLINE CORBA::Boolean
-CORBA::is_nil (CORBA::Object_ptr obj)
+CORBA::Object::is_evaluated (void) const
 {
-  return obj == 0;
+  return this->is_evaluated_;
 }
 
-ACE_INLINE STUB_Object *
-CORBA_Object::_stubobj (void)
+ACE_INLINE TAO_ORB_Core *
+CORBA::Object::orb_core (void) const
 {
-  return this->protocol_proxy_;
+  return this->orb_core_;
 }
 
-// DII hook to objref
-//
-// The mapping for create_request is split into two forms,
-// corresponding to the two usage styles described in CORBA section
-// 6.2.1.
-
-ACE_INLINE void
-CORBA_Object::_create_request (const CORBA::Char *operation,
-                               CORBA::NVList_ptr arg_list,
-                               CORBA::NamedValue_ptr result,
-                               CORBA::Request_ptr &request,
-                               CORBA::Flags req_flags,
-                               CORBA::Environment &env)
+ACE_INLINE IOP::IOR *
+CORBA::Object::steal_ior (void)
 {
-  env.clear ();
-  request = new CORBA::Request (this, operation, arg_list, result, req_flags);
+  return this->ior_._retn ();
 }
 
-ACE_INLINE CORBA::Request_ptr
-CORBA_Object::_request (const CORBA::Char *operation,
-                        CORBA::Environment &env)
+ACE_INLINE const IOP::IOR &
+CORBA::Object::ior (void) const
 {
-  env.clear ();
-  return new CORBA::Request (this, operation);
+  return this->ior_.in ();
 }
 
-
-// *************************************************************
-// Inline operations for class CORBA_Object_var
-// *************************************************************
-
-ACE_INLINE
-CORBA_Object_var::CORBA_Object_var (void)
-  : ptr_ (CORBA_Object::_nil ())
-{
-}
-
-ACE_INLINE
-CORBA_Object_var::CORBA_Object_var (CORBA_Object_ptr p)
-  : ptr_ (p)
-{}
-
-ACE_INLINE
-CORBA_Object_var::~CORBA_Object_var (void)
-{
-  CORBA::release (this->ptr_);
-}
-
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object_var::ptr (void) const
-{
-  return this->ptr_;
-}
-
-ACE_INLINE
-CORBA_Object_var::CORBA_Object_var (const CORBA_Object_var &p) // copy constructor
-        : ptr_ (CORBA_Object::_duplicate (p.ptr ()))
-{}
-
-ACE_INLINE CORBA_Object_var &
-CORBA_Object_var::operator= (CORBA_Object_ptr p)
-{
-  CORBA::release (this->ptr_);
-  this->ptr_ = p;
-  return *this;
-}
-
-ACE_INLINE CORBA_Object_var &
-CORBA_Object_var::operator= (const CORBA_Object_var &p)
-{
-  if (this != &p)
-  {
-    CORBA::release (this->ptr_);
-    this->ptr_ = CORBA_Object::_duplicate (p.ptr ());
-  }
-  return *this;
-}
-
-ACE_INLINE
-CORBA_Object_var::operator const CORBA_Object_ptr &() const // cast
-{
-  return this->ptr_;
-}
-
-ACE_INLINE
-CORBA_Object_var::operator CORBA_Object_ptr &() // cast
-{
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object_var::operator-> (void) const
-{
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object_var::in (void) const
-{
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr &
-CORBA_Object_var::inout (void)
-{
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr &
-CORBA_Object_var::out (void)
-{
-  CORBA::release (this->ptr_);
-  this->ptr_ = CORBA_Object::_nil ();
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object_var::_retn (void)
-{
-  // yield ownership of managed obj reference
-  CORBA_Object_ptr val = this->ptr_;
-  this->ptr_ = CORBA_Object::_nil ();
-  return val;
-}
-
-// *************************************************************
-// Inline operations for class CORBA_Object_out
-// *************************************************************
-
-ACE_INLINE
-CORBA_Object_out::CORBA_Object_out (CORBA_Object_ptr &p)
-        : ptr_ (p)
-{
-  this->ptr_ = CORBA_Object::_nil ();
-}
-
-ACE_INLINE
-CORBA_Object_out::CORBA_Object_out (CORBA_Object_var &p) // constructor from _var
-        : ptr_ (p.out ())
-{
-  CORBA::release (this->ptr_);
-  this->ptr_ = CORBA_Object::_nil ();
-}
-
-ACE_INLINE
-CORBA_Object_out::CORBA_Object_out (CORBA_Object_out &p) // copy constructor
-        : ptr_ (p.ptr_)
-{}
-
-ACE_INLINE CORBA_Object_out &
-CORBA_Object_out::operator= (CORBA_Object_out &p)
-{
-  this->ptr_ = p.ptr_;
-  return *this;
-}
-
-ACE_INLINE CORBA_Object_out &
-CORBA_Object_out::operator= (const CORBA_Object_var &p)
-{
-  this->ptr_ = CORBA_Object::_duplicate (p.ptr ());
-  return *this;
-}
-
-ACE_INLINE CORBA_Object_out &
-CORBA_Object_out::operator= (CORBA_Object_ptr p)
-{
-  this->ptr_ = p;
-  return *this;
-}
-
-ACE_INLINE
-CORBA_Object_out::operator CORBA_Object_ptr &() // cast
-{
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr &
-CORBA_Object_out::ptr (void) // ptr
-{
-  return this->ptr_;
-}
-
-ACE_INLINE CORBA_Object_ptr
-CORBA_Object_out::operator-> (void)
-{
-  return this->ptr_;
-}
+TAO_END_VERSIONED_NAMESPACE_DECL

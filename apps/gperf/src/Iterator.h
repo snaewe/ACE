@@ -1,34 +1,39 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 
-/* Copyright (C) 1989 Free Software Foundation, Inc.
-   written by Douglas C. Schmidt (schmidt@ics.uci.edu)
+// Copyright (C) 1989 Free Software Foundation, Inc.
+// written by Douglas C. Schmidt (schmidt@cs.wustl.edu)
 
-This file is part of GNU GPERF.
+// This file is part of GNU GPERF.
 
-GNU GPERF is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation; either version 1, or (at your option) any
-later version.
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
 
-GNU GPERF is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with GNU GPERF; see the file COPYING.  If not, write to the Free
-Software Foundation, 59 Temple Place - Suite 330, Boston, MA
-02111-1307, USA.  */
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-#if !defined (ITERATOR_H)
+#ifndef ITERATOR_H
 #define ITERATOR_H
 
-#include "ace/OS.h"
+#include "ace/config-all.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "Options.h"
 
 #if defined (ACE_HAS_GPERF)
-class Iterator 
+class Iterator
 {
   // = TITLE
   //   Provides an Iterator that expands and decodes a control string
@@ -52,23 +57,23 @@ public:
   int operator () (void);
 
 private:
-  char *str;                    
+  char *str;
   // A pointer to the string provided by the user.
 
-  int end;                    
-  // Value returned after last key is processed. 
+  int end;
+  // Value returned after last key is processed.
 
-  int end_word;               
+  int end_word;
   // A value marking the abstract ``end of word'' (usually '$').
 
-  int error_value;            
-  // Error value returned when input is syntactically erroneous. 
+  int error_value;
+  // Error value returned when input is syntactically erroneous.
 
   int hi_bound;
-  // Greatest possible value, inclusive. 
+  // Greatest possible value, inclusive.
 
   int lo_bound;
-  // Smallest possible value, inclusive. 
+  // Smallest possible value, inclusive.
 };
 
 #endif /* ACE_HAS_GPERF */

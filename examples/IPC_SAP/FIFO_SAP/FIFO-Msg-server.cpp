@@ -1,13 +1,19 @@
 // $Id$
 
 #include "ace/FIFO_Recv_Msg.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_unistd.h"
+#include "ace/OS_NS_stdlib.h"
+#include "ace/OS_NS_stropts.h"
+#include "ace/OS_main.h"
 
 ACE_RCSID(FIFO_SAP, FIFO_Msg_server, "$Id$")
 
 #if defined (ACE_HAS_STREAM_PIPES)
 
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_OS::unlink (ACE_DEFAULT_RENDEZVOUS);
   ACE_FIFO_Recv_Msg server (ACE_DEFAULT_RENDEZVOUS);
@@ -22,7 +28,7 @@ main (int, char *[])
       if (msg.len == 0)
 	break;
       else
-	ACE_DEBUG ((LM_DEBUG, "%4d (%4d): %*s", 
+	ACE_DEBUG ((LM_DEBUG, "%4d (%4d): %*s",
 		    msg.len, band, msg.len, msg.buf));
       flags = MSG_ANY;
       band = 0;
@@ -34,10 +40,10 @@ main (int, char *[])
   return 0;
 }
 #else
-#include <stdio.h>
-int main (int, char *[])
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
-  ACE_OS::fprintf (stderr, "This feature is not supported\n");
+  ACE_ERROR ((LM_INFO,
+              ACE_TEXT ("This feature is not supported\n")));
   return 0;
 }
 #endif /* ACE_HAS_STREAM_PIPES */

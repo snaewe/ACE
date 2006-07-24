@@ -1,5 +1,5 @@
-/* -*- C++ -*- */
-
+// -*- C++ -*-
+//
 // $Id$
 
 // ============================================================================
@@ -15,14 +15,19 @@
 //
 // ============================================================================
 
-#if !defined (ACE_LOCAL_LOCATOR_H)
+#ifndef ACE_LOCAL_LOCATOR_H
 #define ACE_LOCAL_LOCATOR_H
 
 #include "URL_Locator.h"
 #include "ace/Containers.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ID_Generator.h"
 
-class ACE_SVC_Export ACE_URL_Record
+class ACE_Svc_Export ACE_URL_Record
   // = TITLE
   //     A URL Record.
   //
@@ -45,11 +50,12 @@ public:
   ~ACE_URL_Record (void);
   // dtor.
 
-  int operator== (const ACE_URL_Record &rhs) const;
-  // Two records are equal if they have the same offer id.
+  /// Two records are equal if they have the same offer id.
+  bool operator== (const ACE_URL_Record &rhs) const;
 
-  int operator!= (const ACE_URL_Record &rhs) const;
-  // Unequal, complement of equal.
+  /// Unequal, complement of equal.
+  bool operator!= (const ACE_URL_Record &rhs) const;
+
 
 private:
   ACE_URL_Record (void);
@@ -63,7 +69,7 @@ private:
   // Offer (and its properties).
 };
 
-class ACE_SVC_Export ACE_URL_Local_Locator
+class ACE_Svc_Export ACE_URL_Local_Locator
   // = TITLE
   //     A simple URL repository to store URL offer locally.
   //
@@ -76,30 +82,30 @@ class ACE_SVC_Export ACE_URL_Local_Locator
   // Default destructor.
 
   virtual int url_query (const ACE_URL_Locator::ACE_Selection_Criteria how,
-			 const ACE_URL_Property_Seq *pseq,
-			 const size_t how_many,
-			 size_t &num_query,
-			 ACE_URL_Offer_Seq *offer);
+                         const ACE_URL_Property_Seq *pseq,
+                         const size_t how_many,
+                         size_t &num_query,
+                         ACE_URL_Offer_Seq *offer);
   // Query the locator for HTTP with designate properties (none, some,
   // or all).  The locator being queried will return a sequence of
   // offers with <how_many> offers in it.  This interface allocates
   // <offer> so users must deallocate it after use.
 
   virtual int export_offer (ACE_URL_Offer *offer,
-			    ACE_WString &offer_id);
+                            ACE_WString &offer_id);
   // Export an offer to the locator.
 
   virtual int withdraw_offer (const ACE_WString &offer_id);
   // Withdraw an offer.  return 0 if succeed, -1 otherwise.
 
   virtual int describe_offer (const ACE_WString &offer_id,
-			      ACE_URL_Offer *offer);
+                              ACE_URL_Offer *offer);
   // Query a specific offer.
 
   virtual int modify_offer (const ACE_WString &offer_id,
-			    const ACE_WString *url = 0,
-			    const ACE_URL_Property_Seq *del = 0,
-			    const ACE_URL_Property_Seq *modify = 0);
+                            const ACE_WString *url = 0,
+                            const ACE_URL_Property_Seq *del = 0,
+                            const ACE_URL_Property_Seq *modify = 0);
   // Modify a previously registered offer.
 
 protected:

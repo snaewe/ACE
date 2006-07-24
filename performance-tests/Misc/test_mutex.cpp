@@ -3,19 +3,19 @@
 // This test program illustrates the performance difference between
 // three versions of wrappers for thread mutexes.  These three
 // versions exercise various combinations of the following classes:
-// 
+//
 // Thread_Mutex --
 //    This version is just like ACE_Thread_Mutex, which doesn't use
 //    inheritance and dynamic binding.
-// 
+//
 // Mutex_Base --
 //    This is an abstract base class that defines the
 //    acquire()/release() interface.
-// 
+//
 // Thread_Mutex_Derived --
 //    This derived from Mutex_Base and uses inheritance and
 //    dynamic binding.
-// 
+//
 // The following are the results I got when running this on our
 // SPARCstation 20 model 712:
 //
@@ -32,12 +32,12 @@
 // time per call = 2.112831 usecs
 //
 // My conclusions are as follows:
-// 
+//
 // 1. If your C++ compiler optimizes calls to virtual functions that
 //    are made through instances of derived classes, then the
 //    performance of the Thread_Mutex and Thread_Mutex_Derived are
 //    essentially identical.
-// 
+//
 // 2. The overhead from using virtual functions is approximately
 //    20%.  Naturally, as the amount of contention goes up, the
 //    relative overhead of the virtual function calls will decrease.
@@ -49,7 +49,8 @@
 
 #include "ace/Log_Msg.h"
 #include "ace/Profile_Timer.h"
-#include "ace/OS.h"
+#include "ace/OS_main.h"
+#include "ace/OS_NS_Thread.h"
 
 ACE_RCSID(Misc, test_mutex, "$Id$")
 
@@ -96,9 +97,14 @@ Thread_Mutex::release (void)
 class Mutex_Base
 {
 public:
+  virtual ~Mutex_Base (void);
   virtual int acquire (void) = 0;
   virtual int release (void) = 0;
 };
+
+Mutex_Base::~Mutex_Base (void)
+{
+}
 
 // Subclass for threaded mutex, defines virtual functions.
 class Thread_Mutex_Derived : public Mutex_Base
@@ -139,8 +145,8 @@ static Thread_Mutex thread_mutex;
 static Thread_Mutex_Derived thread_mutex_derived;
 static Mutex_Base *mutex_base = &thread_mutex_derived;
 
-int 
-main (int argc, char *argv[])
+int
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   ACE_Profile_Timer timer;
   int iterations = argc > 1 ? ACE_OS::atoi (argv[1]) : DEFAULT_ITERATIONS;
@@ -169,7 +175,7 @@ main (int argc, char *argv[])
   ACE_DEBUG ((LM_DEBUG, "real time = %f secs, user time = %f secs, system time = %f secs\n",
 	      et.real_time, et.user_time, et.system_time));
 
-  ACE_DEBUG ((LM_DEBUG, "time per call = %f usecs\n", 
+  ACE_DEBUG ((LM_DEBUG, "time per call = %f usecs\n",
 	      (et.real_time / double (iterations)) * 1000000));
 
   // Test the thread mutex derived (which does use inheritance or
@@ -193,7 +199,7 @@ main (int argc, char *argv[])
   ACE_DEBUG ((LM_DEBUG, "real time = %f secs, user time = %f secs, system time = %f secs\n",
 	      et.real_time, et.user_time, et.system_time));
 
-  ACE_DEBUG ((LM_DEBUG, "time per call = %f usecs\n", 
+  ACE_DEBUG ((LM_DEBUG, "time per call = %f usecs\n",
 	      (et.real_time / double (iterations)) * 1000000));
 
   // Test the thread mutex derived (which does use inheritance or
@@ -218,13 +224,13 @@ main (int argc, char *argv[])
   ACE_DEBUG ((LM_DEBUG, "real time = %f secs, user time = %f secs, system time = %f secs\n",
 	      et.real_time, et.user_time, et.system_time));
 
-  ACE_DEBUG ((LM_DEBUG, "time per call = %f usecs\n", 
+  ACE_DEBUG ((LM_DEBUG, "time per call = %f usecs\n",
 	      (et.real_time / double (iterations)) * 1000000));
   return 0;
 }
 #else
-int 
-main (int, char *[])
+int
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;

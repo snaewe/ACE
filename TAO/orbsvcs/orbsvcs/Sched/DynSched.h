@@ -1,4 +1,5 @@
-/* -*- C++ -*- */
+// -*- C++ -*-
+
 // $Id$
 //
 // ============================================================================
@@ -17,19 +18,29 @@
 //
 // ============================================================================
 
-#if ! defined (DYNSCHED_H)
+#ifndef DYNSCHED_H
 #define DYNSCHED_H
+#include /**/ "ace/pre.h"
 
 #include "ace/ACE.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Map_Manager.h"
 #include "ace/Message_Block.h"
-#include "ace/Synch.h"
 #include "ace/SString.h"
-#include "SchedEntry.h"
+#include "orbsvcs/Sched/SchedEntry.h"
+#include "orbsvcs/Sched/sched_export.h"
+#include "ace/Recursive_Thread_Mutex.h"
 
-class TAO_ORBSVCS_Export ACE_DynScheduler
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+class TAO_RTSched_Export ACE_DynScheduler
   // = TITLE
-  //    dispatch scheduling interface.
+  //    Dispatch scheduling interface.
   //
   // = DESCRIPTION
   //    This abstract base class provides the majority of the
@@ -44,16 +55,18 @@ public:
 
   typedef RtecScheduler::handle_t handle_t;
   typedef RtecScheduler::Dependency_Info Dependency_Info;
-  typedef RtecScheduler::Preemption_Priority Preemption_Priority;
+  typedef RtecScheduler::Preemption_Priority_t Preemption_Priority;
   typedef RtecScheduler::OS_Priority OS_Priority;
-  typedef RtecScheduler::Preemption_Subpriority Sub_Priority;
+  typedef RtecScheduler::Preemption_Subpriority_t Sub_Priority;
   typedef RtecScheduler::RT_Info RT_Info;
   typedef RtecScheduler::Config_Info Config_Info;
   typedef RtecScheduler::Time Time;
-  typedef RtecScheduler::Period Period;
-  typedef RtecScheduler::Info_Type Info_Type;
-  typedef RtecScheduler::Dependency_Type Dependency_Type;
-  typedef RtecScheduler::Dispatching_Type Dispatching_Type;
+  typedef RtecScheduler::Period_t Period;
+  typedef RtecScheduler::Info_Type_t Info_Type;
+  typedef RtecScheduler::Dependency_Type_t Dependency_Type;
+  typedef RtecScheduler::Dispatching_Type_t Dispatching_Type;
+  typedef RtecScheduler::Scheduling_Anomaly Scheduling_Anomaly;
+  typedef RtecScheduler::Anomaly_Severity Anomaly_Severity;
 
   typedef ACE_Map_Entry <ACE_CString, RT_Info *> Thread_Map_Entry;
   typedef ACE_Map_Manager <ACE_CString, RT_Info *, ACE_Null_Mutex>
@@ -73,9 +86,13 @@ public:
     , ST_UNKNOWN_TASK
     , ST_UNKNOWN_PRIORITY
     , ST_TASK_ALREADY_REGISTERED
+    , ST_NO_TASKS_REGISTERED
     , ST_BAD_DEPENDENCIES_ON_TASK
     , ST_BAD_INTERNAL_POINTER
     , ST_VIRTUAL_MEMORY_EXHAUSTED
+    , TWO_WAY_DISJUNCTION
+    , TWO_WAY_CONJUNCTION
+    , UNRECOGNIZED_INFO_TYPE
 
     // The following are only used by the runtime Scheduler.
     , TASK_COUNT_MISMATCH     // only used by schedule ()
@@ -89,13 +106,15 @@ public:
     , ST_UTILIZATION_BOUND_EXCEEDED
     , ST_INSUFFICIENT_THREAD_PRIORITY_LEVELS
     , ST_CYCLE_IN_DEPENDENCIES
+    , ST_UNRESOLVED_REMOTE_DEPENDENCIES
+    , ST_UNRESOLVED_LOCAL_DEPENDENCIES
     , ST_INVALID_PRIORITY_ORDERING
     , UNABLE_TO_OPEN_SCHEDULE_FILE
     , UNABLE_TO_WRITE_SCHEDULE_FILE
   };
 
 
-
+
   /////////////////////////////
   // public member functions //
   /////////////////////////////
@@ -106,6 +125,15 @@ public:
   // = Utility function for outputting the textual
   //   representation of a status_t value.
   static const char * status_message (status_t status);
+
+  // = Utility function for creating an entry for determining
+  //   the severity of an anomaly detected during scheduling.
+  static Anomaly_Severity anomaly_severity (status_t status);
+
+  // = Utility function for creating an entry for the
+  //   log of anomalies detected during scheduling.
+  static Scheduling_Anomaly * create_anomaly (status_t status);
+
 
   // = Initialize the scheduler.
   void init (const OS_Priority minimum_priority,
@@ -168,10 +196,11 @@ public:
   // Obtains an RT_Info based on its "handle".
 
   status_t lookup_config_info (Preemption_Priority priority,
-				               Config_Info* &config_info);
+                               Config_Info* &config_info);
   // Obtains a Config_Info based on its priority.
 
-  status_t schedule (void);
+  status_t
+    schedule (ACE_Unbounded_Set<Scheduling_Anomaly *> &anomaly_set);
   // This sets up the data structures, invokes the internal scheduling method.
 
   status_t output_timeline (const char *filename, const char *heading);
@@ -188,7 +217,7 @@ public:
   // subpriorities of the Task that was assigned handle.  "preemption_prio"
   // is a platform-independent priority queue number, ranging from a
   // highest priority value of 0 to the lowest priority value, which is
-  // returned by "minimum_priority_queue ()".  Returns 0 on success, 
+  // returned by "minimum_priority_queue ()".  Returns 0 on success,
   // or -1 if an invalid handle was supplied.
 
   // = Access the platform-independent priority value of the lowest-priority
@@ -219,8 +248,8 @@ public:
   static int number_of_dependencies(RT_Info* rt_info);
   static int number_of_dependencies(RT_Info& rt_info);
 
-  static void export(RT_Info*, FILE* file);
-  static void export(RT_Info&, FILE* file);
+  static void export_to_file (RT_Info*, FILE* file);
+  static void export_to_file (RT_Info&, FILE* file);
 
   // accessors for the minimal and maximal dispatch entry id in the schedule
   u_long min_dispatch_id () const;
@@ -239,11 +268,13 @@ protected:
 
   ACE_DynScheduler ();
 
-  status_t schedule_threads (void);
+  status_t schedule_threads (
+    ACE_Unbounded_Set<RtecScheduler::Scheduling_Anomaly *> &anomaly_set);
   // thread scheduling method: sets up array of pointers to task
   // entries that are threads, calls internal thread scheduling method
 
-  status_t schedule_dispatches (void);
+  status_t schedule_dispatches (
+    ACE_Unbounded_Set<RtecScheduler::Scheduling_Anomaly *> &anomaly_set);
   // dispatch scheduling method: sets up an array of dispatch entries,
   // calls internal dispatch scheduling method.
 
@@ -273,12 +304,16 @@ protected:
   // internal sorting method: this orders the dispatches by
   // static priority and dynamic and static subpriority.
 
-  virtual status_t assign_priorities (Dispatch_Entry **dispatches,
-                                      u_int count) = 0;
+  virtual status_t assign_priorities (
+    Dispatch_Entry **dispatches,
+    u_int count,
+    ACE_Unbounded_Set<RtecScheduler::Scheduling_Anomaly *> &anomaly_set) = 0;
   // = assign priorities to the sorted dispatches
 
-  virtual status_t assign_subpriorities (Dispatch_Entry **dispatches,
-                                         u_int count) = 0;
+  virtual status_t assign_subpriorities (
+    Dispatch_Entry **dispatches,
+    u_int count,
+    ACE_Unbounded_Set<RtecScheduler::Scheduling_Anomaly *> &anomaly_set) = 0;
   // = assign dynamic and static sub-priorities to the sorted dispatches
 
   virtual status_t
@@ -349,15 +384,15 @@ private:
   typedef RT_Info *INT;
 
 #if defined (ACE_HAS_THREADS)
-  typedef ACE_Thread_Mutex SYNCH;
-  typedef ACE_Recursive_Thread_Mutex LOCK;
+  typedef TAO_SYNCH_MUTEX SYNCH;
+  typedef TAO_SYNCH_RECURSIVE_MUTEX LOCK;
 #else
   typedef ACE_Null_Mutex SYNCH;
   typedef ACE_Null_Mutex LOCK;
 #endif /* ACE_HAS_THREADS */
 
-  typedef ACE_Map_Manager<EXT, INT, ACE_SYNCH_MUTEX> Info_Collection;
-  typedef ACE_Map_Iterator<EXT, INT, ACE_SYNCH_MUTEX> Info_Collection_Iterator;
+  typedef ACE_Map_Manager<EXT, INT, TAO_SYNCH_MUTEX> Info_Collection;
+  typedef ACE_Map_Iterator<EXT, INT, TAO_SYNCH_MUTEX> Info_Collection_Iterator;
   typedef ACE_Map_Entry<EXT, INT> Info_Collection_Entry;
 
   //////////////////////////////
@@ -395,7 +430,9 @@ private:
   status_t relate_task_entries_recurse (long &time, Task_Entry &entry);
 
   // identify thread delimiters
-  status_t identify_threads (void);
+  status_t
+    identify_threads (ACE_CString & unresolved_locals,
+                      ACE_CString & unresolved_remotes);
 
   // checks for cycles in the dependency graph
   status_t check_dependency_cycles (void);
@@ -415,7 +452,11 @@ private:
   // update the scheduling parameters for the previous priority level
   void update_priority_level_params ();
 
-  status_t propagate_dispatches ();
+  status_t
+    propagate_dispatches (
+      ACE_Unbounded_Set<RtecScheduler::Scheduling_Anomaly *> &anomaly_set,
+      ACE_CString & unresolved_locals,
+      ACE_CString & unresolved_remotes);
   // propagate the dispatch information from the
   // threads throughout the call graph
 
@@ -423,8 +464,8 @@ private:
   // calculate utilization, frame size, etc.
 
   // the following functions are not implememented
-  ACE_UNIMPLEMENTED_FUNC(ACE_DynScheduler (const ACE_DynScheduler &))
-  ACE_UNIMPLEMENTED_FUNC(ACE_DynScheduler &operator= (const ACE_DynScheduler &))
+  ACE_DynScheduler (const ACE_DynScheduler &);
+  ACE_DynScheduler &operator= (const ACE_DynScheduler &);
 
   //////////////////////////
   // private data members //
@@ -491,10 +532,13 @@ private:
 
 };
 
+TAO_END_VERSIONED_NAMESPACE_DECL
+
 #if defined (__ACE_INLINE__)
-#include "DynSched.i"
+#include "orbsvcs/Sched/DynSched.i"
 #endif /* __ACE_INLINE__ */
 
+#include /**/ "ace/post.h"
 #endif /* DYNSCHED_H */
 
 // EOF

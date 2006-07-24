@@ -4,8 +4,11 @@
 // The following configuration file is designed to work for DG/UX
 // 4.11 platforms using the EPC compiler.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
+
+#define ACE_DGUX
 
 // Platform requires (struct sockaddr *) for msg_name field of struct
 // msghdr.
@@ -15,7 +18,7 @@
 #define ACE_LACKS_STRCASECMP
 
 // Platform supports System V IPC (most versions of UNIX, but not Win32)
-#define ACE_HAS_SYSV_IPC			
+#define ACE_HAS_SYSV_IPC
 
 #define ACE_HAS_CONSISTENT_SIGNAL_PROTOTYPES
 
@@ -29,13 +32,13 @@
 #define ACE_HAS_MSG
 
 // Compiler/platform contains the <sys/syscall.h> file.
-// #define ACE_HAS_SYSCALL_H
+// #define ACE_HAS_SYS_SYSCALL_H
 
 // Platform supports reentrant functions (i.e., all the POSIX *_r functions).
 #define ACE_HAS_REENTRANT_FUNCTIONS
 
-// Platform has terminal ioctl flags like TCGETS and TCSETS.
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS
 
 // Compiler/platform correctly calls init()/fini() for shared libraries.
 #define ACE_HAS_AUTOMATIC_INIT_FINI
@@ -53,20 +56,16 @@
 #define ACE_HAS_IP_MULTICAST
 
 // Compiler/platform supports alloca()
-// #define ACE_HAS_ALLOCA 
+// #define ACE_HAS_ALLOCA
 
 // Compiler/platform has <alloca.h>
 // #define ACE_HAS_ALLOCA_H
-
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
 
 // Platform contains <poll.h>.
 #define ACE_HAS_POLL
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Platform supports the /proc file system.
 #define ACE_HAS_PROC_FS
@@ -82,7 +81,7 @@
 #define ACE_HAS_SIGINFO_T
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler supports the ssize_t typedef.
 #define ACE_HAS_SSIZE_T
@@ -123,7 +122,7 @@
 /* Turn off the following four defines if you want to disable threading. */
 // Compile using multi-thread libraries.
 #if !defined (ACE_MT_SAFE)
-	#define ACE_MT_SAFE 0
+# define ACE_MT_SAFE 0
 #endif
 
 // Platform supports threads.
@@ -134,7 +133,7 @@
 // #define ACE_HAS_PTHREADS
 #define ACE_HAS_SIGWAIT
 // If ACE doesn't compile due to the lack of these methods, please
-// send email to schmidt@cs.wustl.edu reporting this. 
+// send email to schmidt@cs.wustl.edu reporting this.
 // #define ACE_LACKS_CONDATTR_PSHARED
 // #define ACE_LACKS_MUTEXATTR_PSHARED
 
@@ -160,11 +159,6 @@
 // Use the poll() event demultiplexor rather than select().
 //#define ACE_USE_POLL
 
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
-
 // Defines the page size of the system.
 #define ACE_PAGE_SIZE 4096
 
@@ -173,16 +167,15 @@
 #define _DGUX_SOURCE
 // #define ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION
 #define ACE_HAS_UCONTEXT_T
-#define ACE_NEEDS_SYSTIME_H
 #define ACE_HAS_NONCONST_GETBY
 #define ACE_LACKS_MADVISE
 
 #if !defined (IP_ADD_MEMBERSHIP)
-#define IP_ADD_MEMBERSHIP 0x13
+# define IP_ADD_MEMBERSHIP 0x13
 #endif
 
 #if !defined (IP_DROP_MEMBERSHIP)
-#define IP_DROP_MEMBERSHIP 0x14
+# define IP_DROP_MEMBERSHIP 0x14
 #endif
 
 // Header files lack t_errno for ACE_TLI.
@@ -191,5 +184,6 @@
 // Optimize ACE_Handle_Set for select().
 #define ACE_HAS_HANDLE_SET_OPTIMIZED_FOR_SELECT
 #define ACE_HAS_IDTYPE_T
-#define ACE_DGUX
+
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

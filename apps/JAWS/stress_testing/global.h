@@ -1,7 +1,11 @@
 // $Id$
 
 #include "ace/ACE.h"
-#include "ace/OS.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/SOCK_Acceptor.h"
 #include "ace/SOCK_Connector.h"
 #include "ace/Pipe.h"
@@ -12,6 +16,7 @@
 #include "ace/Thread_Manager.h"
 #include "ace/Service_Config.h"
 
+// FUZZ: disable check_for_math_include
 #include <math.h>
 
 

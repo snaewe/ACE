@@ -1,10 +1,16 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (_HANDLE_THR_STREAM_H)
+#ifndef _HANDLE_THR_STREAM_H
 #define _HANDLE_THR_STREAM_H
 
 #include "ace/Acceptor.h"
+#include "ace/Svc_Handler.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Service_Types.h"
 
 #if defined (ACE_HAS_THREADS)
@@ -13,7 +19,7 @@ template <class SVC_HANDLER, ACE_PEER_ACCEPTOR_1>
 class Handle_Thr_Acceptor : public ACE_Strategy_Acceptor<SVC_HANDLER, ACE_PEER_ACCEPTOR_2>
   // = TITLE
   //   This factory creates new <SVC_HANDLERS> and runs them with the
-  //   configured <ACE_Thread_Strategy>.  
+  //   configured <ACE_Thread_Strategy>.
 {
 public:
   // = Initialization and termination.
@@ -21,8 +27,8 @@ public:
   ~Handle_Thr_Acceptor (void);
 
   // = Dynamic linking hooks.
-  virtual int init (int argc, char *argv[]);
-  virtual int info (char **, size_t) const;
+  virtual int init (int argc, ACE_TCHAR *argv[]);
+  virtual int info (ACE_TCHAR **, size_t) const;
   virtual int fini (void);
 
 private:
@@ -59,13 +65,6 @@ protected:
 };
 
 extern ACE_Service_Object_Type rts;
-
-#if defined (__ACE_INLINE__)
-#define ACE_INLINE inline
-#include "Handle_Thr_Stream.i"
-#else
-#define ACE_INLINE 
-#endif /* __ACE_INLINE__ */
 
 #if defined (ACE_TEMPLATES_REQUIRE_SOURCE)
 #include "Handle_Thr_Stream.cpp"

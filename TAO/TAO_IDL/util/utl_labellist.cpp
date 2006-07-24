@@ -64,84 +64,60 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
  */
 
-// utl_labellist.cc
-//
-// Implementation of a list of scoped names
+// Implementation of a list of union labels.
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//	     It relies on a type-unsafe cast from UTL_List to subclasses, which
+//	     will cease to operate correctly if you use either multiple or
+//	     public virtual inheritance.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "utl_labellist.h"
+#include "ast_union_label.h"
 
-ACE_RCSID(util, utl_labellist, "$Id$")
+ACE_RCSID (util, 
+           utl_labellist, 
+           "$Id$")
 
-/*
- * Constructor(s)
- */
-
-UTL_LabelList::UTL_LabelList(AST_UnionLabel *s, UTL_LabelList *cdr)
-	     : UTL_List(cdr),
-	       pd_car_data(s)
+UTL_LabelList::UTL_LabelList (AST_UnionLabel *s, 
+                              UTL_LabelList *cdr)
+  : UTL_List(cdr),
+	  pd_car_data(s)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Get list item
+// Get list item.
 AST_UnionLabel *
-UTL_LabelList::head()
+UTL_LabelList::head (void)
 {
-  return pd_car_data;
+  return this->pd_car_data;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
+void
+UTL_LabelList::destroy (void)
+{
+  this->pd_car_data->destroy ();
+  delete this->pd_car_data;
+  this->pd_car_data = 0;
+  
+  this->UTL_List::destroy ();
+}
 
-// UTL_LabelList active iterator
-
-/*
- * Constructor
- */
-
-UTL_LabellistActiveIterator::UTL_LabellistActiveIterator(UTL_LabelList *s)
-			   : UTL_ListActiveIterator(s)
+UTL_LabellistActiveIterator::UTL_LabellistActiveIterator (UTL_LabelList *s)
+  : UTL_ListActiveIterator (s)
 {
 }
 
-/*
- * Private operations
- */
 
-/*
- * Public operations
- */
-
-// Get current item
+// Get current item.
 AST_UnionLabel *
-UTL_LabellistActiveIterator::item()
+UTL_LabellistActiveIterator::item (void)
 {
-  if (source == NULL)
-    return NULL;
-  return ((UTL_LabelList *) source)->head();
+  if (source == 0)
+    {
+      return 0;
+    }
+
+  return ((UTL_LabelList *) source)->head ();
 }
 
-/*
- * Redefinition of inherited virtual operations
- */

@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,26 +62,26 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _DRV_EXTERN_DRV_EXTERN_HH
 #define _DRV_EXTERN_DRV_EXTERN_HH
 
-// drv_extern.h - External functions for the IDL compiler driver program
+// The ACE_Process_Options default size of 1024 is sometimes not enough.
+const unsigned long TAO_IDL_COMMAND_LINE_BUFFER_SIZE = 4 * 1024;
 
-// Functions
+// External functions for the IDL compiler driver program.
+extern void DRV_parse_args (long, char **);
+extern void DRV_usage (void);
+extern void DRV_pre_proc (const char *myfile);
+extern void DRV_store_env_include_paths (void);
+extern void DRV_cpp_init (void);
+extern void DRV_cpp_post_init (void);
+extern void DRV_cpp_putarg (const char *str);
+extern void DRV_cpp_new_location (char *new_loc);
+extern void DRV_get_orb_idl_includes (void);
 
-extern void		DRV_init();
-extern void		DRV_parse_args(long, char **);
-extern void		DRV_usage();
-
-extern void	        DRV_pre_proc(char *myfile);
-
-extern void		DRV_cpp_init();
-extern void		DRV_cpp_putarg(char *str);
-extern void		DRV_cpp_new_location(char *new_loc);
-
-extern void		DRV_fork();
-extern int              DRV_check_gperf ();
+// Not used by all backends.
+extern void DRV_push_file (const char *s);
 
 #endif           // _DRV_EXTERN_DRV_EXTERN_HH

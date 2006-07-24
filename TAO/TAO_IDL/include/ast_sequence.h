@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,47 +62,75 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_SEQUENCE_AST_SEQUENCE_HH
 #define _AST_SEQUENCE_AST_SEQUENCE_HH
 
-// Representation of sequence declaration:
-//
-// A sequence is a combination of a maximum size and a base type
+#include "ast_concrete_type.h"
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, ast_type.hh, ast_decl.hh,
-**		 ast_expression.hh
-**
-** USE: Included from ast.hh
-*/
 
-class	AST_Sequence : public virtual AST_ConcreteType
+class AST_Expression;
+class AST_Type;
+
+// A sequence is a combination of a maximum size and a base type.
+
+class TAO_IDL_FE_Export AST_Sequence : public virtual AST_ConcreteType
 {
 public:
-  // Operations
+  AST_Sequence (void);
 
-  // Constructor(s)
-  AST_Sequence();
-  AST_Sequence(AST_Expression *max_size, AST_Type *bt);
-  virtual ~AST_Sequence() {}
+  AST_Sequence (AST_Expression *max_size,
+                AST_Type *bt,
+                UTL_ScopedName *n,
+                bool local,
+                bool abstract);
 
-  // Data Accessors
-  AST_Expression *max_size();
-  AST_Type *base_type();
+  virtual ~AST_Sequence (void);
 
-  // Narrowing
+  virtual bool in_recursion (ACE_Unbounded_Queue<AST_Type *> &list);
+  // Are we or the node represented by node involved in recursion.
+
+  // Data Accessors.
+  AST_Expression *max_size (void);
+
+  AST_Type *base_type (void) const;
+
+  virtual bool unbounded (void) const;
+  // Is this sequence bounded or not.
+
+  // Recursively called on valuetype to check for legal use as
+  // a primary key. Overridden for valuetype, struct, sequence,
+  // union, array, typedef, and interface.
+  virtual bool legal_for_primary_key (void) const;
+  
+  // Cleanup method.
+  virtual void destroy (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Sequence, AST_ConcreteType);
   DEF_NARROW_FROM_DECL(AST_Sequence);
 
-  // AST Dumping
-  virtual void			dump(ostream &o);
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &o);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
 
 private:
-  // Data
-  AST_Expression		*pd_max_size;	// Maximum sequence size
-  AST_Type			*pd_base_type;	// Sequence base type
+  // Data.
+  AST_Expression *pd_max_size;
+  // Maximum sequence size.
+
+  AST_Type *pd_base_type;
+  // Sequence base type.
+
+  bool unbounded_;
+  // Whether we are bounded or unbounded.
+  
+  bool owns_base_type_;
+  // If our base type is anonymous array or sequence, we're
+  // responsible for destroying it.
 };
 
 #endif           // _AST_SEQUENCE_AST_SEQUENCE_HH

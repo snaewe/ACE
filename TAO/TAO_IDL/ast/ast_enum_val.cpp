@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,60 +62,57 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_enum_val.cc - Implementation of class AST_EnumVal
- *
- * AST_EnumVals denote IDL enumerator declarations
- * AST_EnumVals are a subclass of AST_Constant
- * AST_EnumVals have no additional fields
- */
+// AST_EnumVals denote IDL enumerator declarations
+// AST_EnumVals are a subclass of AST_Constant
+// AST_EnumVals have no additional fields.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_enum_val.h"
+#include "ast_visitor.h"
 
-ACE_RCSID(ast, ast_enum_val, "$Id$")
+ACE_RCSID (ast, 
+           ast_enum_val, 
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_EnumVal::AST_EnumVal()
+AST_EnumVal::AST_EnumVal (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Constant ()
 {
 }
 
-AST_EnumVal::AST_EnumVal(unsigned long v, UTL_ScopedName *n, UTL_StrList *p)
-	    : AST_Constant(AST_Expression::EV_ulong,
-			   AST_Decl::NT_enum_val,
-			   new AST_Expression(v), n, p),
-	      AST_Decl(AST_Decl::NT_enum_val, n, p)
+AST_EnumVal::AST_EnumVal (unsigned long v,
+                          UTL_ScopedName *n)
+  : COMMON_Base (),
+    AST_Decl (AST_Decl::NT_enum_val,
+              n),
+    AST_Constant  (AST_Expression::EV_ulong,
+		               AST_Decl::NT_enum_val,
+			             new AST_Expression (v),
+                   n)
 {
 }
 
-/*
- * Private operations
- */
+AST_EnumVal::~AST_EnumVal (void)
+{
+}
 
-/*
- * Public operations
- */
+// Redefinition of inherited virtual operations.
 
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_EnumVal to the ostream o
- */
+// Dump this AST_EnumVal to the ostream o.
 void
-AST_EnumVal::dump(ostream &o)
+AST_EnumVal::dump (ACE_OSTREAM_TYPE &o)
 {
-  AST_Constant::dump(o);
+  AST_Constant::dump (o);
 }
 
-/*
- * Narrowing methods
- */
+int
+AST_EnumVal::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_enum_val (this);
+}
+
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_EnumVal, AST_Constant)
 IMPL_NARROW_FROM_DECL(AST_EnumVal)

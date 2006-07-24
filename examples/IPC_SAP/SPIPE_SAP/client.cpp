@@ -1,7 +1,11 @@
 // $Id$
 
+#include "ace/OS_main.h"
 #include "ace/SPIPE_Addr.h"
 #include "ace/SPIPE_Connector.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
 
 ACE_RCSID(SPIPE_SAP, client, "$Id$")
 
@@ -9,8 +13,8 @@ ACE_RCSID(SPIPE_SAP, client, "$Id$")
 
 #include "shared.h"
 
-int 
-main (int argc, char *argv[])
+int
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   if (argc < 2)
     ACE_ERROR_RETURN ((LM_ERROR, "usage: %s string [rendezvous]\n", argv[0]), 1);
@@ -36,7 +40,7 @@ main (int argc, char *argv[])
 }
 #else
 #include <stdio.h>
-int main (int, char *[])
+int ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_OS::fprintf (stderr, "This feature is not supported\n");
   return 0;

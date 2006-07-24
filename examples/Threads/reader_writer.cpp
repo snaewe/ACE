@@ -3,14 +3,18 @@
 // This test program verifies the functionality of the ACE_OS
 // implementation of readers/writer locks on Win32 and Posix pthreads.
 
-#include "ace/Synch.h"
+#include "ace/OS_main.h"
 #include "ace/Thread.h"
 #include "ace/Thread_Manager.h"
 #include "ace/Get_Opt.h"
+#include "ace/Atomic_Op.h"
 
 ACE_RCSID(Threads, reader_writer, "$Id$")
 
 #if defined (ACE_HAS_THREADS)
+
+#include "ace/Guard_T.h"
+#include "ace/RW_Mutex.h"
 
 // Default number of iterations.
 static int n_iterations = 1000;
@@ -25,7 +29,7 @@ static int n_readers = 6;
 static int n_writers = 2;
 
 // Thread id of last writer.
-static volatile ACE_thread_t shared_thr_id;
+static ACE_thread_t shared_thr_id;
 
 // Lock for shared_thr_id.
 static ACE_RW_Mutex rw_mutex;
@@ -41,15 +45,15 @@ static void
 print_usage_and_die (void)
 {
   ACE_DEBUG ((LM_DEBUG,
-	      "usage: %n [-r n_readers] [-w n_writers] [-n iteration_count]\n"));
+              "usage: %n [-r n_readers] [-w n_writers] [-n iteration_count]\n"));
   ACE_OS::exit (1);
 }
 
 // Parse the command-line arguments and set options.
 static void
-parse_args (int argc, char *argv[])
+parse_args (int argc, ACE_TCHAR *argv[])
 {
-  ACE_Get_Opt get_opt (argc, argv, "r:w:n:l:");
+  ACE_Get_Opt get_opt (argc, argv, ACE_TEXT("r:w:n:l:"));
 
   int c;
 
@@ -57,16 +61,16 @@ parse_args (int argc, char *argv[])
     switch (c)
     {
     case 'r':
-      n_readers = ACE_OS::atoi (get_opt.optarg);
+      n_readers = ACE_OS::atoi (get_opt.opt_arg ());
       break;
     case 'w':
-      n_writers = ACE_OS::atoi (get_opt.optarg);
+      n_writers = ACE_OS::atoi (get_opt.opt_arg ());
       break;
     case 'n':
-      n_iterations = ACE_OS::atoi (get_opt.optarg);
+      n_iterations = ACE_OS::atoi (get_opt.opt_arg ());
       break;
     case 'l':
-      n_loops = ACE_OS::atoi (get_opt.optarg);
+      n_loops = ACE_OS::atoi (get_opt.opt_arg ());
       break;
     default:
       print_usage_and_die ();
@@ -96,12 +100,12 @@ reader (void *)
 
       for (int loop = 1; loop <= n_loops; loop++)
         {
-	  ACE_Thread::yield();
+          ACE_Thread::yield();
 
-	  if (ACE_OS::thr_equal (shared_thr_id, thr_id) == 0)
+          if (ACE_OS::thr_equal (shared_thr_id, thr_id) == 0)
             ACE_DEBUG ((LM_DEBUG,
-			"(%t) somebody changed %d to %d\n",
-			thr_id, shared_thr_id));
+                        "(%t) somebody changed %d to %d\n",
+                        thr_id, shared_thr_id));
         }
 
       --current_readers;
@@ -138,11 +142,11 @@ writer (void *)
 
       for (int loop = 1; loop <= n_loops; loop++)
         {
-	  ACE_Thread::yield();
+          ACE_Thread::yield();
 
-	  if (ACE_OS::thr_equal (shared_thr_id, self) == 0)
+          if (ACE_OS::thr_equal (shared_thr_id, self) == 0)
             ACE_DEBUG ((LM_DEBUG, "(%t) somebody wrote on my data %d\n",
-			shared_thr_id));
+                        shared_thr_id));
         }
 
       --current_writers;
@@ -154,7 +158,7 @@ writer (void *)
 
 // Spawn off threads.
 
-int main (int argc, char *argv[])
+int ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   ACE_LOG_MSG->open (argv[0]);
   parse_args (argc, argv);
@@ -174,25 +178,11 @@ int main (int argc, char *argv[])
   return 0;
 }
 
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class ACE_Atomic_Op<ACE_Thread_Mutex, int>;
-template class ACE_Guard<ACE_RW_Mutex>;
-template class ACE_Read_Guard<ACE_RW_Mutex>;
-template class ACE_Write_Guard<ACE_RW_Mutex>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate ACE_Atomic_Op<ACE_Thread_Mutex, int>
-#pragma instantiate ACE_Guard<ACE_RW_Mutex>
-#pragma instantiate ACE_Read_Guard<ACE_RW_Mutex>
-#pragma instantiate ACE_Write_Guard<ACE_RW_Mutex>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
-
 #else
 int
-main (int, char *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR ((LM_ERROR, "threads not supported on this platform\n"));
   return 0;
 }
 #endif /* ACE_HAS_THREADS */
-

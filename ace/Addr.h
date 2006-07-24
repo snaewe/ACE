@@ -1,99 +1,104 @@
-/* -*- C++ -*- */
-// $Id$
+// -*- C++ -*-
 
-// ============================================================================
-//
-// = LIBRARY
-//    ace
-// 
-// = FILENAME
-//    Addr.h
-//
-// = AUTHOR
-//    Doug Schmidt 
-// 
-// ============================================================================
+//=============================================================================
+/**
+ *  @file    Addr.h
+ *
+ *  $Id$
+ *
+ *  @author Douglas C. Schmidt <schmidt@cs.wustl.edu>
+ */
+//=============================================================================
 
-#if !defined (ACE_ADDR_H)
+#ifndef ACE_ADDR_H
 #define ACE_ADDR_H
 
-#include "ace/ACE.h"
+#include /**/ "ace/pre.h"
 
-class ACE_Export ACE_Addr 
+#include "ace/ACE_export.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
+ACE_BEGIN_VERSIONED_NAMESPACE_DECL
+
+/**
+ * @class ACE_Addr
+ *
+ * @brief Defines the base class for the "address family independent"
+ * address format.
+ */
+class ACE_Export ACE_Addr
 {
-  //  = TITLE
-  //     Defines the base class for the "address family independent"
-  //     address format.
 public:
   // = Initialization and termination methods.
+  /// Initializes instance variables.
   ACE_Addr (int type = -1,
             int size = -1);
-  // Initializes instance variables. 
 
+  /// Destructor.
   virtual ~ACE_Addr (void);
-  // Destructor.
 
-  // = Get/set the size of the address. 
+  // = Get/set the size of the address.
 
+  /// Return the size of the address.
   int get_size (void) const;
-  // Return the size of the address.
 
+  /// Sets the size of the address.
   void set_size (int size);
-  // Sets the size of the address. 
 
-  // = Get/set the type of the address. 
+  // = Get/set the type of the address.
 
+  /// Get the type of the address.
   int get_type (void) const;
-  // Get the type of the address. 
 
+  /// Set the type of the address.
   void set_type (int type);
-  // Set the type of the address. 
 
+  /// Return a pointer to the address.
   virtual void *get_addr (void) const;
-  // Return a pointer to the address.
 
-  virtual void set_addr (void *,
-                         int len);
-  // Set a pointer to the address.
+  /// Set a pointer to the address.
+  virtual void set_addr (void *, int len);
 
   // = Equality/inequality tests
-  int operator == (const ACE_Addr &sap) const;
-  // Check for address equality.
+  /// Check for address equality.
+  bool operator == (const ACE_Addr &sap) const;
 
-  int operator != (const ACE_Addr &sap) const;
-  // Check for address inequality.
+  /// Check for address inequality.
+  bool operator != (const ACE_Addr &sap) const;
 
-  void base_set (int type,
-                 int size);
-  // Initializes instance variables.
+  /// Initializes instance variables.
+  void base_set (int type, int size);
 
-#if defined (ACE_HAS_BROKEN_SAP_ANY)
-  static const ACE_Addr &sap_any (void);
-  // Wild-card address.
-
-  // This #define works around broken C++ compilers...
-#define sap_any sap_any()
-#else
+  /// Wild-card address.
   static const ACE_Addr sap_any;
-  // Wild-card address.
-#endif /* ACE_HAS_BROKEN_SAP_ANY */
 
+  /// Returns a hash value.  This should be overwritten by a subclass
+  /// that can produce a better hash value.
+  virtual unsigned long hash (void) const;
+
+  /// Dump the state of an object.
   void dump (void) const;
-  // Dump the state of an object.
 
+  /// Declare the dynamic allocation hooks.
   ACE_ALLOC_HOOK_DECLARE;
-  // Declare the dynamic allocation hooks.
 
 protected:
-  int addr_type_; 
-  // e.g., AF_UNIX, AF_INET, AF_SPIPE, etc.
+  /// e.g., AF_UNIX, AF_INET, AF_SPIPE, etc.
+  int addr_type_;
 
-  int addr_size_; 
-  // Number of bytes in the address.
+  /// Number of bytes in the address.
+  int addr_size_;
 };
 
+ACE_END_VERSIONED_NAMESPACE_DECL
+
 #if defined (__ACE_INLINE__)
-#include "ace/Addr.i"
+#include "ace/Addr.inl"
 #endif /* __ACE_INLINE__ */
+
+#include /**/ "ace/post.h"
 
 #endif /* ACE_ADDR_H */

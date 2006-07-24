@@ -1,57 +1,64 @@
-# $Id$
-# -*- perl -*-
 eval '(exit $?0)' && eval 'exec perl -S $0 ${1+"$@"}'
     & eval 'exec perl -S $0 $argv:q'
     if 0;
 
-$tao_root = $ENV{TAO_ROOT};
-# This is a Perl script that runs the Naming Service, client and servers
+# $Id$
+# -*- perl -*-
 
-unshift @INC, '../../../../bin';
-require Process;
-require Uniqueid;
+use lib '../../../../bin';
+use PerlACE::Run_Test;
 
 # amount of delay between running the servers
 
 $sleeptime = 6;
+$status = 0;
 
 # variables for parameters
 
-$nsport = 20000 + uniqueid ();
-sub name_server
-{
-    my $args = "-ORBnameserviceport $nsport";
-    my $prog = "$tao_root/orbsvcs/Naming_Service/Naming_Service"
-	.$Process::EXE_EXT;
-    print ("\nNaming_Service: $prog$Process::EXE_EXT $args\n");
-    $NS = Process::Create ($prog, $args);
+$nsior = PerlACE::LocalFile ("ns.ior");
+
+unlink $nsior;
+
+$NS = new PerlACE::Process ("../../Naming_Service/Naming_Service", "-o $nsior");
+$SV = new PerlACE::Process ("server", "-ORBInitRef NameService=file://$nsior");
+$CL = new PerlACE::Process ("client", "-ORBInitRef NameService=file://$nsior");
+
+print STDERR "Starting Naming_Service\n";
+$NS->Spawn ();
+
+if (PerlACE::waitforfile_timed ($nsior, 10) == -1) {
+    print STDERR "ERROR: cannot find naming service IOR file\n";
+    $NS->Kill (); 
+    exit 1;
 }
 
+print STDERR "Starting Server\n";
+$SV->Spawn ();
 
-sub server
-{
-    my $args = "-ORBnameserviceport $nsport";
-    print ("\nServer: server$Process::EXE_EXT $args\n");
-    $SV = Process::Create ("server$Process::EXE_EXT", $args);
+sleep $sleeptime;
+
+print STDERR "Starting Client\n";
+
+
+$client = $CL->SpawnWaitKill (60);
+
+if ($client != 0) {
+    print STDERR "ERROR: client returned $client\n";
+    $status = 1;
 }
 
+$server = $SV->TerminateWaitKill (5);
 
-sub client
-{
-    my $args = "-ORBnameserviceport $nsport";
-    print ("\nclient: client $args\n");
-    $CL = Process::Create ("client$Process::EXE_EXT", $args);
+if ($server != 0) {
+    print STDERR "ERROR: server returned $server\n";
+    $status = 1;
 }
 
-name_server ();
-sleep $sleeptime;
+$nserver = $NS->TerminateWaitKill (5);
 
-server ();
-sleep $sleeptime;
+if ($nserver != 0) {
+    print STDERR "ERROR: name server returned $nserver\n";
+    $status = 1;
+}
 
-client ();
-sleep $sleeptime;
-
-$NS->Kill ();
-$SV->Kill ();
-
+exit $status;

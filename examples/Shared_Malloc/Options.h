@@ -1,10 +1,15 @@
 /* -*- C++ -*- */
 // $Id$
 
-#if !defined (_OPTIONS)
+#ifndef _OPTIONS
 #define _OPTIONS
 
-#include "ace/OS.h"
+#include "ace/os_include/os_stddef.h"
+#include "ace/os_include/os_limits.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
 
 class Options
   // = TITLE
@@ -14,11 +19,11 @@ public:
   static Options *instance (void);
   // Return Singleton.
 
-  void parse_args (int argc, char *argv[]);
+  void parse_args (int argc, ACE_TCHAR *argv[]);
   // Parse the arguments.
 
   // = Accessor methods.
-  char *program_name (void);
+  const char *program_name (void);
   const char *slave_name (void);
   int debug (void);
   int exec_slave (void);
@@ -41,10 +46,10 @@ private:
   void print_usage_and_die (void);
   // Explain usage and exit.
 
-  char *program_name_;
+  char program_name_[MAXPATHLEN];
   // Name of the program.
 
-  const char *slave_name_;
+  char slave_name_[MAXPATHLEN];
   // Name of slave process.
 
   int debug_;

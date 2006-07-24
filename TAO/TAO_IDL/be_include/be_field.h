@@ -19,40 +19,35 @@
 //
 // ============================================================================
 
-#if !defined (BE_FIELD_H)
+#ifndef BE_FIELD_H
 #define BE_FIELD_H
 
-/*
- * BE_Field
- */
+#include "be_decl.h"
+#include "ast_field.h"
+
+class be_visitor;
+
 class be_field : public virtual AST_Field,
                  public virtual be_decl
 {
 public:
-  // =Operations
-
   be_field (void);
-  // default constructor
+  // Default constructor.
 
-  be_field (AST_Type *ft, UTL_ScopedName *n, UTL_StrList *p);
-  // constructor
+  be_field (AST_Type *ft,
+            UTL_ScopedName *n,
+            Visibility vis = vis_NA);
+  // Constructor.
 
-  virtual int gen_encapsulation (void);
-  // generate the typecode
-
-  virtual long tc_encap_len (void);
-  // return the total byte length of ourselves represented as an encapsulation
-
-  // Visiting
+  // Visiting.
   virtual int accept (be_visitor *visitor);
+  
+  // Cleanup.
+  virtual void destroy (void);
 
-  // Narrowing
+  // Narrowing.
   DEF_NARROW_METHODS2 (be_field, AST_Field, be_decl);
   DEF_NARROW_FROM_DECL (be_field);
-
-protected:
-  virtual int compute_size_type (void);
-  // compute the size type if it is unknown
 };
 
 #endif

@@ -1,3 +1,5 @@
+#-*- Makefile -*-
+
 #----------------------------------------------------------------------------
 #	$Id$
 #
@@ -11,11 +13,13 @@ TARGETS_LOCAL  = \
 	optimize.local \
 	install.local \
 	deinstall.local \
+	clean_idl_stubs.local \
 	clean.local \
 	realclean.local \
 	clobber.local \
 	depend.local \
-	rcs_info.local
+	rcs_info.local \
+	idl_stubs.local
 
 TARGETS_NESTED   = \
 	$(TARGETS_LOCAL:.local=.nested)

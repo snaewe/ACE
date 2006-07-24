@@ -10,7 +10,7 @@
 //    server_A.h
 //
 // = DESCRIPTION
-//      This class implements a simple server for the 
+//      This class implements a simple server for the
 //      Nested Upcalls - MT Client test
 //
 // = AUTHORS
@@ -18,12 +18,17 @@
 //
 // ============================================================================
 
-#if !defined (MT_CLIENT_TEST_MT_OBJECT_SERVER_H)
+#ifndef MT_CLIENT_TEST_MT_OBJECT_SERVER_H
 #define MT_CLIENT_TEST_MT_OBJECT_SERVER_H
 
 #include "ace/Get_Opt.h"
+
+#if !defined (ACE_LACKS_PRAGMA_ONCE)
+# pragma once
+#endif /* ACE_LACKS_PRAGMA_ONCE */
+
 #include "ace/Log_Msg.h"
-#include "tao/TAO.h"
+#include "tao/Utils/ORB_Manager.h"
 #include "MT_Object_i.h"
 
 class MT_Object_Server
@@ -43,11 +48,11 @@ public:
   // Destructor
 
   int init (int argc,
-            char **argv,
-            CORBA::Environment& env);
+            char **argv
+            ACE_ENV_ARG_DECL);
   // Initialize the NestedUpCalls_Server state - parsing arguments and ...
 
-  int run (CORBA::Environment& env);
+  int run (ACE_ENV_SINGLE_ARG_DECL);
   // Run the orb
 
 private:

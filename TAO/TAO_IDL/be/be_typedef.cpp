@@ -19,164 +19,105 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
+#include "be_typedef.h"
+#include "be_visitor.h"
+#include "ace/Log_Msg.h"
 
-ACE_RCSID(be, be_typedef, "$Id$")
-
+ACE_RCSID (be,
+           be_typedef,
+           "$Id$")
 
 be_typedef::be_typedef (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_Typedef (),
+    be_decl (),
+    be_type ()
 {
 }
 
-be_typedef::be_typedef (AST_Type *bt, UTL_ScopedName *n, UTL_StrList *p)
-  : AST_Typedef (bt, n, p),
-    AST_Decl (AST_Decl::NT_typedef, n, p)
+be_typedef::be_typedef (AST_Type *bt,
+                        UTL_ScopedName *n,
+                        bool local,
+                        bool abstract)
+  : COMMON_Base (bt->is_local () || local,
+                 abstract),
+    AST_Decl (AST_Decl::NT_typedef,
+              n),
+    AST_Type (AST_Decl::NT_typedef,
+              n),
+    AST_Typedef (bt,
+                 n,
+                 bt->is_local () || local,
+                 abstract),
+    be_decl (AST_Decl::NT_typedef,
+             n),
+    be_type (AST_Decl::NT_typedef,
+             n)
 {
+  AST_Type *pbt = this->primitive_base_type ();
+  AST_Decl::NodeType nt = pbt->node_type ();
+
+  if (nt == AST_Decl::NT_sequence)
+    {
+      pbt->anonymous (false);
+    }
 }
 
-// given a typedef node, traverse the chain of base types until they are no
-// more typedefs, and return that most primitive base type
+void
+be_typedef::seen_in_sequence (bool val)
+{
+  this->be_type::seen_in_sequence (val);
+  this->primitive_base_type ()->seen_in_sequence (val);
+}
+
+// Some compilers seems to have a problem with a function
+// that's both virtual and overloaded.
+bool
+be_typedef::seen_in_operation (void) const
+{
+  return this->be_type::seen_in_operation ();
+}
+
+void
+be_typedef::seen_in_operation (bool val)
+{
+  this->be_type::seen_in_operation (val);
+}
+
+// Given a typedef node, traverse the chain of base types until they are no
+// more typedefs, and return that most primitive base type.
 be_type *
 be_typedef::primitive_base_type (void)
 {
-  be_type *d;
+  be_type *d = this;
+  be_typedef *temp = 0;
 
-  d = this;
   while (d && d->node_type () == AST_Decl::NT_typedef)
     {
-      be_typedef *temp; // temporary
-
       temp = be_typedef::narrow_from_decl (d);
       d = be_type::narrow_from_decl (temp->base_type ());
     }
+
   return d;
 }
 
-int
-be_typedef::gen_typecode (void)
+AST_Decl::NodeType
+be_typedef::base_node_type (void) const
 {
-  TAO_OutStream *cs; // output stream
-  TAO_NL  nl;        // end line
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
+  be_typedef *td = const_cast<be_typedef *> (this);
 
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
+  be_type *base = be_type::narrow_from_decl (td->base_type ());
 
-  *cs << "CORBA::tk_alias, // typecode kind for typedefs" << nl;
-  *cs << this->tc_encap_len () << ", // encapsulation length\n";
-  // now emit the encapsulation
-  cs->incr_indent (0);
-  if (this->gen_encapsulation () == -1)
-    {
-      return -1;
-    }
-
-  cs->decr_indent (0);
-  return 0;
-}
-
-// generate encapsulation. A typedef is an alias to its base type
-int
-be_typedef::gen_encapsulation  (void)
-{
-  TAO_OutStream *cs; // output stream
-  TAO_NL  nl;        // end line
-  TAO_CodeGen *cg = TAO_CODEGEN::instance ();
-  long i, arrlen;
-  long *arr;  // an array holding string names converted to array of longs
-  be_type *bt; // base type
-
-  cs = cg->client_stubs ();
-  cs->indent (); // start from whatever indentation level we were at
-
-  *cs << "TAO_ENCAP_BYTE_ORDER, // byte order" << nl;
-  // generate repoID
-  *cs << (ACE_OS::strlen (this->repoID ())+1) << ", ";
-  (void)this->tc_name2long (this->repoID (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
-    {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
-    }
-  *cs << " // repository ID = " << this->repoID () << nl;
-
-  // generate name
-  *cs << (ACE_OS::strlen (this->local_name ()->get_string ())+1) << ", ";
-  (void)this->tc_name2long(this->local_name ()->get_string (), arr, arrlen);
-  for (i=0; i < arrlen; i++)
-    {
-      cs->print ("ACE_NTOHL (0x%x), ", arr[i]);
-    }
-  *cs << " // name = " << this->local_name () << "\n";
-
-  // generate typecode for the base type
-  bt = be_type::narrow_from_decl (this->base_type ());
-  if (!bt || (bt->gen_typecode () == -1))
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-       "be_typedef::gen_encapsulation failed for base type\n"),
-                        -1);
-    }
-  return 0;
-}
-
-long
-be_typedef::tc_size (void)
-{
-  // 4 bytes for enumeration, 4 bytes for storing encap length val, followed by the
-  // actual encapsulation length
-  return 4 + 4 + this->tc_encap_len ();
-}
-
-long
-be_typedef::tc_encap_len (void)
-{
-  if (this->encap_len_ == -1) // not computed yet
-    {
-      be_type *bt; // base type
-      this->encap_len_ = 4;  // holds the byte order flag
-
-      this->encap_len_ += this->repoID_encap_len (); // repoID
-
-      // do the same thing for the local name
-      this->encap_len_ += this->name_encap_len ();
-
-      // add the encapsulation length of our base type
-      bt = be_type::narrow_from_decl (this->base_type ());
-      if (!bt)
-        {
-          ACE_ERROR ((LM_ERROR,
-              "be_typedef::tc_encap_len - bad base type\n"));
-          return 0;
-        }
-      this->encap_len_ += bt->tc_size ();
-
-    }
-  return this->encap_len_;
-}
-
-// compute the size type of the node in question
-int
-be_typedef::compute_size_type (void)
-{
-  be_type *type = be_type::narrow_from_decl (this->base_type ());
-  if (!type)
-    {
-      ACE_ERROR_RETURN ((LM_ERROR,
-                         "(%N:%l) be_typedef::compute_size_type - "
-                         "bad base type\n"), -1);
-    }
-
-  // our size type is the same as our type
-  this->size_type (type->size_type ());
-  return 0;
-}
-
-AST_Decl::NodeType be_typedef::base_node_type (void) const
-{
-  be_type *base = be_type::narrow_from_decl (ACE_const_cast(be_typedef*, this)->base_type ());
   return base->base_node_type ();
+}
+
+void
+be_typedef::destroy (void)
+{
+  this->AST_Typedef::destroy ();
+  this->be_type::destroy ();
 }
 
 int
@@ -185,6 +126,6 @@ be_typedef::accept (be_visitor *visitor)
   return visitor->visit_typedef (this);
 }
 
-// Narrowing
+// Narrowing.
 IMPL_NARROW_METHODS2 (be_typedef, AST_Typedef, be_type)
 IMPL_NARROW_FROM_DECL (be_typedef)

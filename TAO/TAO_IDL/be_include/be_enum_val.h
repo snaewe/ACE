@@ -20,32 +20,30 @@
 //
 // ============================================================================
 
-#if !defined (BE_ENUM_VAL_H)
+#ifndef BE_ENUM_VAL_H
 #define BE_ENUM_VAL_H
 
-/*
- * BE_EnumVal
- */
+#include "be_decl.h"
+#include "ast_enum_val.h"
+
+class be_visitor;
+
 class be_enum_val : public virtual AST_EnumVal,
                     public virtual be_decl
 {
 public:
-  // =Operations
-
   be_enum_val (void);
-  // default constructor
+  // Default constructor.
 
-  be_enum_val (unsigned long v, UTL_ScopedName *n, UTL_StrList *p);
-  // constructor
-
-  virtual int gen_encapsulation (void);
-  // generate the typecode
-
-  virtual long tc_encap_len (void);
-  // return length of encapsulation
+  be_enum_val (unsigned long v,
+               UTL_ScopedName *n);
+  // Constructor.
 
   // Visiting
   virtual int accept (be_visitor *visitor);
+
+  //Cleanup.
+  virtual void destroy (void);
 
   // Narrowing
   DEF_NARROW_METHODS2 (be_enum_val, AST_EnumVal, be_decl);

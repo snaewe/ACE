@@ -14,13 +14,13 @@
  *      T.C. Slattery, USNA
  * Minor improvements, Mike Muuss and Terry Slattery, 16-Oct-85.
  * Modified in 1989 at Silicon Graphics, Inc.
- *      catch SIGPIPE to be able to print stats when receiver has died 
+ *      catch SIGPIPE to be able to print stats when receiver has died
  *      for tcp, don't look for sentinel during reads to allow small transfers
  *      increased default buffer size to 8K, nbuf to 2K to transfer 16MB
  *      moved default port to 5001, beyond IPPORT_USERRESERVED
- *      make sinkmode default because it is more popular, 
- *              -s now means don't sink/source 
- *      count number of read/write system calls to see effects of 
+ *      make sinkmode default because it is more popular,
+ *              -s now means don't sink/source
+ *      count number of read/write system calls to see effects of
  *              blocking from full socket buffers
  *      for tcp, -D option turns off buffered writes (sets TCP_NODELAY sockopt)
  *      buffer alignment options, -A and -O
@@ -46,16 +46,11 @@
 /* #define BSD43 */
 /* #define BSD42 */
 /* #define BSD41a */
-#define SYSV /* required on SGI IRIX releases before 3.3 */
+// #define SYSV /* required on SGI IRIX releases before 3.3 */
 
-#include <ace/SOCK_Connector.h>
-ACE_SOCK_Connector connector_factory;
-
-#include <ace/SOCK_Acceptor.h>
-ACE_SOCK_Acceptor acceptor_factory;
-
-#include <ace/INET_Addr.h>
-ACE_INET_Addr address;
+#include "ace/Log_Msg.h"
+#include "ace/SOCK_Connector.h"
+#include "ace/SOCK_Acceptor.h"
 
 #include <stdio.h>
 #include <signal.h>
@@ -76,11 +71,16 @@ ACE_INET_Addr address;
 #include <sys/un.h>
 #include <unistd.h>
 
+ACE_SOCK_Connector connector_factory;
+ACE_SOCK_Acceptor acceptor_factory;
+ACE_INET_Addr address;
+
 #if defined(SYSV)
 #define bcopy(b1,b2,n)  memcpy(b2,b1,n)
 #define bzero(b1,n)             memset(b1,0,n)
 #include <sys/times.h>
 #include <sys/param.h>
+
 struct rusage
   {
     struct timeval ru_utime, ru_stime;
@@ -91,8 +91,6 @@ struct rusage
 #include <sys/resource.h>
 #endif
 
-ACE_RCSID(ACE_C++, wrapper_new_ttcp, "$Id$")
-
 struct sockaddr_in sinme;
 struct sockaddr_un sunme;
 struct sockaddr_in sinhim;
@@ -102,7 +100,7 @@ struct sockaddr_un fromunix;
 
 struct Session_Control_Message
 {
-  long nbuf_; 
+  long nbuf_;
   // number of buffers that will be sent this round.
   long size_;
   // size of the buffers that will be sent
@@ -140,7 +138,7 @@ int nodelay = 0;		/* set TCP_NODELAY socket option */
 int b_flag = 0;			/* use mread() */
 int sockbufsize = 0;		/* socket buffer size to use */
 char fmt = 'K';			/* output format: k = kilobits, K = kilobytes,
-				 *  m = megabits, M = megabytes, 
+				 *  m = megabits, M = megabytes,
 				 *  g = gigabits, G = gigabytes */
 int touchdata = 0;		/* access data after reading */
 
@@ -182,8 +180,6 @@ void err (char *s);
 void mes (char *s);
 void pattern (register char *cp, register int cnt);
 char *outfmt (double b);
-static void getrusage (int ignored, register struct rusage *ru);
-static void gettimeofday (struct timeval *tp, struct timezone *zp);
 void prep_timer (void);
 double read_timer (char *str, int len);
 static void prusage (register struct rusage *r0, struct rusage *r1, struct timeval *e, struct timeval *b, char *outp);
@@ -196,8 +192,10 @@ int Nread (ACE_SOCK_Stream &s, void *buf, int count);
 int Nwrite (ACE_SOCK_Stream &s, void *buf, int count);
 
 #if !defined (__cplusplus)
-typedef void (*SIG_TYP)(); 
-#endif 
+typedef void (*SIG_TYP)();
+#else
+typedef void (*SIG_TYP)(int);
+#endif
 
 #ifdef SVR4
 void
@@ -209,6 +207,11 @@ sigpipe ()
 {
 }
 
+void sigpipe(int foo)
+{
+   printf("Caught signal %d\n", foo);
+}
+
 char *title = 0;
 int new_line = 0;
 
@@ -216,9 +219,9 @@ int
 main (int argc, char *argv[])
 {
   ACE_SOCK_Stream connection_stream;
-  unsigned long addr_tmp;
   int c;
 
+  printf("HZ = %d\n", HZ);
   if (argc < 2)
     goto usage;
 
@@ -344,8 +347,8 @@ main (int argc, char *argv[])
 	       data_buf_len, nbuf, bufalign, bufoffset, port);
       if (sockbufsize)
 	fprintf (stdout, ", sockbufsize=%d", sockbufsize);
-      fprintf (stdout, "  %s  -> %s\n", 
-	       domain == PF_INET ? (udp ? "udp" : "tcp") : "unix", 
+      fprintf (stdout, "  %s  -> %s\n",
+	       domain == PF_INET ? (udp ? "udp" : "tcp") : "unix",
 	       host == 0 ? domainname : host);
     }
   else // receiver
@@ -360,7 +363,7 @@ main (int argc, char *argv[])
 
   mes ("socket");
 
-  // 
+  //
   // connect and accept
   //
 
@@ -371,12 +374,6 @@ main (int argc, char *argv[])
       /* the transmitter will set options and connect to receiver */
       if (trans)
 	{
-	  if (connector_factory.connect (connection_stream, address) == -1)
-	    perror ("connection failed"), exit (1);
-	  fprintf (stdout,
-		   "ttcp-t: data_buf_len=%d, nbuf=%d, align=%d/%d, port=%d",
-		   data_buf_len, nbuf, bufalign, bufoffset, port);
-
 	  // turn off weird ack things
 	  if (nodelay)
 	    {
@@ -384,11 +381,17 @@ main (int argc, char *argv[])
 
 	      if (p && connection_stream.set_option (p->p_proto,
 						     TCP_NODELAY,
-						     (char *)& one, 
+						     (char *)& one,
 						     sizeof (one)))
 		err ("setsockopt: nodelay");
 	      mes ("nodelay");
 	    }
+	  if (connector_factory.connect (connection_stream, address) == -1)
+	    perror ("connection failed"), exit (1);
+	  fprintf (stdout,
+		   "ttcp-t: data_buf_len=%d, nbuf=%d, align=%d/%d, port=%d",
+		   data_buf_len, nbuf, bufalign, bufoffset, port);
+
 	  if (sockbufsize)
 	    {
 	      if (connection_stream.set_option (SOL_SOCKET,
@@ -406,13 +409,6 @@ main (int argc, char *argv[])
 	  if (acceptor_factory.open (address, 1) == -1)
 	    perror ("acceptor open"), exit (1);
 
-	  ACE_INET_Addr remote_address;
-
-	  if (acceptor_factory.accept (connection_stream, 
-				       (ACE_Addr *) &remote_address) == -1)
-	    perror ("acceptor accept"), exit (1);
-
-	  // set the window size
 	  if (sockbufsize)
 		{
 		  if (connection_stream.set_option (SOL_SOCKET,
@@ -422,6 +418,14 @@ main (int argc, char *argv[])
 		    err ("acceptor_factory.set_option");
 		  mes ("rcvbuf");
 		}
+
+	  ACE_INET_Addr remote_address;
+
+	  if (acceptor_factory.accept (connection_stream,
+				       (ACE_Addr *) &remote_address) == -1)
+	    perror ("acceptor accept"), exit (1);
+
+	  // set the window size
 
 	  fprintf (stderr, "ttcp-r: accept from %s\n", remote_address.get_host_name());
 	}
@@ -461,10 +465,11 @@ main (int argc, char *argv[])
 	      != sizeof ack)
 	    ACE_ERROR_RETURN ((LM_ERROR, "%p recv of ack failed\n",
 			       "ttcp"), -1);
-	  
+
 	  if (ack != data_buf_len)
-	    ACE_DEBUG ((LM_DEBUG, "%received ack for only %d bytes\n", ack));
+	    ACE_DEBUG ((LM_DEBUG, "received ack for only %d bytes\n", ack));
 	}
+        printf("Client finished. \n");
     }
   else
     {
@@ -504,11 +509,12 @@ main (int argc, char *argv[])
 	    ACE_ERROR_RETURN ((LM_ERROR, "%p send ack failed\n",
 			       "ttcp"), -1);
 	}
+        printf("Server finished. \n");
     }
 
-  if (errno)
+  /*  if (errno)
     err ("IO");
-
+    */
   //
   // stop the timer
   //
@@ -650,13 +656,6 @@ getrusage (int ignored, register struct rusage *ru)
   ru->ru_utime.tv_usec = ((buf.tms_utime % HZ) * 1000000) / HZ;
 }
 
-/*ARGSUSED */
-static void
-gettimeofday (struct timeval *tp, struct timezone *zp)
-{
-  tp->tv_sec = time (0);
-  tp->tv_usec = 0;
-}
 #endif /* SYSV */
 /*
  *                    P R E P _ T I M E R
@@ -666,11 +665,15 @@ prep_timer ()
 {
   itime0.it_interval.tv_sec = 0;
   itime0.it_interval.tv_usec = 0;
-  itime0.it_value.tv_sec = LONG_MAX / 22;	/* greatest possible value , itimer() count backwards */
+  //  itime0.it_value.tv_sec = LONG_MAX / 22;	/* greatest possible value , itimer() count backwards */
+  itime0.it_value.tv_sec = 3600;
   itime0.it_value.tv_usec = 0;
 
 
   getrusage (RUSAGE_SELF, &ru0);
+  fprintf(stdout, "\n");
+  fprintf(stdout, "beginning user time = %d sec and %d usec\n", ru0.ru_utime.tv_sec, ru0.ru_utime.tv_usec);
+  fprintf(stdout, "beginning sys time = %d sec and %d usec\n", ru0.ru_stime.tv_sec, ru0.ru_stime.tv_usec);
 
   /* Init REAL Timer */
   if (setitimer (ITIMER_REAL, &itime0, NULL))
@@ -678,12 +681,12 @@ prep_timer ()
       perror ("Setting 'itimer' REAL failed");
       return;
     }
-
+  fprintf(stdout, "Beginning transaction time = %d sec and %d usec\n", itime0.it_value.tv_sec, itime0.it_value.tv_usec);
 }
 
 /*
  *                    R E A D _ T I M E R
- * 
+ *
  */
 double
 read_timer (char *str, int len)
@@ -695,13 +698,16 @@ read_timer (char *str, int len)
   char line[132];
 
   getrusage (RUSAGE_SELF, &ru1);
+  fprintf(stdout, "final user time = %d sec and %d usec\n", ru1.ru_utime.tv_sec, ru1.ru_utime.tv_usec);
+  fprintf(stdout, "final sys time = %d sec and %d usec\n", ru1.ru_stime.tv_sec, ru1.ru_stime.tv_usec);
 
   if (getitimer (ITIMER_REAL, &itimedol))
     {
       perror ("Getting 'itimer' REAL failed");
       return (0.0);
-    }
 
+    }
+  fprintf(stdout, "End transaction time = %d sec and %d usec\n", itimedol.it_value.tv_sec, itimedol.it_value.tv_usec);
   prusage (&ru0, &ru1, &itime0.it_value, &itimedol.it_value, line);
   (void) strncpy (str, line, len);
 
@@ -721,7 +727,7 @@ read_timer (char *str, int len)
 
 static void
 prusage (register struct rusage *r0, struct rusage *r1, 
-	 struct timeval *e, struct timeval *b, char *outp)
+	 struct timeval *b, struct timeval *e,  char *outp)
 {
   struct timeval tdiff;
   register time_t t;
@@ -729,11 +735,11 @@ prusage (register struct rusage *r0, struct rusage *r1,
   register int i;
   int ms;
 
-  t = (r1->ru_utime.tv_sec - r0->ru_utime.tv_sec) * 100 +
-    (r1->ru_utime.tv_usec - r0->ru_utime.tv_usec) / 10000 +
-    (r1->ru_stime.tv_sec - r0->ru_stime.tv_sec) * 100 +
-    (r1->ru_stime.tv_usec - r0->ru_stime.tv_usec) / 10000;
-  ms = (e->tv_sec - b->tv_sec) * 100 + (e->tv_usec - b->tv_usec) / 10000;
+  t = (r1->ru_utime.tv_sec - r0->ru_utime.tv_sec) * 1000 +
+    (r1->ru_utime.tv_usec - r0->ru_utime.tv_usec) / 100000 +
+    (r1->ru_stime.tv_sec - r0->ru_stime.tv_sec) * 1000 +
+    (r1->ru_stime.tv_usec - r0->ru_stime.tv_usec) / 100000;
+  ms = -((e->tv_sec - b->tv_sec) * 1000 + (e->tv_usec - b->tv_usec) / 1000);/* in milliseconds */
 
 #define END(x)  {while(*x) x++;}
 #if defined(SYSV)
@@ -742,7 +748,8 @@ prusage (register struct rusage *r0, struct rusage *r1,
 #if defined(sgi)		/* IRIX 3.3 will show 0 for %M,%F,%R,%C */
   cp = "%Uuser %Ssys %Ereal %P %Mmaxrss %F+%Rpf %Ccsw";
 #else
-  cp = "%Uuser %Ssys %Ereal %P %Xi+%Dd %Mmaxrss %F+%Rpf %Ccsw";
+  cp = "%Uutime %Sstime %Edtime %P cpu occupancy";
+  /*  cp = "%Uuser %Ssys %Ereal %P %Xi+%Dd %Mmaxrss %F+%Rpf %Ccsw";*/
 #endif
 #endif
   for (; *cp; cp++)
@@ -755,23 +762,25 @@ prusage (register struct rusage *r0, struct rusage *r1,
 
 	  case 'U':
 	    tvsub (&tdiff, &r1->ru_utime, &r0->ru_utime);
-	    sprintf (outp, "%d.%01d", tdiff.tv_sec, tdiff.tv_usec / 100000);
+	    /*	    sprintf (outp, "%d.%01d", tdiff.tv_sec, tdiff.tv_usec);*/
+            sprintf (outp, "%f", (tdiff.tv_sec + tdiff.tv_usec/1000000.0));
 	    END (outp);
 	    break;
 
 	  case 'S':
 	    tvsub (&tdiff, &r1->ru_stime, &r0->ru_stime);
-	    sprintf (outp, "%d.%01d", tdiff.tv_sec, tdiff.tv_usec / 100000);
+	    /*	    sprintf (outp, "%d.%01d", tdiff.tv_sec, tdiff.tv_usec);*/
+            sprintf (outp, "%f", (tdiff.tv_sec + tdiff.tv_usec/1000000.0));
 	    END (outp);
 	    break;
 
 	  case 'E':
-	    psecs (ms / 100, outp);
+	    psecs (ms / 1000, outp);
 	    END (outp);
 	    break;
 
 	  case 'P':
-	    sprintf (outp, "%d%%", (int) (t * 100 / ((ms ? ms : 1))));
+	    sprintf (outp, "%f%%",  (t * 100.0 / ((ms ? ms : 1))));
 	    END (outp);
 	    break;
 
@@ -863,21 +872,22 @@ psecs (long l, register char *cp)
   i = l / 3600;
   if (i)
     {
-      sprintf (cp, "%d:", i);
+      sprintf (cp, "%d hours", i);
       END (cp);
       i = l % 3600;
-      sprintf (cp, "%d%d", (i / 60) / 10, (i / 60) % 10);
+      sprintf (cp, "%d minutes ", (i / 60));
+      sprintf (cp, "%d seconds ", (i % 60));
       END (cp);
     }
   else
     {
       i = l;
-      sprintf (cp, "%d", i / 60);
+      sprintf (cp, "%d minutes ", i / 60);
       END (cp);
     }
   i %= 60;
   *cp++ = ':';
-  sprintf (cp, "%d%d", i / 10, i % 10);
+  sprintf (cp, "%d seconds ", i);
 }
 
 /*
@@ -943,3 +953,4 @@ mread (int fd, register char *bufp, unsigned n)
 
   return ((int) count);
 }
+

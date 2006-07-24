@@ -62,84 +62,203 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_sequence.cc - Implementation of class AST_Sequence
- *
- * AST_Sequence nodes represent IDL sequence declarations.
- * AST_Sequence is a subclass of AST_ConcreteType.
- * AST_Sequence nodes have a maximum size (an AST_Expression which
- * must evaluate to a positive integer) and a base type (a subclass
- * of AST_Type).
- */
+// AST_Sequence nodes represent IDL sequence declarations.
+// AST_Sequence is a subclass of AST_ConcreteType.
+// AST_Sequence nodes have a maximum size (an AST_Expression which
+// must evaluate to a positive integer) and a base type (a subclass
+// of AST_Type).
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_sequence.h"
+#include "ast_typedef.h"
+#include "ast_expression.h"
+#include "ast_visitor.h"
+#include "utl_identifier.h"
+#include "global_extern.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_Memory.h"
+#include "ace/OS_NS_string.h"
 
-ACE_RCSID(ast, ast_sequence, "$Id$")
+ACE_RCSID (ast,
+           ast_sequence,
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_Sequence::AST_Sequence()
-	    : pd_max_size(0),
-	      pd_base_type(NULL)
+AST_Sequence::AST_Sequence (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_ConcreteType (),
+    pd_max_size (0),
+    pd_base_type (0),
+    owns_base_type_ (false)
+{
+  // A sequence data type is always VARIABLE.
+  this->size_type (AST_Type::VARIABLE);
+}
+
+AST_Sequence::AST_Sequence (AST_Expression *ms,
+                            AST_Type *bt,
+                            UTL_ScopedName *n,
+                            bool local,
+                            bool abstract)
+  : COMMON_Base (bt->is_local () || local,
+                 abstract),
+    AST_Decl (AST_Decl::NT_sequence,
+              n,
+              true),
+    AST_Type (AST_Decl::NT_sequence,
+              n),
+    AST_ConcreteType (AST_Decl::NT_sequence,
+                      n),
+    pd_max_size (ms),
+    pd_base_type (bt),
+    owns_base_type_ (false)
+{
+  // Check if we are bounded or unbounded. An expression value of 0 means
+  // unbounded.
+  if (ms->ev ()->u.ulval == 0)
+    {
+      this->unbounded_ = true;
+    }
+  else
+    {
+      this->unbounded_ = false;
+    }
+
+  // A sequence data type is always VARIABLE.
+  this->size_type (AST_Type::VARIABLE);
+
+  AST_Decl::NodeType nt = bt->node_type ();
+  
+  if (AST_Decl::NT_array == nt || AST_Decl::NT_sequence == nt)
+    {
+      this->owns_base_type_ = true;
+    }
+}
+
+AST_Sequence::~AST_Sequence (void)
 {
 }
 
-AST_Sequence::AST_Sequence(AST_Expression *ms, AST_Type *bt)
-	    : AST_Decl(AST_Decl::NT_sequence,
-		       new UTL_ScopedName(
-				      new Identifier("sequence",1,0,I_FALSE),
-				      NULL),
-		       NULL),
-	      pd_max_size(ms),
-	      pd_base_type(bt)
+// Public operations.
+
+bool
+AST_Sequence::in_recursion (ACE_Unbounded_Queue<AST_Type *> &list)
 {
+  // We should calculate this only once. If it has already been
+  // done, just return it.
+  if (this->in_recursion_ != -1)
+    {
+      return this->in_recursion_;
+    }
+
+  AST_Type *type = AST_Type::narrow_from_decl (this->base_type ());
+
+  if (!type)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         ACE_TEXT ("(%N:%l) AST_Sequence::")
+                         ACE_TEXT ("in_recursion - ")
+                         ACE_TEXT ("bad base type\n")),
+                        0);
+    }
+
+  if (type->node_type () == AST_Decl::NT_typedef)
+    {
+      AST_Typedef *td = AST_Typedef::narrow_from_decl (type);
+      type = td->primitive_base_type ();
+      AST_Decl::NodeType nt = type->node_type ();
+
+      if (nt != AST_Decl::NT_struct && nt != AST_Decl::NT_union)
+        {
+          return false;
+        }
+    }
+
+  if (this->match_names (type, list))
+    {
+      // They match.
+      this->in_recursion_ = 1;
+      idl_global->recursive_type_seen_ = true;
+    }
+  else
+    {
+      // Check the element type.
+      list.enqueue_tail (type);
+      this->in_recursion_ = type->in_recursion (list);
+
+      if (this->in_recursion_ == 1)
+        {
+          idl_global->recursive_type_seen_ = true;
+        }
+    }
+
+  return this->in_recursion_;
 }
 
-/*
- * Private operations
- */
+// Redefinition of inherited virtual operations.
 
-/*
- * Public operations
- */
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_Sequence node to the ostream o
- */
+// Dump this AST_Sequence node to the ostream o.
 void
-AST_Sequence::dump(ostream &o)
+AST_Sequence::dump (ACE_OSTREAM_TYPE &o)
 {
-  o << "sequence <";
-  pd_base_type->dump(o);
-  o << ", ";
-  pd_max_size->dump(o);
-  o << ">";
+  this->dump_i (o, "sequence <");
+  this->pd_base_type->dump (o);
+  this->dump_i (o, ", ");
+  this->pd_max_size->dump (o);
+  this->dump_i (o, ">");
 }
 
-/*
- * Data accessors
- */
+int
+AST_Sequence::ast_accept (ast_visitor *visitor)
+{
+  return visitor->visit_sequence (this);
+}
+
+// Data accessors.
 
 AST_Expression *
-AST_Sequence::max_size()
+AST_Sequence::max_size (void)
 {
-  return pd_max_size;
+  return this->pd_max_size;
 }
 
 AST_Type *
-AST_Sequence::base_type()
+AST_Sequence::base_type (void) const
 {
-  return pd_base_type;
+  return this->pd_base_type;
 }
 
-// Narrowing
+bool
+AST_Sequence::unbounded (void) const
+{
+  return this->unbounded_;
+}
+
+bool
+AST_Sequence::legal_for_primary_key (void) const
+{
+  return this->base_type ()->legal_for_primary_key ();
+}
+
+void
+AST_Sequence::destroy (void)
+{
+  if (this->owns_base_type_)
+    {
+      this->pd_base_type->destroy ();
+      delete this->pd_base_type;
+      this->pd_base_type = 0;
+    }
+
+  this->pd_max_size->destroy ();
+  delete this->pd_max_size;
+  this->pd_max_size = 0;
+  
+  this->AST_ConcreteType::destroy ();
+}
+
+// Narrowing.
 IMPL_NARROW_METHODS1(AST_Sequence, AST_ConcreteType)
 IMPL_NARROW_FROM_DECL(AST_Sequence)

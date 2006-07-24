@@ -62,86 +62,73 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-// utl_namelist.cc
-//
-// Implementation of a list of scoped names
+// Implementation of a list of scoped names.
 
 // NOTE: This list class only works correctly because we use single public
 //       inheritance, as opposed to multiple inheritance or public virtual.
-//	 It relies on a type-unsafe cast from UTL_List to subclasses, which
-//	 will cease to operate correctly if you use either multiple or
-//	 public virtual inheritance.
-//
-//	 For portability reasons we have decided to provide both this and
-//	 an implementation of the list classes in terms of templates. If
-//	 your compiler supports templates, please use the files in the
-//	 include/utl_tmpl and util/utl_tmpl directories instead of the
-//	 files by the same names in the include and util directories.
+//       It relies on a type-unsafe cast from UTL_List to subclasses, which
+//       will cease to operate correctly if you use either multiple or
+//       public virtual inheritance.
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "utl_namelist.h"
 
-ACE_RCSID(util, utl_namelist, "$Id$")
+ACE_RCSID (util,
+           utl_namelist,
+           "$Id$")
 
-/*
- * Constructor(s)
- */
-
-UTL_NameList::UTL_NameList(UTL_ScopedName *s, UTL_NameList *cdr)
-	    : UTL_List(cdr),
-	      pd_car_data(s)
+UTL_NameList::UTL_NameList (UTL_ScopedName *s,
+                            UTL_NameList *cdr)
+  : UTL_List (cdr),
+    pd_car_data (s),
+    pd_truncatable (false)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Get list item
+// Get list item.
 UTL_ScopedName *
-UTL_NameList::head()
+UTL_NameList::head (void)
 {
-  return pd_car_data;
+  return this->pd_car_data;
 }
 
-/*
- * Redefinition of inherited virtual operations
- */
+bool
+UTL_NameList::truncatable (void) const
+{
+  return this->pd_truncatable;
+}
 
-// UTL_NameList active iterator
+void
+UTL_NameList::truncatable (bool val)
+{
+  this->pd_truncatable = val;
+}
 
-/*
- * Constructor
- */
+void
+UTL_NameList::destroy (void)
+{
+  this->pd_car_data->destroy ();
+  delete this->pd_car_data;
+  this->pd_car_data = 0;
+  
+  this->UTL_List::destroy ();
+}
 
-UTL_NamelistActiveIterator::UTL_NamelistActiveIterator(UTL_NameList *s)
-			    : UTL_ListActiveIterator(s)
+UTL_NamelistActiveIterator::UTL_NamelistActiveIterator (UTL_NameList *s)
+  : UTL_ListActiveIterator(s)
 {
 }
 
-/*
- * Private operations
- */
-
-/*
- * Public operations
- */
-
-// Get current item
+// Get current item.
 UTL_ScopedName *
-UTL_NamelistActiveIterator::item()
+UTL_NamelistActiveIterator::item (void)
 {
-  if (source == NULL)
-    return NULL;
-  return ((UTL_NameList *) source)->head();
+  if (source == 0)
+    {
+      return 0;
+    }
+
+  return ((UTL_NameList *) source)->head ();
 }
 
-/*
- * Redefinition of inherited virtual operations
- */

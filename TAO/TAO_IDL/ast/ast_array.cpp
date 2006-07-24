@@ -62,130 +62,222 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
-/*
- * ast_array.cc - Implementation of class AST_Array
- *
- * AST_Array nodes denote array type and field modifiers.
- * AST_Array nodes have a list of dimensions (a UTL_ExprList)
- * a count of the number of dimensions and a base type (a
- * subtype of AST_ConcreteType. This means that we cannot have
- * arrays of AST_Interfaces???
- */
+// AST_Array nodes denote array type and field modifiers.
+// AST_Array nodes have a list of dimensions (a UTL_ExprList)
+// a count of the number of dimensions and a base type (a
+// subtype of AST_ConcreteType. This means that we cannot have
+// arrays of AST_Interfaces???
 
-#include	"idl.h"
-#include	"idl_extern.h"
+#include "ast_array.h"
+#include "ast_expression.h"
+#include "ast_visitor.h"
+#include "utl_exprlist.h"
+#include "utl_identifier.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_Memory.h"
 
-ACE_RCSID(ast, ast_array, "$Id$")
+ACE_RCSID (ast,
+           ast_array,
+           "$Id$")
 
-/*
- * Constructor(s) and destructor
- */
-AST_Array::AST_Array()
-	 : pd_n_dims(0),
-	   pd_dims(NULL),
-	   pd_base_type(NULL)
+// Constructor(s) and destructor.
+
+AST_Array::AST_Array (void)
+  : COMMON_Base (),
+    AST_Decl (),
+    AST_Type (),
+    AST_ConcreteType (),
+    pd_n_dims (0),
+    pd_dims (0),
+    pd_base_type (0),
+    owns_base_type_ (false)
 {
 }
 
-AST_Array::AST_Array(UTL_ScopedName *n, unsigned long nd, UTL_ExprList *ds)
-	 : AST_Decl(AST_Decl::NT_array, n, NULL),
-	   pd_n_dims(nd), pd_base_type(NULL)
+AST_Array::AST_Array (UTL_ScopedName *n,
+                      unsigned long nd,
+                      UTL_ExprList *ds,
+                      bool local,
+                      bool abstract)
+  : COMMON_Base (local,
+                 abstract),
+    AST_Decl (AST_Decl::NT_array,
+              n,
+              true),
+    AST_Type (AST_Decl::NT_array,
+              n),
+    AST_ConcreteType (AST_Decl::NT_array,
+                      n),
+    pd_n_dims (nd),
+    pd_base_type (0),
+    owns_base_type_ (false)
 {
-  pd_dims = compute_dims(ds, nd);
+  this->pd_dims = this->compute_dims (ds,
+                                      nd);
 }
 
-/*
- * Private operations
- */
+AST_Array::~AST_Array (void)
+{
+}
 
-/*
- * Compute how many dimensions there are and collect their expressions
- * into an array
- */
+// Private operations.
+
+// Compute how many dimensions there are and collect their expressions
+// into an array.
 AST_Expression **
-AST_Array::compute_dims(UTL_ExprList *ds, unsigned long nds)
+AST_Array::compute_dims (UTL_ExprList *ds,
+                         unsigned long nds)
 {
-  AST_Expression	**result;
-  UTL_ExprlistActiveIterator *l;
-  unsigned long		i;
+  if (ds == 0)
+    {
+      return 0;
+    }
 
-  if (ds == NULL)
-    return NULL;
+  AST_Expression **result = 0;
+  ACE_NEW_RETURN (result,
+                  AST_Expression *[nds],
+                  0);
 
-  result = new AST_Expression *[nds];
-  l      = new UTL_ExprlistActiveIterator(ds);
+  UTL_ExprlistActiveIterator iter (ds);
 
-  for (i = 0; !(l->is_done()) && i < nds; l->next(), i++)
-    result[i] = l->item();
-  delete l;
+  for (unsigned long i = 0;
+       !iter.is_done () && i < nds;
+       iter.next (), i++)
+    {
+      AST_Expression *orig = iter.item ();
+      AST_Expression *copy = 0;
+      ACE_NEW_RETURN (copy,
+                      AST_Expression (orig,
+                                      orig->ev ()->et),
+                      0);
+      result[i] = copy;
+    }
+
   return result;
 }
 
-/*
- * Public operations
- */
+// Redefinition of inherited virtual operations.
 
-
-/*
- * Redefinition of inherited virtual operations
- */
-
-/*
- * Dump this AST_Array node to the ostream o
- */
+// Dump this AST_Array node to the ostream o.
 void
-AST_Array::dump(ostream &o)
+AST_Array::dump (ACE_OSTREAM_TYPE &o)
 {
-  unsigned long	i;
+  pd_base_type->dump (o);
 
-  pd_base_type->dump(o);
-  o << " ";
-  local_name()->dump(o);
-  for (i = 0; i < pd_n_dims; i++) {
-    o << "[";
-    pd_dims[i]->dump(o);
-    o << "]";
-  }
+  this->dump_i (o, " ");
+
+  this->local_name ()->dump (o);
+
+  for (unsigned long i = 0; i < this->pd_n_dims; i++)
+    {
+      this->dump_i (o, "[");
+
+      pd_dims[i]->dump (o);
+
+      this->dump_i (o, "]");
+    }
 }
 
-/*
- * Data accessors
- */
-unsigned long
-AST_Array::n_dims()
+int
+AST_Array::ast_accept (ast_visitor *visitor)
 {
-  return pd_n_dims;
+  return visitor->visit_array (this);
+}
+
+// Compute the size type of the node in question.
+int
+AST_Array::compute_size_type (void)
+{
+  AST_Type *type = this->base_type ();
+
+  if (!type)
+    {
+      ACE_ERROR_RETURN ((LM_ERROR,
+                         "(%N:%l) be_array::compute_size_type - "
+                         "bad base type\n"),
+                        -1);
+    }
+
+  // Our size type is the same as our type.
+  this->size_type (type->size_type ());
+
+  this->has_constructor (type->has_constructor ());
+
+  return 0;
+}
+
+// Data accessors.
+unsigned long
+AST_Array::n_dims (void)
+{
+  return this->pd_n_dims;
 }
 
 AST_Expression **
-AST_Array::dims()
+AST_Array::dims (void)
 {
-  return pd_dims;
+  return this->pd_dims;
 }
 
 AST_Type *
-AST_Array::base_type()
+AST_Array::base_type (void) const
 {
-  return pd_base_type;
+  return this->pd_base_type;
 }
 
 void
-AST_Array::set_base_type(AST_Type *nbt)
+AST_Array::set_base_type (AST_Type *nbt)
 {
-  pd_base_type = nbt;
+  this->pd_base_type = nbt;
+
+  this->is_local_ = nbt->is_local ();
+
+  if (AST_Decl::NT_sequence == nbt->node_type ())
+    {
+      this->owns_base_type_ = true;
+    }
+}
+
+bool
+AST_Array::legal_for_primary_key (void) const
+{
+  return this->base_type ()->legal_for_primary_key ();
 }
 
 void
-AST_Array::set_dims(AST_Expression **ds, unsigned long nds)
+AST_Array::destroy (void)
 {
-    pd_dims = ds;
-    pd_n_dims = nds;
+  if (this->owns_base_type_)
+    {
+      this->pd_base_type->destroy ();
+      delete this->pd_base_type;
+      this->pd_base_type = 0;
+    }
+
+  for (unsigned long i = 0; i < this->pd_n_dims; ++i)
+    {
+      this->pd_dims[i]->destroy ();
+      delete this->pd_dims[i];
+      this->pd_dims[i] = 0;
+    }
+    
+  delete [] this->pd_dims;
+  this->pd_dims = 0;
+  this->pd_n_dims = 0;
+  
+  this->AST_ConcreteType::destroy ();
 }
 
-/*
- * Narrowing methods
- */
+void
+AST_Array::set_dims (AST_Expression **ds,
+                     unsigned long nds)
+{
+  this->pd_dims = ds;
+  this->pd_n_dims = nds;
+}
+
+// Narrowing methods.
 IMPL_NARROW_METHODS1(AST_Array, AST_ConcreteType)
 IMPL_NARROW_FROM_DECL(AST_Array)

@@ -19,18 +19,16 @@
 #include "helper.h"
 #include "objref.h"
 
-ACE_RCSID(Param_Test, objref, "$Id$")
+ACE_RCSID (Param_Test,
+           objref, 
+           "$Id$")
 
 // ************************************************************************
 //               Test_ObjRef
 // ************************************************************************
 
 Test_ObjRef::Test_ObjRef (void)
-  : opname_ (CORBA::string_dup ("test_objref")),
-    in_courier (new CORBA::Object_ptr),
-    inout_courier (new CORBA::Object_ptr),
-    out_courier (new CORBA::Object_ptr),
-    ret_courier (new CORBA::Object_ptr)
+  : opname_ (CORBA::string_dup ("test_objref"))
 {
 }
 
@@ -38,17 +36,42 @@ Test_ObjRef::~Test_ObjRef (void)
 {
   CORBA::string_free (this->opname_);
   this->opname_ = 0;
-
-  delete this->in_courier;
-  delete this->inout_courier;
-  delete this->out_courier;
-  delete this->ret_courier;
 }
 
 const char *
 Test_ObjRef::opname (void) const
 {
   return this->opname_;
+}
+
+void
+Test_ObjRef::dii_req_invoke (CORBA::Request *req
+                             ACE_ENV_ARG_DECL)
+{
+  req->add_in_arg ("s1") <<= this->in_.in ();
+  req->add_inout_arg ("s2") <<= this->inout_.in ();
+  req->add_out_arg ("s3") <<= this->out_.in ();
+
+  req->set_return_type (_tc_Coffee);
+
+  req->invoke (ACE_ENV_SINGLE_ARG_PARAMETER);
+  ACE_CHECK;
+
+  Coffee_ptr tmp;
+  req->return_value () >>= tmp;
+  this->ret_ = Coffee::_duplicate (tmp);
+
+  CORBA::NamedValue_ptr o2 =
+    req->arguments ()->item (1 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o2->value () >>= tmp;
+  this->inout_ = Coffee::_duplicate (tmp);
+
+  CORBA::NamedValue_ptr o3 =
+    req->arguments ()->item (2 ACE_ENV_ARG_PARAMETER);
+  ACE_CHECK;
+  *o3->value () >>= tmp;
+  this->out_ = Coffee::_duplicate (tmp);
 }
 
 static const char *Coffee_Flavor [] = {
@@ -61,250 +84,219 @@ static const char *Coffee_Flavor [] = {
 };
 
 int
-Test_ObjRef::init_parameters (Param_Test_ptr objref,
-                              CORBA::Environment &env)
+Test_ObjRef::init_parameters (Param_Test_ptr objref
+                              ACE_ENV_ARG_DECL)
 {
   Coffee::Desc desc;
   Generator *gen = GENERATOR::instance (); // value generator
 
-  // first get a Coffee object
-  this->in_ = objref->make_coffee (env);
-  if (env.exception ())
+  char msg_str[256] = "";
+
+  ACE_TRY
     {
-      env.print_exception ("make_coffee");
-      return -1;
+      ACE_OS::strcpy (msg_str, "make_cofee");
+
+      // first get a Coffee object
+      this->in_ = objref->make_coffee (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      // Get some index into Coffee_Flavor [].
+      CORBA::ULong index = (CORBA::ULong) (gen->gen_long () % 6);
+      desc.name = Coffee_Flavor [index];
+
+      // set the attribute of the object
+      ACE_OS::strcpy (msg_str, "set coffee attribute");
+      this->in_->description (desc ACE_ENV_ARG_PARAMETER); // set the attribute for the in object
+      ACE_TRY_CHECK;
+
+      this->inout_ = Coffee::_nil ();
+      this->out_ = Coffee::_nil ();
+      this->ret_ = Coffee::_nil ();
+
+      return 0;
     }
-
-  // Get some index into Coffee_Flavor [].
-  CORBA::ULong index = (CORBA::ULong) (gen->gen_long () % 6);
-  desc.name = Coffee_Flavor [index];
-  // set the attribute of the object
-  this->in_->description (desc, env); // set the attribute for the in object
-
-  if (env.exception ())
+  ACE_CATCHANY
     {
-      env.print_exception ("set coffee attribute");
-      return -1;
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, msg_str);
     }
-
-  this->inout_ = Coffee::_nil ();
-  this->out_ = Coffee::_nil ();
-  this->ret_ = Coffee::_nil ();
-
-  // DII
-  *this->in_courier = this->in_.in ();
-  *this->inout_courier = this->inout_.in ();
-
-  return 0;
+  ACE_ENDTRY;
+  return -1;
 }
 
 int
 Test_ObjRef::reset_parameters (void)
 {
-  CORBA::Environment env;
+  // Environemnt variable
+  ACE_DECLARE_NEW_CORBA_ENV;
   Coffee::Desc desc;
   Generator *gen = GENERATOR::instance (); // value generator
 
   // Get some index into Coffee_Flavor [].
   CORBA::ULong index = (CORBA::ULong) (gen->gen_long () % 6);
   desc.name = Coffee_Flavor [index];
-  // set the attribute of the object
-  this->in_->description (desc, env); // set the attribute for the in object
 
-  if (env.exception ())
+  ACE_TRY
     {
-      env.print_exception ("set coffee attribute");
+      // set the attribute of the object
+      this->in_->description (desc ACE_ENV_ARG_PARAMETER); // set the attribute for the in object
+      ACE_TRY_CHECK;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "set coffee attribute");
       return -1;
     }
+  ACE_ENDTRY;
 
   this->inout_ = Coffee::_nil ();
   this->out_ = Coffee::_nil ();
   this->ret_ = Coffee::_nil ();
 
-  // DII
-  *this->in_courier = this->in_.in ();
-  *this->inout_courier = this->inout_.in ();
-
   return 0;
 }
 
 int
-Test_ObjRef::run_sii_test (Param_Test_ptr objref,
-                           CORBA::Environment &env)
+Test_ObjRef::run_sii_test (Param_Test_ptr objref
+                           ACE_ENV_ARG_DECL)
 {
-  Coffee_out out (this->out_.out ());
-  this->ret_ = objref->test_objref (this->in_.in (),
-                                    this->inout_.inout (),
-                                    out,
-                                    env);
-  return (env.exception () ? -1:0);
-}
+  ACE_TRY
+    {
+      this->ret_ =
+        objref->test_objref (this->in_.in (),
+                             this->inout_.inout (),
+                             this->out_.out ()
+                             ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
-int
-Test_ObjRef::add_args (CORBA::NVList_ptr param_list,
-		       CORBA::NVList_ptr retval,
-		       CORBA::Environment &env)
-{
-  CORBA::Any in_arg (_tc_Coffee,
-                     this->in_courier,
-                     CORBA::B_FALSE);
+      return 0;
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION,
+                           "Test_ObjRef::run_sii_test\n");
 
-  CORBA::Any inout_arg (_tc_Coffee,
-                        this->inout_courier,
-                        CORBA::B_FALSE);
-
-  CORBA::Any out_arg (_tc_Coffee,
-                      this->out_courier,
-                      CORBA::B_FALSE);
-
-  // Add parameters.
-  param_list->add_value ("o1",
-                         in_arg,
-                         CORBA::ARG_IN,
-                         env);
-
-  param_list->add_value ("o2",
-                         inout_arg,
-                         CORBA::ARG_INOUT,
-                         env);
-
-  param_list->add_value ("o3",
-                         out_arg,
-                         CORBA::ARG_OUT,
-                         env);
-
-  // Add return value.
-  retval->item (0, env)->value ()->replace (_tc_Coffee,
-                                            this->ret_courier,
-                                            CORBA::B_FALSE, // does not own
-                                            env);
-
-  return 0;
+    }
+  ACE_ENDTRY;
+  return -1;
 }
 
 CORBA::Boolean
 Test_ObjRef::check_validity (void)
 {
-  CORBA::Environment env;
+  // Environemnt variable
+  ACE_DECLARE_NEW_CORBA_ENV;
 
-  Coffee::Desc_var in_desc = 
-    this->in_->description (env);
-  if (env.exception ())
+  ACE_TRY
     {
-      env.print_exception ("retrieving description");
+      if (CORBA::is_nil (this->in_.in ())
+          || CORBA::is_nil (this->inout_.in ())
+          || CORBA::is_nil (this->out_.in ())
+          || CORBA::is_nil (this->ret_.in ()))
+        {
+          ACE_ERROR ((LM_ERROR, "Nil object references returned\n"));
+          return 0;
+        }
+      Coffee::Desc_var in_desc =
+        this->in_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      const char *in = in_desc->name.in ();
+
+      Coffee::Desc_var inout_desc =
+        this->inout_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      const char *inout = inout_desc->name.in ();
+
+      Coffee::Desc_var out_desc =
+        this->out_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      const char *out = out_desc->name.in ();
+
+      Coffee::Desc_var ret_desc = this->out_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+      ACE_TRY_CHECK;
+
+      const char* ret = ret_desc->name.in ();
+
+      // now compare them
+      if (!ACE_OS::strcmp (in, inout) &&
+          !ACE_OS::strcmp (in, out) &&
+          !ACE_OS::strcmp (in, ret))
+        return 1; // success
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "Retrieving description");
       return 0;
     }
-  char* in = in_desc->name;
+  ACE_ENDTRY;
 
-  Coffee::Desc_var inout_desc =
-    this->inout_->description (env);
-  if (env.exception ())
-    {
-      env.print_exception ("retrieving description");
-      return 0;
-    }
-  char* inout = inout_desc->name;
-
-  Coffee::Desc_var out_desc =
-    this->out_->description (env);
-  if (env.exception ())
-    {
-      env.print_exception ("retrieving description");
-      return 0;
-    }
-  char* out = out_desc->name;
-
-  Coffee::Desc_var ret_desc =
-    this->out_->description (env);
-  if (env.exception ())
-    {
-      env.print_exception ("retrieving description");
-      return 0;
-    }
-  char* ret = ret_desc->name;
-
-  // now compare them
-  if (!ACE_OS::strcmp (in, inout) &&
-      !ACE_OS::strcmp (in, out) &&
-      !ACE_OS::strcmp (in, ret))
-    return 1; // success
-  else
-    return 0;
+  return 1;
 }
 
 CORBA::Boolean
-Test_ObjRef::check_validity (CORBA::Request_ptr req)
+Test_ObjRef::check_validity (CORBA::Request_ptr)
 {
-  ACE_UNUSED_ARG (req);
-  CORBA::Environment env;
-
-  // Narrow each checked variable into its _var before
-  // calling check_validity().
-
-  this->inout_ = Coffee::_narrow (*this->inout_courier, env);
-  if (env.exception ())
-    {
-      env.print_exception ("_narrow from DII result");
-      return 0;
-    }
-
-  this->out_ = Coffee::_narrow (*this->out_courier, env);
-  if (env.exception ())
-    {
-      env.print_exception ("_narrow from DII result");
-      return 0;
-    }
-
-  this->ret_ = Coffee::_narrow (*this->ret_courier, env);
-  if (env.exception ())
-    {
-      env.print_exception ("_narrow from DII result");
-      return 0;
-    }
-
   return this->check_validity ();
 }
 
 void
 Test_ObjRef::print_values (void)
 {
-  CORBA::Environment env;
+  // Env. variable
+  ACE_DECLARE_NEW_CORBA_ENV;
 
-  Coffee::Desc_var in_desc = 
-    this->in_->description (env);
-  if (env.exception ())
+  Coffee::Desc_var in_desc;
+  Coffee::Desc_var inout_desc;
+  Coffee::Desc_var out_desc;
+  Coffee::Desc_var ret_desc;
+  const char *in = 0;
+  const char *out = 0;
+  const char *inout = 0;
+  const char *ret = 0;
+  ACE_TRY
     {
-      env.print_exception ("retrieving description");
+      if (!CORBA::is_nil (this->in_.in ()))
+        {
+          in_desc =
+            this->in_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          in = in_desc->name.in ();
+        }
+
+      if (!CORBA::is_nil (this->inout_.in ()))
+        {
+          inout_desc =
+            this->inout_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          inout = inout_desc->name.in ();
+        }
+
+      if (!CORBA::is_nil (this->out_.in ()))
+        {
+          out_desc =
+            this->out_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          out = out_desc->name.in ();
+        }
+
+      if (!CORBA::is_nil (this->ret_.in ()))
+        {
+          ret_desc =
+            this->ret_->description (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
+          ret = ret_desc->name.in ();
+        }
+    }
+  ACE_CATCHANY
+    {
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "Retrieving Description");
       return;
     }
-  char* in = in_desc->name;
+  ACE_ENDTRY;
+  ACE_CHECK;
 
-  Coffee::Desc_var inout_desc =
-    this->inout_->description (env);
-  if (env.exception ())
-    {
-      env.print_exception ("retrieving description");
-      return;
-    }
-  char* inout = inout_desc->name;
-
-  Coffee::Desc_var out_desc =
-    this->out_->description (env);
-  if (env.exception ())
-    {
-      env.print_exception ("retrieving description");
-      return;
-    }
-  char* out = out_desc->name;
-
-  Coffee::Desc_var ret_desc =
-    this->out_->description (env);
-  if (env.exception ())
-    {
-      env.print_exception ("retrieving description");
-      return;
-    }
-  char* ret = ret_desc->name;
 
 
   ACE_DEBUG ((LM_DEBUG,
@@ -313,9 +305,9 @@ Test_ObjRef::print_values (void)
               "inout = %s, "
               "out = %s, "
               "ret = %s*=*=*=*=*=\n",
-              in,
-              inout,
-              out,
-              ret));
+              in?in:"ERROR(null string)",
+              inout?inout:"ERROR(null string)",
+              out?out:"ERROR(null string)",
+              ret?ret:"ERROR(null string)"
+              ));
 }
-

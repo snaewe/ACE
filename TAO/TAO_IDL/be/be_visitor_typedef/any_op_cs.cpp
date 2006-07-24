@@ -18,22 +18,18 @@
 //
 // ============================================================================
 
-#include	"idl.h"
-#include	"idl_extern.h"
-#include	"be.h"
-
-#include "be_visitor_typedef.h"
-
-ACE_RCSID(be_visitor_typedef, any_op_cs, "$Id$")
-
+ACE_RCSID (be_visitor_typedef, 
+           any_op_cs, 
+           "$Id$")
 
 // ***************************************************************************
 // Typedef visitor for generating Any operator declarations in the client
 // stubs file
 // ***************************************************************************
 
-be_visitor_typedef_any_op_cs::be_visitor_typedef_any_op_cs
-(be_visitor_context *ctx)
+be_visitor_typedef_any_op_cs::be_visitor_typedef_any_op_cs (
+    be_visitor_context *ctx
+  )
   : be_visitor_typedef (ctx)
 {
 }
@@ -48,7 +44,7 @@ be_visitor_typedef_any_op_cs::visit_typedef (be_typedef *node)
   if (node->cli_stub_any_op_gen () || node->imported ())
     return 0;
 
-  TAO_OutStream *os = tao_cg->client_stubs ();
+  TAO_OutStream *os = this->ctx_->stream ();
 
   // generate the Any <<= and >>= operator declarations
   // Any <<= and >>= operators
@@ -145,9 +141,6 @@ be_visitor_typedef_any_op_cs::visit_typedef (be_typedef *node)
 int
 be_visitor_typedef_any_op_cs::visit_array (be_array *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
@@ -176,9 +169,6 @@ be_visitor_typedef_any_op_cs::visit_array (be_array *node)
 int
 be_visitor_typedef_any_op_cs::visit_enum (be_enum *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
@@ -206,9 +196,6 @@ be_visitor_typedef_any_op_cs::visit_enum (be_enum *node)
 int
 be_visitor_typedef_any_op_cs::visit_sequence (be_sequence *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
@@ -236,9 +223,6 @@ be_visitor_typedef_any_op_cs::visit_sequence (be_sequence *node)
 int
 be_visitor_typedef_any_op_cs::visit_structure (be_structure *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef
@@ -266,9 +250,6 @@ be_visitor_typedef_any_op_cs::visit_structure (be_structure *node)
 int
 be_visitor_typedef_any_op_cs::visit_union (be_union *node)
 {
-  TAO_OutStream *os = this->ctx_->stream (); // output stream
-  be_typedef *tdef = this->ctx_->tdef (); // typedef node
-  be_decl *scope = this->ctx_->scope (); // scope in which it is used
   be_type *bt;
 
   if (this->ctx_->alias ()) // typedef of a typedef

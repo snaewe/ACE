@@ -53,8 +53,8 @@ Technical Data and Computer Software clause at DFARS 252.227-7013 and FAR
 Sun, Sun Microsystems and the Sun logo are trademarks or registered
 trademarks of Sun Microsystems, Inc.
 
-SunSoft, Inc.  
-2550 Garcia Avenue 
+SunSoft, Inc.
+2550 Garcia Avenue
 Mountain View, California  94043
 
 NOTE:
@@ -62,82 +62,141 @@ NOTE:
 SunOS, SunSoft, Sun, Solaris, Sun Microsystems or the Sun logo are
 trademarks or registered trademarks of Sun Microsystems, Inc.
 
- */
+*/
 
 #ifndef _AST_UNION_AST_UNION_HH
 #define _AST_UNION_AST_UNION_HH
 
-// Representation of union declaration:
-//
-// NOTE: add(AST_ConcreteType *) is defined here because a union
+#include "ast_structure.h"
+
+// NOTE: add (AST_ConcreteType *) is defined here because a union
 // can contain locally defined types in addition to fields.
 //
-// NOTE: add(AST_EnumValue *) is defined here because enums can
+// NOTE: add (AST_EnumValue *) is defined here because enums can
 // be defined manifest locally; the constants defined in these
 // enums are inserted in the enclosing scope. It is unlikely that
 // a BE writer will need to overload this function in AST_Union.
 
-/*
-** DEPENDENCIES: ast_concrete_type.hh, utl_scope.hh, ast_union_branch.hh,
-**		 ast_union_label.hh, utl_scoped_name.hh, utl_strlist.hh
-**
-** USE: Included from ast.hh
-*/
-
-class	AST_Union : public virtual AST_Structure
+class TAO_IDL_FE_Export AST_Union : public virtual AST_Structure
 {
 public:
-  // Operations
+  // Operations.
 
-  // Constructor(s)
-  AST_Union();
-  AST_Union(AST_ConcreteType *disc_type, UTL_ScopedName *n, UTL_StrList *p);
-  virtual ~AST_Union() {}
+  // Constructor(s).
+  AST_Union (void);
 
-  // Data Accessors
-  AST_ConcreteType *disc_type();
-  AST_Expression::ExprType udisc_type();
+  AST_Union (AST_ConcreteType *disc_type,
+             UTL_ScopedName *n,
+             bool local,
+             bool abstract);
 
-  // Narrowing
+  // Destructor.
+  virtual ~AST_Union (void);
+
+  // This also calls the base class version.
+  virtual void redefine (AST_Structure *from);
+
+  virtual bool in_recursion (ACE_Unbounded_Queue<AST_Type *> &list);
+  // Are we or the parameter node involved in some kind of recursion?
+
+  // Data Accessors.
+
+  AST_ConcreteType *disc_type (void);
+
+  AST_Expression::ExprType udisc_type (void);
+
+  // Narrowing.
   DEF_NARROW_METHODS1(AST_Union, AST_Structure);
   DEF_NARROW_FROM_DECL(AST_Union);
   DEF_NARROW_FROM_SCOPE(AST_Union);
 
-  // AST Dumping
-  virtual void			dump(ostream &);
+  struct DefaultValue
+  {
+    union PermittedTypes
+    {
+      char char_val;
+      ACE_CDR::WChar wchar_val;
+      bool bool_val;
+      ACE_INT16 short_val;
+      ACE_UINT16 ushort_val;
+      ACE_INT32 long_val;
+      ACE_UINT32 ulong_val;
+      ACE_UINT32 enum_val;
+      // TO-DO - handle (u)longlong types.
+    } u;
+    long computed_;
+    // computed == -1 => error condition
+    //          == 0 => does not exist because all cases have been covered
+    //          == 1 => already computed
+    //          == -2 => initial value
+  };
+
+  int default_value (DefaultValue &);
+  // Get the default value.
+
+  virtual int default_index (void);
+  // Return the default index used.
+
+  // AST Dumping.
+  virtual void dump (ACE_OSTREAM_TYPE &);
+
+  // Visiting.
+  virtual int ast_accept (ast_visitor *visitor);
+
+protected:
+  virtual int compute_size_type (void);
+  // Compute the size type if it is unknown.
 
 private:
-  // Data
-  AST_ConcreteType		*pd_disc_type;	// Discriminator type
-  AST_Expression::ExprType	pd_udisc_type;	// Its expression type
-  /* Convention: udisc_type == EV_any denotes an enum value */
+  // Data.
 
-  // Operations
+  AST_ConcreteType *pd_disc_type;
+  // Discriminator type.
 
-  // Look up a branch by node pointer
-  AST_UnionBranch		*lookup_branch(AST_UnionBranch *branch);
+  AST_Expression::ExprType pd_udisc_type;
+  // Its expression type.
+  // Convention: udisc_type == EV_enum denotes an enum value.
 
-  // Look up the branch with the "default" label
-  AST_UnionBranch		*lookup_default();
+  // Operations.
+
+  // Look up a branch by node pointer.
+  AST_UnionBranch *lookup_branch (AST_UnionBranch *branch);
+
+  // Look up the branch with the "default" label.
+  AST_UnionBranch *lookup_default (void);
 
   // Look up a branch given a branch with a label. This is used to
-  // check for duplicate labels
-  AST_UnionBranch		*lookup_label(AST_UnionBranch *b);
+  // check for duplicate labels.
+  AST_UnionBranch *lookup_label (AST_UnionBranch *b);
 
   // Look up a union branch given an enumerator. This is used to
-  // check for duplicate enum labels
-  AST_UnionBranch		*lookup_enum(AST_UnionBranch *b);
+  // check for duplicate enum labels.
+  AST_UnionBranch *lookup_enum (AST_UnionBranch *b);
 
-private:
-  friend int tao_yyparse();
-  // Scope Management Protocol
+  friend int tao_yyparse (void);
+  // Scope Management Protocol.
 
-  virtual AST_Union		*fe_add_union(AST_Union			*u);
-  virtual AST_UnionBranch	*fe_add_union_branch(AST_UnionBranch	*b);
-  virtual AST_Structure		*fe_add_structure(AST_Structure		*s);
-  virtual AST_Enum		*fe_add_enum(AST_Enum			*e);
-  virtual AST_EnumVal		*fe_add_enum_val(AST_EnumVal		*v);
+  virtual AST_Union *fe_add_union (AST_Union *u);
 
+  virtual AST_UnionBranch *fe_add_union_branch (AST_UnionBranch *b);
+
+  virtual AST_Structure *fe_add_structure (AST_Structure *s);
+
+  virtual AST_Enum *fe_add_enum (AST_Enum *e);
+
+  virtual AST_EnumVal *fe_add_enum_val (AST_EnumVal *v);
+
+  virtual int compute_default_value (void);
+  // Compute the default value (if any).
+
+  int compute_default_index (void);
+  // Count the default index.
+
+  DefaultValue default_value_;
+  // Default value (if any).
+
+  int default_index_;
+  // Default label index (zero based indexing).
 };
 
 #endif           // _AST_UNION_AST_UNION_HH

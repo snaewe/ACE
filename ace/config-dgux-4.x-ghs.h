@@ -4,8 +4,14 @@
 // The following configuration file is designed to work for DG/UX
 // 4.x platforms using the Green Hills Multi C++ compiler.
 
-#if !defined (ACE_CONFIG_H)
+#ifndef ACE_CONFIG_H
 #define ACE_CONFIG_H
+#include /**/ "ace/pre.h"
+
+#define ACE_DGUX
+
+# define ACE_CONFIG_INCLUDE_GHS_COMMON
+# include "ace/config-ghs-common.h"
 
 // Static objects do not get initialized correctly, so this is needed.
 #define ACE_HAS_NONSTATIC_OBJECT_MANAGER
@@ -18,7 +24,7 @@
 #define ACE_LACKS_STRCASECMP
 
 // Platform supports System V IPC (most versions of UNIX, but not Win32)
-#define ACE_HAS_SYSV_IPC			
+#define ACE_HAS_SYSV_IPC
 
 #define ACE_HAS_CONSISTENT_SIGNAL_PROTOTYPES
 
@@ -34,8 +40,8 @@
 // Platform supports reentrant functions (i.e., all the POSIX *_r functions).
 //#define ACE_HAS_REENTRANT_FUNCTIONS
 
-// Platform has terminal ioctl flags like TCGETS and TCSETS.
-#define ACE_HAS_TERM_IOCTLS
+// Platform has POSIX terminal interface.
+#define ACE_HAS_TERMIOS
 
 // Compiler/platform correctly calls init()/fini() for shared libraries.
 #define ACE_HAS_AUTOMATIC_INIT_FINI
@@ -52,21 +58,14 @@
 // Platform supports IP multicast
 #define ACE_HAS_IP_MULTICAST
 
-// Compiler/platform does not support the "long long" datatype.
-#define ACE_LACKS_LONGLONG_T
-
 // Green Hills doesn't give a preprocessor symbol for long double
 #define ACE_SIZEOF_LONG_DOUBLE 8
-
-// Sockets may be called in multi-threaded programs.
-#define ACE_HAS_MT_SAFE_SOCKETS
 
 // Platform contains <poll.h>.
 #define ACE_HAS_POLL
 
 // Platform supports POSIX timers via timestruc_t.
 #define ACE_HAS_POSIX_TIME
-#define ACE_HAS_SVR4_TIME
 
 // Platform supports the /proc file system.
 #define ACE_HAS_PROC_FS
@@ -82,7 +81,7 @@
 #define ACE_HAS_SIGINFO_T
 
 // Compiler/platform provides the sockio.h file.
-#define ACE_HAS_SOCKIO_H
+#define ACE_HAS_SYS_SOCKIO_H
 
 // Compiler supports the ssize_t typedef.
 #define ACE_HAS_SSIZE_T
@@ -131,7 +130,7 @@
 /* Turn off the following four defines if you want to disable threading. */
 // Compile using multi-thread libraries.
 #if !defined (ACE_MT_SAFE)
-#define ACE_MT_SAFE 1
+# define ACE_MT_SAFE 1
 #endif
 
 // Platform supports threads.
@@ -146,14 +145,13 @@
 #define ACE_HAS_PTHREADS_STD
 #define _POSIX4_DRAFT_SOURCE
 // Well, here are some from the standard they don't have...
-#define ACE_LACKS_KEYDELETE
 #define ACE_LACKS_PTHREAD_THR_SIGSETMASK
 #define ACE_HAS_SIGWAIT
 #define ACE_LACKS_CONDATTR_PSHARED
 #define ACE_LACKS_THREAD_PROCESS_SCOPING
 // The default thread stacksize on DG/UX 4.x is 4096.  This needs to be bumped
 // up to do anything real in ACE.
-#define ACE_NEEDS_HUGE_THREAD_STACKSIZE 65536 
+#define ACE_NEEDS_HUGE_THREAD_STACKSIZE 65536
 
 // Need to #include <sched.h>
 #define ACE_NEEDS_SCHED_H
@@ -180,29 +178,15 @@
 // Platform doesn't have timespec_t data type.
 #define ACE_LACKS_TIMESPEC_T
 
-// Platform doesn't correctly support signed char
-#define ACE_LACKS_SIGNED_CHAR
-
-// Platform doesn't have streambuf linebuffered()
-#define ACE_LACKS_ACE_IOSTREAM
-#define ACE_LACKS_LINEBUFFERED_STREAMBUF
-
 // Use the poll() event demultiplexor rather than select().
 //#define ACE_USE_POLL
-
-// Turns off the tracing feature.
-#if !defined (ACE_NTRACE)
-#define ACE_NTRACE 1
-#endif /* ACE_NTRACE */
 
 // Defines the page size of the system.
 #define ACE_PAGE_SIZE 4096
 
-#define ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA
 #define ACE_TEMPLATES_REQUIRE_SOURCE
 
 #define ACE_HAS_UCONTEXT_T
-#define ACE_NEEDS_SYSTIME_H
 #define ACE_HAS_NONCONST_GETBY
 #define ACE_LACKS_MADVISE
 
@@ -211,7 +195,7 @@
 #endif
 
 #if !defined (IP_DROP_MEMBERSHIP)
-#define IP_DROP_MEMBERSHIP 0x14
+# define IP_DROP_MEMBERSHIP 0x14
 #endif
 
 // Header files lack t_errno for ACE_TLI.
@@ -220,5 +204,5 @@
 // Optimize ACE_Handle_Set for select().
 #define ACE_HAS_HANDLE_SET_OPTIMIZED_FOR_SELECT
 
-#define ACE_DGUX
+#include /**/ "ace/post.h"
 #endif /* ACE_CONFIG_H */

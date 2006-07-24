@@ -1,5 +1,6 @@
 // $Id$
 
+#include "ace/OS_NS_string.h"
 #include "Event_Analyzer.h"
 
 ACE_RCSID(UPIPE_Event_Server, Event_Analyzer, "$Id$")
@@ -46,7 +47,7 @@ Event_Analyzer::put (ACE_Message_Block *mb, ACE_Time_Value *)
 }
 
 int 
-Event_Analyzer::init (int, char *[])
+Event_Analyzer::init (int, ACE_TCHAR *[])
 {
   return 0;
 }
@@ -58,9 +59,9 @@ Event_Analyzer::fini (void)
 }
 
 int 
-Event_Analyzer::info (char **strp, size_t length) const
+Event_Analyzer::info (ACE_TCHAR **strp, size_t length) const
 {
-  const char *mod_name = this->name ();
+  const ACE_TCHAR *mod_name = this->name ();
   
   if (*strp == 0 && (*strp = ACE_OS::strdup (mod_name)) == 0)
     return -1;

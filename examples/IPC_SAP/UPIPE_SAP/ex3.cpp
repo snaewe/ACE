@@ -18,9 +18,11 @@
 //
 // ============================================================================
 
+#include "ace/OS_main.h"
 #include "ace/UPIPE_Connector.h"
 #include "ace/UPIPE_Acceptor.h"
 #include "ace/Auto_Ptr.h"
+#include "ace/OS_NS_time.h"
 
 ACE_RCSID(UPIPE_SAP, ex3, "$Id$")
 
@@ -34,7 +36,7 @@ static void *
 supplier (void *)
 {
   ACE_UPIPE_Stream s_stream;
-  ACE_UPIPE_Addr c_addr ("pattern");
+  ACE_UPIPE_Addr c_addr (ACE_TEXT("pattern"));
 
   ACE_UPIPE_Connector con;
 
@@ -46,7 +48,7 @@ supplier (void *)
                 "(%t) %p\n",
                 "ACE_UPIPE_Acceptor.connect failed"));
 
-  ACE_Auto_Basic_Array_Ptr <char> mybuf = new char[size];
+  ACE_Auto_Basic_Array_Ptr<char> mybuf (new char[size]);
 
   for (int i = 0; i < size; i++)
     mybuf[i] = 'a';
@@ -71,7 +73,7 @@ static void *
 consumer (void *)
 {
   ACE_UPIPE_Stream c_stream;
-  ACE_UPIPE_Addr serv_addr ("pattern");
+  ACE_UPIPE_Addr serv_addr (ACE_TEXT("pattern"));
 
   // Accept will wait up to 4 seconds
   ACE_UPIPE_Acceptor acc (serv_addr);
@@ -95,7 +97,7 @@ consumer (void *)
                 "ACE_UPIPE_Acceptor.accept failed"));
 
   // Ensure deletion upon exit.
-  ACE_Auto_Basic_Array_Ptr <char> mybuf = new char[size];
+  ACE_Auto_Basic_Array_Ptr<char> mybuf (new char[size]);
   time_t currsec;
 
   ACE_OS::time (&currsec);
@@ -129,7 +131,7 @@ consumer (void *)
 }
 
 int
-main (int argc, ASYS_TCHAR *argv[])
+ACE_TMAIN (int argc, ACE_TCHAR *argv[])
 {
   size = argc > 1 ? ACE_OS::atoi (argv[1]) : 32;
   iterations = argc > 2 ? ACE_OS::atoi (argv[2]) : 16;
@@ -148,7 +150,7 @@ main (int argc, ASYS_TCHAR *argv[])
 }
 #else
 int
-main (int, ASYS_TCHAR *[])
+ACE_TMAIN (int, ACE_TCHAR *[])
 {
   ACE_ERROR_RETURN ((LM_ERROR,
                      "threads not supported on this platform\n"),

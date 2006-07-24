@@ -17,9 +17,18 @@
 //
 // ============================================================================
 
-#include "tao/corba.h"
+#include "tao/AnyTypeCode/TypeCode.h"
+#include "tao/AnyTypeCode/TypeCode_Constants.h"
+#include "tao/ORB.h"
+#include "tao/SystemException.h"
+#include "tao/debug.h"
 
-ACE_RCSID(CDR, tc, "$Id$")
+#include "ace/Log_Msg.h"
+
+
+ACE_RCSID (CDR,
+           tc,
+           "$Id$")
 
 // In this version of TAO typecodes are based on CDR, we have to
 // verify that CDR offers the services needed for Typecode...
@@ -27,13 +36,13 @@ ACE_RCSID(CDR, tc, "$Id$")
 int
 main (int argc, char *argv[])
 {
-  TAO_TRY
+  ACE_TRY_NEW_ENV
     {
       CORBA::ORB_var orb = CORBA::ORB_init (argc,
                                             argv,
-                                            0,
-					    TAO_TRY_ENV);
-      TAO_CHECK_ENV;
+                                            0
+                                            ACE_ENV_ARG_PARAMETER);
+      ACE_TRY_CHECK;
 
       static const CORBA::TypeCode_ptr tcs[]=
       {
@@ -91,8 +100,8 @@ main (int argc, char *argv[])
         CORBA::_tc_BAD_CONTEXT,
         CORBA::_tc_OBJ_ADAPTER,
         CORBA::_tc_DATA_CONVERSION,
-        CORBA::_tc_Bounds,
-        CORBA::_tc_BadKind
+        CORBA::TypeCode::_tc_Bounds,
+        CORBA::TypeCode::_tc_BadKind
       };
 
       static int n = sizeof (tcs) / sizeof (tcs[0]);
@@ -100,56 +109,63 @@ main (int argc, char *argv[])
       for (const CORBA::TypeCode_ptr *i = tcs;
            i != tcs + n;
            ++i)
-	{
-	  CORBA::TypeCode_ptr tc = *i;
+        {
+          CORBA::TypeCode_ptr tc = *i;
 
-	  CORBA::TCKind k = tc->kind (TAO_TRY_ENV);
-	  TAO_CHECK_ENV;
+          CORBA::TCKind k = tc->kind (ACE_ENV_SINGLE_ARG_PARAMETER);
+          ACE_TRY_CHECK;
 
-	  switch (k)
-	    {
-	    case CORBA::tk_objref:
-	    case CORBA::tk_struct:
-	    case CORBA::tk_union:
-	    case CORBA::tk_enum:
-	    case CORBA::tk_alias:
-	    case CORBA::tk_except:
-	      {
-		const char *id = tc->id (TAO_TRY_ENV);
-		TAO_CHECK_ENV;
+          switch (k)
+            {
+            case CORBA::tk_objref:
+            case CORBA::tk_struct:
+            case CORBA::tk_union:
+            case CORBA::tk_enum:
+            case CORBA::tk_alias:
+            case CORBA::tk_except:
+              {
+                const char *id = tc->id (ACE_ENV_SINGLE_ARG_PARAMETER);
+                ACE_TRY_CHECK;
 
-		const char *name = tc->name (TAO_TRY_ENV);
-		TAO_CHECK_ENV;
+                const char *name = tc->name (ACE_ENV_SINGLE_ARG_PARAMETER);
+                ACE_TRY_CHECK;
 
-		CORBA::ULong length = 0;
+                CORBA::ULong length = 0;
                 // tc->length (TAO_TRY_ENV);
-		TAO_CHECK_ENV;
+                // ACE_TRY_CHECK;
 
-		ACE_DEBUG ((LM_DEBUG,
-			    "ID = '%s'\n"
-			    "%{%{ NAME = %s%$"
-			    " KIND = %d%$"
-			    " LENGTH = %d"
-			    "%}%}\n",
-			    (id?id:"empty ID"),
-                            (name?name:"empty name"),
-                            k,
-                            length));
+                if (TAO_debug_level > 0)
+                  {
+                    ACE_DEBUG ((LM_DEBUG,
+                                "ID = '%s'\n"
+                                "%{%{ NAME = %s%$"
+                                " KIND = %d%$"
+                                " LENGTH = %d"
+                                "%}%}\n",
+                                (id?id:"empty ID"),
+                                (name?name:"empty name"),
+                                k,
+                                length));
+                  }
                 break;
-	      }
-	    default:
-              ACE_DEBUG ((LM_DEBUG,
-                          "basic type: %d\n",
-                          k));
+              }
+            default:
+              if (TAO_debug_level > 0)
+                {
+                  ACE_DEBUG ((LM_DEBUG,
+                              "basic type: %d\n",
+                              k));
+                }
               break;
-	    }
-	}
+            }
+        }
     }
-  TAO_CATCHANY
+  ACE_CATCHANY
     {
-      TAO_TRY_ENV.print_exception ("TC");
+      ACE_PRINT_EXCEPTION (ACE_ANY_EXCEPTION, "TC");
+      return 1;
     }
-  TAO_ENDTRY;
+  ACE_ENDTRY;
 
   return 0;
 }

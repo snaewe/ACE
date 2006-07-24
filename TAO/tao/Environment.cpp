@@ -1,47 +1,61 @@
-// $Id$
+#include "tao/Environment.h"
+#include "tao/ORB_Core.h"
+#include "tao/SystemException.h"
+#include "tao/default_environment.h"
 
-#include "tao/corba.h"
+#include "ace/OS_NS_string.h"
 
 #if !defined (__ACE_INLINE__)
 # include "tao/Environment.i"
 #endif /* __ACE_INLINE__ */
 
-ACE_RCSID(tao, Environment, "$Id$")
 
-CORBA_Environment::CORBA_Environment (void)
-  : exception_ (0),
-    previous_ (TAO_ORB_Core_instance ()->default_environment ())
+ACE_RCSID (tao,
+           Environment,
+           "$Id$")
+
+
+TAO_BEGIN_VERSIONED_NAMESPACE_DECL
+
+CORBA::Environment::Environment (void)
+  : exception_ (0)
+  , previous_ (0)
 {
-  TAO_ORB_Core_instance ()->default_environment (this);
 }
 
-CORBA_Environment::CORBA_Environment (TAO_ORB_Core* orb_core)
-  : exception_ (0),
-    previous_ (orb_core->default_environment ())
+CORBA::Environment::Environment (const CORBA::Environment& rhs)
+  : exception_ (0)
+  , previous_ (0)
+{
+  if (rhs.exception_)
+    this->exception_ = rhs.exception_->_tao_duplicate ();
+}
+
+CORBA::Environment::Environment (TAO_ORB_Core* orb_core)
+  : exception_ (0)
+  , previous_ (orb_core->default_environment ())
 {
   orb_core->default_environment (this);
 }
 
-CORBA_Environment::CORBA_Environment (const CORBA_Environment& rhs)
-  : exception_ (rhs.exception_),
-    previous_ (TAO_ORB_Core_instance ()->default_environment ())
+CORBA::Environment&
+CORBA::Environment::operator= (const CORBA::Environment& rhs)
 {
-  TAO_ORB_Core_instance ()->default_environment (this);
-  exception_->_incr_refcnt ();
-}
-
-CORBA_Environment&
-CORBA_Environment::operator= (const CORBA_Environment& rhs)
-{
-  if (this != &rhs)
-    {
-      this->clear ();
-      this->exception (rhs.exception_);
-    }
+  CORBA::Environment tmp (rhs);
+  {
+    CORBA::Exception *tmp_ex = this->exception_;
+    this->exception_ = tmp.exception_;
+    tmp.exception_ = tmp_ex;
+  }
+  {
+    CORBA::Environment *tmp_env = this->previous_;
+    this->previous_ = rhs.previous_;
+    tmp.previous_ = tmp_env;
+  }
   return *this;
 }
 
-CORBA_Environment::~CORBA_Environment (void)
+CORBA::Environment::~Environment (void)
 {
   this->clear ();
 
@@ -53,32 +67,64 @@ CORBA_Environment::~CORBA_Environment (void)
 }
 
 void
-CORBA_Environment::exception (CORBA_Exception *ex)
+CORBA::Environment::exception (CORBA::Exception *ex)
 {
+  // @@ This does not look right, setting the exception to the
+  //    contained exception is a bug,  the application is only
+  //    supposed to pass in a pointer to an exception that it (the
+  //    application) owns, however, if we contain the exception then
+  //    *WE* own it.
+  //    Normally I (coryan) would remove code like this, but I feel
+  //    that it is a typical example of defensive programming for the
+  //    *BAD*, i.e. we are not helping the application to get better
+  //    and only making the ORB bigger and slower.
+#if 0
   if (ex != this->exception_)
     {
       this->clear ();
-      this->exception_ = ex;
-      this->exception_->_incr_refcnt ();
     }
-#if defined (TAO_USE_EXCEPTIONS)
-  ex->_raise ();
-#endif /* TAO_USE_EXCEPTIONS */
+#else
+  ACE_ASSERT (ex != this->exception_);
+  this->clear ();
+#endif /* 0 */
+
+  this->exception_ = ex;
+
+#if defined (TAO_HAS_EXCEPTIONS)
+  if (this->exception_ != 0)
+    this->exception_->_raise ();
+#endif /* TAO_HAS_EXCEPTIONS */
 }
 
 void
-CORBA_Environment::clear (void)
+CORBA::Environment::clear (void)
 {
-  if (this->exception_)
-    this->exception_->_decr_refcnt ();
-
+  delete this->exception_;
   this->exception_ = 0;
 }
 
-CORBA_Environment&
-CORBA_Environment::default_environment ()
+CORBA::Environment&
+CORBA::Environment::default_environment ()
 {
-  return *TAO_ORB_Core_instance ()->default_environment ();
+#if defined (TAO_HAS_EXCEPTIONS)
+  //
+  // If we are using native C++ exceptions the user is *not* supposed
+  // to clear the environment every time she calls into TAO.  In fact
+  // the user is not supposed to use the environment at all!
+  //
+  // But TAO is using the default environment internally, thus
+  // somebody has to clear it. Since TAO passes the environment around
+  // this function should only be called when going from the user code
+  // into TAO's code.
+  //
+  // This is not an issue when using the alternative C++ mapping (with
+  // the Environment argument) because then the user is supposed to
+  // clear the environment before calling into the ORB.
+  //
+  TAO_ORB_Core_instance ()->default_environment ()->clear ();
+#endif /* TAO_HAS_EXCEPTIONS */
+
+  return TAO_default_environment ();;
 }
 
 // Convenience -- say if the exception is a system exception or not.
@@ -86,26 +132,48 @@ CORBA_Environment::default_environment ()
 int
 CORBA::Environment::exception_type (void) const
 {
+  // @@ Carlos, is this stuff that's properly "transformed" for EBCDIC
+  //    platforms?!
+  // @@ Doug: Yes, they are used to compare against the _id() of the
+  //    exception, which should have been mappend to the native
+  //    codeset.  Notice the "should" we haven't tried that stuff yet,
+  //    and i find it hard to keep track of all the transformations
+  //    going on, specially for the TypeCodes that are generated by
+  //    the IDL compiler vs. the ones hard-coded in
+  //    $TAO_ROOT/tao/Typecode_Constants.cpp
+
   static char sysex_prefix [] = "IDL:omg.org/CORBA/";
   static char typecode_extra [] = "TypeCode/";
-  static char poa_prefix [] = "IDL:PortableServer/";
 
   if (!this->exception_)
-    return CORBA::NO_EXCEPTION;
+    {
+      return CORBA::NO_EXCEPTION;
+    }
 
-  // All exceptions currently (CORBA 2.0) defined in the CORBA
-  // scope are system exceptions ... except for a couple that
-  // are related to TypeCodes.
+  // All exceptions currently (CORBA 2.0) defined in the CORBA scope
+  // are system exceptions ... except for a couple that are related to
+  // TypeCodes.
 
-  const char *id = this->exception_->_id ();
+  const char *id = this->exception_->_rep_id ();
 
-  if ((ACE_OS::strncmp (id, sysex_prefix, sizeof sysex_prefix - 1) == 0
+  if ((ACE_OS::strncmp (id,
+                        sysex_prefix,
+                        sizeof sysex_prefix - 1) == 0
        && ACE_OS::strncmp (id + sizeof sysex_prefix - 1,
-                           typecode_extra, sizeof typecode_extra - 1) != 0)
-      || ACE_OS::strncmp (id, poa_prefix, sizeof poa_prefix - 1) == 0)
+                           typecode_extra,
+                           sizeof typecode_extra - 1) != 0))
     return CORBA::SYSTEM_EXCEPTION;
-  
-  return CORBA::USER_EXCEPTION;
+  else
+    return CORBA::USER_EXCEPTION;
+}
+
+const char*
+CORBA::Environment::exception_id (void) const
+{
+  if (this->exception_ == 0)
+    return 0;
+
+  return this->exception_->_rep_id ();
 }
 
 // Diagnostic utility routine: describe the exception onto the
@@ -115,40 +183,30 @@ void
 CORBA::Environment::print_exception (const char *info,
                                      FILE *) const
 {
-  const char *id = this->exception_->_id ();
-
-  ACE_DEBUG ((LM_ERROR, "(%P|%t) EXCEPTION, %s\n", info));
-
-  // @@ get rid of this logic, and rely on some member function on
-  // Exception to say if it's user or system exception.
-
-  if (this->exception_type () == CORBA::SYSTEM_EXCEPTION)
+  if (this->exception_)
     {
+      const char *id = this->exception_->_rep_id ();
+
+      ACE_DEBUG ((LM_ERROR,
+                  ACE_TEXT ("TAO: (%P|%t) EXCEPTION, %s\n"),
+                  ACE_TEXT_CHAR_TO_TCHAR (info)));
+
       CORBA::SystemException *x2 =
-	CORBA_SystemException::_narrow (this->exception_);
+        CORBA::SystemException::_downcast (this->exception_);
 
-      // @@ there are a other few "user exceptions" in the CORBA
-      // scope, they're not all standard/system exceptions ... really
-      // need to either compare exhaustively against all those IDs
-      // (yeech) or (preferably) to represent the exception type
-      // directly in the exception value so it can be queried.
+      if (x2 != 0)
+        x2->_tao_print_system_exception ();
+      else
+        // @@ we can use the exception's typecode to dump all the data
+        // held within it ...
 
-      ACE_DEBUG ((LM_ERROR,
-                  "(%P|%t) system exception, ID '%s'\n",
-                  id));
-      ACE_DEBUG ((LM_ERROR,
-                  "(%P|%t) minor code = %x, completed = %s\n",
-                  x2->minor (),
-                  (x2->completion () == CORBA::COMPLETED_YES) ? "YES" :
-                  (x2->completion () == CORBA::COMPLETED_NO) ? "NO" :
-                  (x2->completion () == CORBA::COMPLETED_MAYBE) ? "MAYBE" :
-                  "garbage"));
+        ACE_DEBUG ((LM_ERROR,
+                    ACE_TEXT ("TAO: (%P|%t) user exception, ID '%s'\n"),
+                    ACE_TEXT_CHAR_TO_TCHAR (id)));
     }
   else
-    // @@ we can use the exception's typecode to dump all the data
-    // held within it ...
-
     ACE_DEBUG ((LM_ERROR,
-                "(%P|%t) user exception, ID '%s'\n",
-                id));
+                ACE_TEXT ("TAO: (%P|%t) no exception, %s\n"), ACE_TEXT_CHAR_TO_TCHAR (info)));
 }
+
+TAO_END_VERSIONED_NAMESPACE_DECL

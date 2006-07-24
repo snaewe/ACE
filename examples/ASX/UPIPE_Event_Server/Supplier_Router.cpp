@@ -1,5 +1,7 @@
 // $Id$
 
+#include "ace/OS_NS_stdio.h"
+#include "ace/OS_NS_string.h"
 #include "Options.h"
 #include "Supplier_Router.h"
 
@@ -56,10 +58,10 @@ int
 Supplier_Router::open (void *)
 {
   ACE_ASSERT (this->is_writer ());
-  char *argv[3];
+  ACE_TCHAR *argv[3];
 
-  argv[0] = (char *) this->name ();
-  argv[1] = options.supplier_file ();
+  argv[0] = (ACE_TCHAR *)this->name ();
+  argv[1] = (ACE_TCHAR *)options.supplier_file ();
   argv[2] = 0;
 
   if (this->init (1, &argv[1]) == -1)
@@ -105,19 +107,25 @@ Supplier_Router::put (ACE_Message_Block *mb, ACE_Time_Value *)
 // Return information about the Supplier_Router ACE_Module..
 
 int
-Supplier_Router::info (char **strp, size_t length) const
+Supplier_Router::info (ACE_TCHAR **strp, size_t length) const
 {
-  char       buf[BUFSIZ];
+  ACE_TCHAR       buf[BUFSIZ];
   ACE_UPIPE_Addr  addr;
-  const char *mod_name = this->name ();
+  const ACE_TCHAR *mod_name = this->name ();
   ACE_UPIPE_Acceptor &sa = (ACE_UPIPE_Acceptor &) *this->acceptor_;
 
   if (sa.get_local_addr (addr) == -1)
     return -1;
 
-  ACE_OS::sprintf (buf, "%s\t %s/ %s",
-	     mod_name,  "upipe",
-	     "# supplier router\n");
+#if !defined (ACE_WIN32) && defined (ACE_USES_WCHAR)
+# define FMTSTR ACE_TEXT ("%ls\t %ls/ %ls")
+#else
+# define FMTSTR ACE_TEXT ("%s\t %s/ %s")
+#endif
+
+  ACE_OS::sprintf (buf, FMTSTR,
+                   mod_name, ACE_TEXT ("upipe"),
+                   ACE_TEXT ("# supplier router\n"));
 
   if (*strp == 0 && (*strp = ACE_OS::strdup (mod_name)) == 0)
     return -1;
@@ -125,36 +133,5 @@ Supplier_Router::info (char **strp, size_t length) const
     ACE_OS::strncpy (*strp, mod_name, length);
   return ACE_OS::strlen (mod_name);
 }
-
-#if defined (ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION)
-template class Acceptor_Factory<Supplier_Handler, SUPPLIER_KEY>;
-template class ACE_Acceptor<Supplier_Handler, ACE_UPIPE_ACCEPTOR>;
-template class ACE_Svc_Handler<ACE_UPIPE_STREAM, ACE_MT_SYNCH>;
-template class Peer_Handler<SUPPLIER_ROUTER, SUPPLIER_KEY>;
-template class Peer_Router<Supplier_Handler, SUPPLIER_KEY>;
-template class ACE_Map_Entry<SUPPLIER_KEY, Supplier_Handler *>;
-template class ACE_Map_Iterator_Base<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>;
-template class ACE_Map_Iterator<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>;
-template class ACE_Map_Reverse_Iterator<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>;
-template class ACE_Map_Manager<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>;
-template class ACE_Read_Guard<ACE_RW_Mutex>;
-template class ACE_Write_Guard<ACE_RW_Mutex>;
-template class ACE_Guard<ACE_RW_Mutex>;
-#elif defined (ACE_HAS_TEMPLATE_INSTANTIATION_PRAGMA)
-#pragma instantiate Acceptor_Factory<Supplier_Handler, SUPPLIER_KEY>
-#pragma instantiate ACE_Acceptor<Supplier_Handler, ACE_UPIPE_ACCEPTOR>
-#pragma instantiate ACE_Svc_Handler<ACE_UPIPE_STREAM, ACE_MT_SYNCH>
-#pragma instantiate Peer_Handler<SUPPLIER_ROUTER, SUPPLIER_KEY>
-#pragma instantiate Peer_Router<Supplier_Handler, SUPPLIER_KEY>
-#pragma instantiate ACE_Map_Entry<SUPPLIER_KEY, Supplier_Handler *>
-#pragma instantiate ACE_Map_Iterator_Base<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>
-#pragma instantiate ACE_Map_Iterator<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>
-#pragma instantiate ACE_Map_Reverse_Iterator<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>
-#pragma instantiate ACE_Map_Manager<SUPPLIER_KEY, Supplier_Handler *, ACE_RW_Mutex>
-#pragma instantiate ACE_Read_Guard<ACE_RW_Mutex>
-#pragma instantiate ACE_Write_Guard<ACE_RW_Mutex>
-#pragma instantiate ACE_Guard<ACE_RW_Mutex>
-#endif /* ACE_HAS_EXPLICIT_TEMPLATE_INSTANTIATION */
-
 
 #endif /* ACE_HAS_THREADS */

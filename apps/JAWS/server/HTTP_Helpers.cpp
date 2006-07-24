@@ -3,15 +3,20 @@
 // HTTP_Helpers.cpp -- Helper utilities for both server and client
 
 #include "HTTP_Helpers.h"
+#include "ace/Log_Msg.h"
+#include "ace/OS_NS_string.h"
+#include "ace/Guard_T.h"
+#include "ace/OS_NS_time.h"
+#include "ace/OS_NS_stdio.h"
 
 ACE_RCSID(server, HTTP_Helpers, "$Id$")
 
 // = Static initialization.
 const char *const
-HTTP_Helper::months_[12]= 
+HTTP_Helper::months_[12]=
 {
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" 
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
 char const *HTTP_Helper::alphabet_ = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -36,13 +41,13 @@ HTTP_Helper::HTTP_mktime (const char *httpdate)
   const char *ptr1 = httpdate;
   char *ptr2 = buf;
 
-  do 
+  do
     {
-      if (*ptr1 == ' ') 
+      if (*ptr1 == ' ')
 	*ptr2++ = ';';
       else
 	*ptr2++ = *ptr1;
-    } 
+    }
   while (*ptr1++ != '\0');
 
   // In HTTP/1.0, there are three versions of an HTTP_date.
@@ -51,9 +56,9 @@ HTTP_Helper::HTTP_mktime (const char *httpdate)
   // rfc850-date    = weekday "," SP dd-month-yy SP hh:mm:ss SP "GMT"
   // asctime-date   = wkday SP month dd SP hh:mm:ss SP yyyy
 
-  const char *rfc1123_date = "%3s,;%2d;%3s;%4d;%2d:%2d:%2d;GMT";
-  const char *rfc850_date = "%s,;%2d-%3s-%2d;%2d:%2d:%2d;GMT";
-  const char *asctime_date = "%3s;%3s;%2d;%2d:%2d:%2d;%4d";
+  static const char rfc1123_date[] = "%3s,;%2d;%3s;%4d;%2d:%2d:%2d;GMT";
+  static const char rfc850_date[]  = "%s,;%2d-%3s-%2d;%2d:%2d:%2d;GMT";
+  static const char asctime_date[] = "%3s;%3s;%2d;%2d:%2d:%2d;%4d";
 
   // Should also support other versions (such as from NNTP and SMTP)
   // for robustness, but it should be clear how to extend this.
@@ -69,12 +74,12 @@ HTTP_Helper::HTTP_mktime (const char *httpdate)
 	       &tms.tm_year,
                &tms.tm_hour,
 	       &tms.tm_min,
-	       &tms.tm_sec) == 7) 
+	       &tms.tm_sec) == 7)
     ;
   else if (::sscanf(buf, rfc850_date,
                     weekday,
                     &tms.tm_mday, month, &tms.tm_year,
-                    &tms.tm_hour, &tms.tm_min, &tms.tm_sec) == 7) 
+                    &tms.tm_hour, &tms.tm_min, &tms.tm_sec) == 7)
     {
       weekday[3] = '\0';
     }
@@ -82,15 +87,16 @@ HTTP_Helper::HTTP_mktime (const char *httpdate)
                     weekday,
                     month, &tms.tm_mday,
                     &tms.tm_hour, &tms.tm_min, &tms.tm_sec,
-                    &tms.tm_year) == 7) 
-    ;
+                    &tms.tm_year) == 7)
+    {
+    }
 
-  delete buf;
+  delete [] buf;
 
   tms.tm_year = HTTP_Helper::fixyear (tms.tm_year);
   tms.tm_mon = HTTP_Helper::HTTP_month (month);
 
-  if (tms.tm_mon == -1) 
+  if (tms.tm_mon == -1)
     return (time_t) -1;
 
   // mktime is a Standard C function.
@@ -111,19 +117,12 @@ HTTP_Helper::HTTP_date (void)
     {
       ACE_MT (ACE_Guard<ACE_SYNCH_MUTEX> m (HTTP_Helper::mutex_));
 
-      time_t tloc;
-      struct tm tms;
-
       if (HTTP_Helper::date_string_ == 0)
         {
           // 40 bytes is all I need.
-          HTTP_Helper::date_string_ = new char[40];
+          ACE_NEW_RETURN (HTTP_Helper::date_string_, char[40], 0);
 
-          if (ACE_OS::time (&tloc) != (time_t) -1
-              && ACE_OS::gmtime_r (&tloc, &tms) != NULL)
-            ACE_OS::strftime (HTTP_Helper::date_string_, 40,
-                              "%a, %d %b %Y %T GMT", &tms);
-          else
+          if (!HTTP_Helper::HTTP_date (HTTP_Helper::date_string_))
             {
               delete [] HTTP_Helper::date_string_;
               HTTP_Helper::date_string_ = 0;
@@ -137,13 +136,25 @@ HTTP_Helper::HTTP_date (void)
 const char *
 HTTP_Helper::HTTP_date (char *s)
 {
+  // Return the date-string formatted per HTTP standards.  Time must
+  // be in UTC, so using the 'strftime' call (which obeys the locale)
+  // isn't correct.
+  static const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun",
+                                 "Jul","Aug","Sep","Oct","Nov","Dec"};
+  static const char* days[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+
   time_t tloc;
   struct tm tms;
   char * date_string = s;
 
   if (ACE_OS::time (&tloc) != (time_t) -1
       && ACE_OS::gmtime_r (&tloc, &tms) != NULL)
-    ACE_OS::strftime (date_string, 40, "%a, %d %b %Y %T GMT", &tms);
+  {
+    ACE_OS::sprintf (date_string,
+                     "%s, %2.2d %s %4.4d %2.2d:%2.2d:%2.2d GMT",
+                     days[tms.tm_wday], tms.tm_mday, months[tms.tm_mon],
+                     tms.tm_year + 1900, tms.tm_hour, tms.tm_min, tms.tm_sec);
+  }
   else
     date_string = 0;
 
@@ -163,7 +174,7 @@ HTTP_Helper::HTTP_month (const char *month)
 const char *
 HTTP_Helper::HTTP_month (int month)
 {
-  if (month < 0 || month >= 12) 
+  if (month < 0 || month >= 12)
     return 0;
 
   return HTTP_Helper::months_[month];
@@ -177,10 +188,10 @@ HTTP_Helper::HTTP_decode_string (char *path)
   // replace the percentcodes with the actual character
   int i, j;
   char percentcode[3];
-  
-  for (i = j = 0; path[i] != '\0'; i++, j++) 
+
+  for (i = j = 0; path[i] != '\0'; i++, j++)
     {
-      if (path[i] == '%') 
+      if (path[i] == '%')
 	{
 	  percentcode[0] = path[++i];
 	  percentcode[1] = path[++i];
@@ -332,7 +343,7 @@ HTTP_Helper::HTTP_encode_base64 (char *data)
       *outdata = '\0';
       ACE_OS::strcpy (data, buf);
     }
-  
+
   return (error ? 0 : data);
 }
 
@@ -343,7 +354,7 @@ HTTP_Helper::fixyear (int year)
 
   if (year > 1000)
     year -= 1900;
-  else if (year < 100) 
+  else if (year < 100)
     {
       struct tm tms;
       time_t tloc;
@@ -374,17 +385,17 @@ HTTP_Helper::fixyear (int year)
 const char **
 HTTP_Status_Code::instance (void)
 {
-  if (HTTP_Status_Code::instance_ == 0) 
+  if (HTTP_Status_Code::instance_ == 0)
     {
-      ACE_Guard<ACE_SYNCH_MUTEX> g (lock_);
-      
-      if (HTTP_Status_Code::instance_ == 0) 
+      ACE_MT (ACE_Guard<ACE_SYNCH_MUTEX> g (lock_));
+
+      if (HTTP_Status_Code::instance_ == 0)
 	{
 	  for (size_t i = 0;
 	       i < HTTP_Status_Code::MAX_STATUS_CODE + 1;
-	       i++) 
+	       i++)
 	    {
-	      switch (i) 
+	      switch (i)
 		{
 		case STATUS_OK:
 		  HTTP_Status_Code::Reason[i] = "OK"; break;

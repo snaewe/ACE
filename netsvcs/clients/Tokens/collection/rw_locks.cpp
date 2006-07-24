@@ -1,14 +1,13 @@
 // $Id$
 
-#include "ace/OS.h"
 #include "ace/Get_Opt.h"
 #include "ace/Local_Tokens.h"
 #include "ace/Remote_Tokens.h"
 #include "ace/Thread_Manager.h"
 
-ACE_RCSID(collection, rw_locks, "$Id$")
+#if defined (ACE_HAS_THREADS) && defined (ACE_HAS_THREADS_LIBRARY)
 
-#if defined (ACE_HAS_THREADS)
+ACE_RCSID(collection, rw_locks, "$Id$")
 
 static ACE_Token_Proxy *global_rlock;
 static ACE_Token_Proxy *global_wlock;
@@ -82,16 +81,16 @@ parse_args (int argc, char *argv[])
       switch (c)
 	{
 	case 'h':  // specify the host machine on which the server is running
-	  server_host = get_opt.optarg;
+	  server_host = get_opt.opt_arg ();
 	  break;
 	case 'p':  // specify the port on which the server is running
-	  server_port = ACE_OS::atoi (get_opt.optarg);
+	  server_port = ACE_OS::atoi (get_opt.opt_arg ());
 	  break;
 	case 't':
-	  threads = ACE_OS::atoi (get_opt.optarg);
+	  threads = ACE_OS::atoi (get_opt.opt_arg ());
 	  break;
 	case 'R':
-	  reads = ACE_OS::atoi (get_opt.optarg);
+	  reads = ACE_OS::atoi (get_opt.opt_arg ());
 	  break;
 	case 'd':
 	  debug = 1;
@@ -103,7 +102,7 @@ parse_args (int argc, char *argv[])
 	  write_sleep = 1;
 	  break;
 	case 'n':
-	  iterations = ACE_OS::atoi (get_opt.optarg);
+	  iterations = ACE_OS::atoi (get_opt.opt_arg ());
 	  break;
 	case 'i':
 	  ignore_deadlock = 1;
@@ -152,7 +151,7 @@ main (int argc, char* argv[])
   ACE_Thread_Manager mgr;
 
   if (mgr.spawn_n (threads, ACE_THR_FUNC (run_thread),
-		   (void *) &0,
+		   (void *) 0,
 		   THR_BOUND | THR_SUSPENDED) == -1)
     ACE_ERROR_RETURN ((LM_DEBUG, "%p\n", "spawn failed"), -1);
 
